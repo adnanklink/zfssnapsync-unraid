@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.21.01 (2026-09-21)
+
+- Fix overlapping replication editor fields by isolating the vertical form from Unraid table sizing and wrapping rules.
+- Verify editor layout at desktop, tablet, and mobile widths.
+
 ### 2026.09.18.06 (2026-09-18)
 
 - Update install, update, source, and support links for the renamed `adnanklink/zfssnapsync-unraid` repository.

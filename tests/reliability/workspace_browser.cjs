@@ -82,6 +82,19 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  await page.selectOption('#new_job_source','tank/anchor-test');await page.fill('#new_job_destination','backup/anchor-test');
  await page.locator('#zfsas_add_send_job').click();
  await page.getByRole('button',{name:'Edit',exact:true}).last().click();
+
+ // Reproduce host table rules that must not constrain the vertical editor.
+ await page.addStyleTag({content:'td {height:30px;white-space:nowrap;} tr {height:32px;}'});
+ for(const width of [1440,900,390]){
+   await page.setViewportSize({width,height:1000});
+   const layout=await page.locator('#edit-job-dialog').evaluate(dialog=>{
+     const cells=[...dialog.querySelectorAll('td')].map(el=>el.getBoundingClientRect());
+     return {overlap:cells.some((cell,i)=>i && cell.top<cells[i-1].bottom),overflow:dialog.scrollWidth>dialog.clientWidth+1,
+       contained:[...dialog.querySelectorAll('td')].every(cell=>[...cell.children].filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().bottom<=cell.getBoundingClientRect().bottom+1))};
+   });
+   assert(!layout.overlap && !layout.overflow && layout.contained,'Editor layout failed at '+width+': '+JSON.stringify(layout));
+ }
+ await page.setViewportSize({width:1440,height:1000});
  const policy=page.locator('#job-editor-body select[name^="job_cleanup_policy["]');
  assert.equal(await policy.inputValue(),'retention_only','New job inherited cleanup authority');
  await policy.selectOption('older_anchors');await page.locator('#cancel-job-edit').click();

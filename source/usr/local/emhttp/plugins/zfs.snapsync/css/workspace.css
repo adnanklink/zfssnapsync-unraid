@@ -700,3 +700,50 @@
 .zfsas-workspace .zfsas-dataset-toolbar input { width:220px; max-width:100%; }
 .zfsas-workspace .zfsas-save-feedback-inline:empty { display:none; }
 .zfsas-workspace .snapsync-manual-status { margin-right:auto; }
+
+/* A job row becomes a vertical form inside the drawer. Reset host table sizing. */
+.zfsas-workspace #edit-job-dialog .ui-job-editor,
+.zfsas-workspace #edit-job-dialog .ui-job-editor tbody,
+.zfsas-workspace #edit-job-dialog .ui-job-editor tr,
+.zfsas-workspace #edit-job-dialog .ui-job-editor td {
+  height:auto;
+  min-height:0;
+  max-height:none;
+  min-width:0;
+  max-width:100%;
+  float:none;
+  position:static;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.55;
+}
+.zfsas-workspace #edit-job-dialog .ui-job-editor tr {
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+.zfsas-workspace #edit-job-dialog .ui-job-editor td {
+  display:flex;
+  flex-direction:column;
+  flex:0 0 auto;
+  gap:8px;
+  margin:0;
+}
+.zfsas-workspace #edit-job-dialog .ui-editor-label { margin:0; }
+.zfsas-workspace #edit-job-dialog .ui-job-editor input:not([type=hidden]),
+.zfsas-workspace #edit-job-dialog .ui-job-editor select {
+  display:block;
+  float:none;
+  position:static;
+  max-width:100%;
+  margin:0;
+}
+.zfsas-workspace #edit-job-dialog .ui-job-editor input[type=hidden] { display:none; }
+.zfsas-workspace #edit-job-dialog .ui-job-editor label {
+  height:auto;
+  float:none;
+  width:auto;
+  white-space:normal;
+}
+.zfsas-workspace #edit-job-dialog .ui-job-editor button { align-self:flex-start; }
+.zfsas-workspace #edit-job-dialog > .toolbar { margin-top:24px; }
