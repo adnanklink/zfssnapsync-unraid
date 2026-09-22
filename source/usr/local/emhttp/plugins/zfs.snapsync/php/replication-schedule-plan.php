@@ -29,14 +29,22 @@ function zfsas_replication_schedule_plan(array $parameters, ?callable $read=null
 
 function zfsas_replication_publish_plan(array $plan, int &$sequence): void
 {
-    if(count($plan['tasks'])<=50){zfsas_coordinator_worker_report('plan',$sequence++,$plan);return;}
+    if(count($plan['tasks'])<=50 && strlen(json_encode($plan,JSON_THROW_ON_ERROR))<=700000){zfsas_coordinator_worker_report('plan',$sequence++,$plan);return;}
     $canonical=static function(array $value)use(&$canonical):array{
         if(!array_is_list($value)){ksort($value,SORT_STRING);}
         foreach($value as &$item){if(is_array($item))$item=$canonical($item);}return $value;
     };
     $digest=hash('sha256',json_encode($canonical($plan),JSON_THROW_ON_ERROR));$offset=0;
-    foreach(array_chunk($plan['tasks'],50,true) as $chunk){
-        zfsas_coordinator_worker_report('plan_chunk',$sequence++,['digest'=>$digest,'offset'=>$offset,'tasks'=>$chunk]);$offset+=count($chunk);
+    $chunk=[];$bytes=0;
+    $flush=static function()use(&$chunk,&$bytes,&$offset,&$sequence,$digest):void{
+        zfsas_coordinator_worker_report('plan_chunk',$sequence++,['digest'=>$digest,'offset'=>$offset,'tasks'=>$chunk]);$offset+=count($chunk);$chunk=[];$bytes=0;
+    };
+    foreach($plan['tasks'] as $name=>$task){
+        $size=strlen(json_encode([$name=>$task],JSON_THROW_ON_ERROR));
+        if($size>700000){throw new InvalidArgumentException('A preparation task exceeds the bounded publication limit.');}
+        if($chunk && (count($chunk)>=50 || $bytes+$size>700000)){$flush();}
+        $chunk[$name]=$task;$bytes+=$size;
     }
+    if($chunk){$flush();}
     zfsas_coordinator_worker_report('plan_seal',$sequence++,['digest'=>$digest,'count'=>$offset]);
 }

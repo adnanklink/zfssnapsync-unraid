@@ -37,7 +37,7 @@ trait ZfsasCoordinatorWorkerState
         $type = $request['type'] ?? '';
         $payload = $request['payload'] ?? null;
         if (!is_int($sequence) || $sequence < 1 || !is_array($payload)
-            || !in_array($type, ['progress', 'result', 'plan', 'plan_chunk', 'plan_seal', 'item_chunk', 'item_start', 'item_result', 'pressure_chunk', 'pressure_seal', 'pressure_authorize'], true)) {
+            || !in_array($type, ['source_item', 'progress', 'result', 'plan', 'plan_chunk', 'plan_seal', 'item_chunk', 'item_start', 'item_result', 'pressure_chunk', 'pressure_seal', 'pressure_authorize'], true)) {
             throw new InvalidArgumentException('Invalid worker publication.');
         }
         $fingerprint = hash('sha256', json_encode(self::canonical(['type' => $type, 'payload' => $payload]), JSON_THROW_ON_ERROR));
@@ -50,7 +50,20 @@ trait ZfsasCoordinatorWorkerState
             throw new InvalidArgumentException('Out-of-order or conflicting worker publication.');
         }
         $response = ['accepted'=>true, 'sequence'=>$sequence];
-        if (str_starts_with($type, 'pressure_')) {
+        if ($type==='source_item') {
+            $sourceTask=&$this->state['tasks'][$taskId];$candidate=null;
+            if (($sourceTask['parameters']['phase'] ?? '')!=='source_retention_delete') { throw new InvalidArgumentException('No source cleanup item authority.'); }
+            foreach ($sourceTask['parameters']['candidates'] as $row) {
+                if ($row['snapshot']===($payload['snapshot'] ?? '') && $row['guid']===($payload['guid'] ?? '')) { $candidate=$row;break; }
+            }
+            if (!$candidate || !in_array($payload['state'] ?? '',['completed','skipped'],true)
+                || !is_string($payload['message'] ?? null) || strlen($payload['message'])>4096
+                || array_diff(array_keys($payload),['snapshot','guid','state','message'])) { throw new InvalidArgumentException('Invalid source cleanup item result.'); }
+            $prior=$sourceTask['sourceResults'][$candidate['guid']] ?? null;
+            if ($prior && $prior!==$payload) { throw new InvalidArgumentException('Source cleanup result is already committed.'); }
+            $sourceTask['sourceResults'][$candidate['guid']]=$payload;
+            unset($sourceTask);
+        } elseif (str_starts_with($type, 'pressure_')) {
             $response += $this->reportPressure($taskId, $type, $payload);
         } elseif (str_starts_with($type, 'item_')) {
             $response += $this->reportItem($taskId, $token, $type, $payload, $now);

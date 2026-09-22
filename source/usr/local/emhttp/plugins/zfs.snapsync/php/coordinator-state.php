@@ -274,6 +274,9 @@ final class ZfsasCoordinatorState
         }
         if (!$active && ($failed || $allComplete)) {
             $run['state'] = $failed ? 'failed' : 'complete'; $run['finishedAt'] = $now;
+            $origin=$this->state['tasks'][$runId.':prepare']['parameters'] ?? [];
+            if (!$failed && ($origin['phase'] ?? '')==='replication_schedule' && ($origin['sourcePolicy']['keep'] ?? 0)>0
+                && !isset($run['sourceCleanupRunId'])) { $run['sourceCleanupPending']=true; }
         }
     }
 
@@ -387,7 +390,9 @@ final class ZfsasCoordinatorState
         uasort($terminal, fn($a, $b) => $b['finishedAt'] <=> $a['finishedAt']);
         $changed = false; $count = 0;
         foreach ($terminal as $id => $run) {
-            if ($this->runRequiresReview($id)) { continue; }
+            if ($this->runRequiresReview($id) || !empty($run['sourceCleanupPending'])) { continue; }
+            $cleanup=$this->state['runs'][$run['sourceCleanupRunId'] ?? ''] ?? null;
+            if ($cleanup && !self::terminal($cleanup['state'])) { continue; }
             // A child deletion result remains evidence for its unfinished owner.
             foreach ($run['tasks'] as $taskId) {
                 $ownerId = $this->state['tasks'][$taskId]['parameters']['ownerRunId'] ?? '';

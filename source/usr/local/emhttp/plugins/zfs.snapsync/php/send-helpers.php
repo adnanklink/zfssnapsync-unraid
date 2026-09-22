@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/config-service.php";
 require_once __DIR__ . "/send-cleanup-policy.php";
+require_once __DIR__ . "/source-retention-policy.php";
 
 require_once __DIR__ . '/response-helpers.php';
 
@@ -364,6 +365,7 @@ function zfsas_send_defaults()
         'SEND_SPIPED_KEY_PATH' => '',
         'SEND_JOBS' => '',
         'SEND_SCHEDULE_SPECS' => '{}',
+        'SEND_SOURCE_RETENTION' => '{"version":1,"jobs":{}}',
         'SEND_CLEANUP_POLICIES' => '{"version":1,"jobs":{}}',
     ];
 }
@@ -767,6 +769,7 @@ function zfsas_send_render_config($config)
     $lines[] = 'SEND_KEEP_DAILY_UNTIL_DAYS=' . zfsas_send_normalize_retention_days($config['SEND_KEEP_DAILY_UNTIL_DAYS'], 30);
     $lines[] = 'SEND_KEEP_WEEKLY_UNTIL_DAYS=' . zfsas_send_normalize_retention_days($config['SEND_KEEP_WEEKLY_UNTIL_DAYS'], 183);
     $lines[] = '';
+    $lines[] = 'SEND_SOURCE_RETENTION=' . zfsas_send_quote_config_string($config['SEND_SOURCE_RETENTION'] ?? '{"version":1,"jobs":{}}');
     $lines[] = 'SEND_CLEANUP_POLICIES=' . zfsas_send_quote_config_string($config['SEND_CLEANUP_POLICIES'] ?? '{"version":1,"jobs":{}}');
     $lines[] = '';
     $lines[] = '# SSH transport receiver settings. SSH uses keys or other preconfigured non-interactive auth; raw passwords are not stored here.';
@@ -946,6 +949,15 @@ function zfsas_send_handle_save_request($post, $configDir, $configFile, $syncScr
                 $choices[$id] = $post['job_cleanup_policy'][$index];
             }
             $submitted['SEND_CLEANUP_POLICIES'] = zfsas_send_cleanup_save($config, $submittedJobs, $choices);
+            $sourceChoices=[];$sourceTokens=[];
+            foreach (($post['job_source'] ?? []) as $index=>$source) {
+                $id=$post['job_id'][$index] ?? '';
+                if (!preg_match('/^[a-f0-9]{12}$/D',$id)) { $id=zfsas_send_job_id(zfsas_send_normalize_dataset_path($source),zfsas_send_normalize_dataset_path($post['job_destination'][$index] ?? '')); }
+                if (isset($post['job_source_keep'][$index])) { $sourceChoices[$id]=$post['job_source_keep'][$index]; }
+                $sourceTokens[$id]=$post['job_source_review'][$index] ?? '';
+            }
+            $submitted['__source_choices']=$sourceChoices;$submitted['__source_tokens']=$sourceTokens;
+
         } catch (InvalidArgumentException $error) { $errors[] = $error->getMessage(); }
     }
 

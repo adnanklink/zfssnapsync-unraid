@@ -49,7 +49,13 @@ trait ZfsasCoordinatorReferences
     private function checkReferenceAdmission(array $references): void
     {
         foreach ($this->activeTaskIds() as $id) {
-            $job = $this->state['tasks'][$id]['parameters']['deleteJob'] ?? null;
+            $parameters=$this->state['tasks'][$id]['parameters'];
+            $job = $parameters['deleteJob'] ?? null;
+            foreach (($parameters['phase'] ?? '') === 'source_retention_delete' ? ($parameters['candidates'] ?? []) : [] as $candidate) {
+                foreach ($references as $reference) {
+                    if ($reference['snapshot']===$candidate['snapshot'] || $reference['guid']===$candidate['guid']) { throw new InvalidArgumentException('Source cleanup owns this snapshot; prepare after verified shutdown.'); }
+                }
+            }
             if (!$job) { continue; }
             foreach ($references as $reference) {
                 // Snapshot GUIDs can be preserved by replication. Without a
@@ -67,6 +73,11 @@ trait ZfsasCoordinatorReferences
         $references = [];
         foreach ($tasks as $task) { $references = array_merge($references, $task['references'] ?? []); }
         foreach ($tasks as $task) {
+            foreach (($task['parameters']['phase'] ?? '')==='source_retention_delete' ? ($task['parameters']['candidates'] ?? []) : [] as $candidate) {
+                foreach ($references as $reference) {
+                    if ($reference['snapshot']===$candidate['snapshot'] || $reference['guid']===$candidate['guid']) { throw new InvalidArgumentException('Source cleanup would delete a required reference.'); }
+                }
+            }
             $job = $task['parameters']['deleteJob'] ?? null;
             if (!$job) { continue; }
             foreach ($references as $reference) {

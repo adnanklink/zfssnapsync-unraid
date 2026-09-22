@@ -3,6 +3,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/coordinator-socket.php';
 require_once __DIR__ . '/coordinator-executor.php';
 require_once __DIR__ . '/coordinator-retention.php';
+require_once __DIR__ . '/coordinator-source-retention.php';
 require_once __DIR__ . '/coordinator-auto-admission.php';
 require_once __DIR__ . '/coordinator-deletion.php';
 require_once __DIR__ . '/coordinator-replication-inspect.php';
@@ -50,6 +51,7 @@ $submitAuto = static function (string $commandId, bool $manual, ?int $occurrence
 $command = static function (array $task) use ($root, $configDir, $journal, $deletion): ?array {
     if (is_file($configDir . '/maintenance')) { return null; }
     if (in_array($task['parameters']['phase'] ?? '',['replication_schedule','replication_snapshot','replication_member','replication_run_verify'],true)) { return zfsas_coordinator_schedule_command($task,$journal,$root,zfsas_config_revision($configDir)); }
+    if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) { return zfsas_coordinator_source_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if ($task['kind'] === 'delete') { return $deletion->command($task); }
     if ($task['kind'] === 'prepare' && ($task['parameters']['phase'] ?? '') === 'replication_inspect') {
         return zfsas_coordinator_replication_inspection_command($task, $root);
@@ -94,7 +96,8 @@ $outcome = static function ($task, $code) use ($configDir, $journal): array {
     return ['outcome' => $code === 0 ? 'success' : 'transient_failure', 'exitCode' => $code];
 };
 $executor = new ZfsasCoordinatorExecutor($journal, $root, $runtime, $command, $outcome, [],
-    static function($taskId) use ($journal, $deletion) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); });
+    static function($taskId) use ($journal, $deletion) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); zfsas_coordinator_source_followup($journal,$journal->state['tasks'][$taskId]['runId']); });
+foreach (array_keys($journal->state['runs']) as $runId) { zfsas_coordinator_source_followup($journal,$runId); }
 // Replay persistent decisions before allowing recovery to admit another attempt.
 foreach ($journal->state['runs'] as $run) {
     if (is_file(zfsas_ops_control_path('cancelled', $run['id'])) && !ZfsasCoordinatorState::terminal($run['state'])) { $executor->cancel($run['id']); }
@@ -112,10 +115,23 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         foreach ($runs as &$run) {
             $run['canRetry'] = $run['manual'] && in_array($run['state'],['failed','canceled'],true) && !empty($journal->state['tasks'][$run['id'].':prepare']['parameters']['replication']);
             $run['nativeReplication']=isset($journal->state['tasks'][$run['id'].':prepare']['parameters']['replication']) || !empty($journal->state['tasks'][$run['id'].':prepare']['parameters']['nativeSchedule']);
+            $run['sourceCleanup']=['deleted'=>0,'skipped'=>0,'protected'=>0,'deferred'=>0,'protectedReasons'=>[],'skippedReasons'=>[]];
             $run['cleanup'] = ['policy'=>'retention_only','deleted'=>0,'skipped'=>0,'phase'=>'','currentSnapshot'=>null,'requiredBytes'=>null,'availableBytes'=>null,'stopReason'=>''];
             $run['kinds'] = []; $run['taskStatus'] = []; $run['blockedReasons'] = []; $run['nextRetry'] = null; $run['recoveryRequired'] = false;
             foreach ($run['tasks'] as $id) {
                 $task = $journal->state['tasks'][$id];
+                if (($task['parameters']['phase'] ?? '')==='source_retention_review') { $run['sourceReview']=true; }
+                if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) {
+                    foreach ($task['sourceResults'] ?? [] as $item) {
+                        $run['sourceCleanup'][$item['state']==='completed'?'deleted':'skipped']++;
+                        if ($item['state']==='skipped') { $run['sourceCleanup']['skippedReasons'][$item['message']]=($run['sourceCleanup']['skippedReasons'][$item['message']] ?? 0)+1; }
+                    }
+                    foreach ($task['result']['summary']['reasons'] ?? [] as $reason=>$count) { $run['sourceCleanup']['protectedReasons'][$reason]=($run['sourceCleanup']['protectedReasons'][$reason] ?? 0)+$count; }
+                    if (!empty($task['result']['referenceSkipped'])) { $run['sourceCleanup']['skippedReasons']['active or recovery reference']=($run['sourceCleanup']['skippedReasons']['active or recovery reference'] ?? 0)+$task['result']['referenceSkipped']; }
+                    $run['sourceCleanup']['skipped']+=(int)($task['result']['referenceSkipped'] ?? 0);
+                    $run['sourceCleanup']['protected']+=(int)($task['result']['summary']['protected'] ?? 0);
+                    $run['sourceCleanup']['deferred']+=(int)($task['result']['skippedDataset'] ?? 0);
+                }
                 if (isset($task['parameters']['cleanupPolicy']['mode'])) { $run['cleanup']['policy']=$task['parameters']['cleanupPolicy']['mode']; }
                 if (isset($task['parameters']['pressure'])) {
                     if ($task['state']==='complete') { $run['cleanup'][($task['result']['itemState'] ?? '')==='completed'?'deleted':'skipped']++; }
@@ -139,6 +155,16 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         return ['runs' => array_slice($runs, 0, 120), 'sequence' => $journal->state['sequence'],
             'autoPaused' => is_file(zfsas_ops_control_path('paused', 'auto')),
             'schedule' => ZfsasSchedule::preview(ZfsasSchedule::autoConfig($config['auto']), time(), ZfsasSchedule::hostTimezone())];
+    }
+    if ($action === 'source_retention_review') {
+        if (!$loadConfig() || $config['revision']!==($request['revision'] ?? '')) { throw new InvalidArgumentException('Configuration changed. Reload before reviewing source retention.'); }
+        $job=$request['job'];
+        ZfsasReplicationInspection::validate(['sourceSnapshot'=>$job['source'].'@probe','sourceGuid'=>'0','destination'=>$job['destination']]);
+        zfsas_source_review_path($request['token']);
+        if (($job['transport'] ?? '')!=='local' || !is_int($request['keep']) || $request['keep']<1 || $request['keep']>1000) { throw new InvalidArgumentException('Invalid local source retention review.'); }
+        return $journal->submit('source-review-'.$request['token'],['manual'=>true,'revision'=>$config['revision'],'tasks'=>['review'=>[
+            'kind'=>'prepare','dataset'=>$job['source'],'parameters'=>['phase'=>'source_retention_review','job'=>$job,'keep'=>$request['keep'],
+                'reviewToken'=>$request['token'],'revision'=>$config['revision']]]]],time());
     }
     if ($action === 'reload') { if (!$loadConfig()) { throw new InvalidArgumentException('Configuration save is in progress. Retry.'); } return ['revision' => $config['revision']]; }
     if ($action === 'auto') {
@@ -204,7 +230,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         $pauseAuto = false;
         foreach ($run['tasks'] as $taskId) {
             $kind = $journal->state['tasks'][$taskId]['kind'];
-            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule'])) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
+            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']) && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'source_retention_')) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
             $pauseAuto = $pauseAuto || ($kind === 'auto' && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']));
         }
         $scheduleId=$pauseAuto ? 'auto' : ($journal->state['tasks'][$runId.':prepare']['parameters']['job']['id'] ?? '');

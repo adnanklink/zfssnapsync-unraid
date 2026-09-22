@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/replication-schedule-plan.php';
 require_once __DIR__.'/send-cleanup-policy.php';
+require_once __DIR__.'/source-retention-policy.php';
 
 function zfsas_coordinator_schedule_command(array $task, ZfsasCoordinatorState $journal, string $root, string $revision): array
 {
@@ -53,6 +54,6 @@ function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array
             'cleanupPolicy'=>['mode'=>zfsas_send_cleanup_mode($config['send'],$job),'freeSpaceFloor'=>$job['threshold'],'scheduleId'=>$job['id'],'prefix'=>$prefix,'sendConfigHash'=>hash('sha256',$config['rawSend']),
                 'keepAll'=>(int)$config['send']['SEND_KEEP_ALL_FOR_DAYS'],'keepDaily'=>(int)$config['send']['SEND_KEEP_DAILY_UNTIL_DAYS'],
                 'keepWeekly'=>(int)$config['send']['SEND_KEEP_WEEKLY_UNTIL_DAYS']],
-            'job'=>$job,'revision'=>$config['revision'],'snapshotName'=>$name,'occurrence'=>$occurrence,
+            'sourcePolicy'=>zfsas_source_policy($config['send'],$job),'job'=>$job,'revision'=>$config['revision'],'snapshotName'=>$name,'occurrence'=>$occurrence,
             'rateLimit'=>$config['send']['SEND_RATE_LIMIT']]]]],time());
 }
