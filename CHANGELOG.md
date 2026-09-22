@@ -5,7 +5,7 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
-### Unreleased
+### 2026.09.22.07 (2026-09-22)
 
 - Keep waiting replication status steady during resource rechecks and prevent progress updates from changing operation-row height.
 

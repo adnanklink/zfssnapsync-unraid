@@ -2,6 +2,10 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Add source retention for native local replication: new jobs default to three checkpoints; existing jobs require review before enabling cleanup.
+- Run source cleanup only after verified replication, preserving receiver bases, recovery references, holds, clones and foreign snapshots.
+- Add reversible Needs attention dismissal without releasing recovery protections or deleting history.
+- Keep waiting transfers steady during resource checks and prevent operation status updates from shifting the page.
 - Reduce snapshot inventory rescans and improve bounded loading for larger datasets.
 - Correct workflow navigation and add persistent replication schedule Pause/Resume controls.
 - Refresh cached Activity scripts and stabilize Details log scrolling.
