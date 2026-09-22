@@ -40,7 +40,7 @@ if ($uiStandalone) { ?><!doctype html><html lang="en"><head><meta charset="utf-8
   <header class="ui-page-header"><div><p class="ui-eyebrow">ZFS SNAPSYNC</p><h1><?= zfsas_ui_h($uiSections[$uiSection][0]) ?></h1><p><?= zfsas_ui_h($uiSections[$uiSection][1]) ?></p></div><a class="ui-subtle-link" href="<?= zfsas_ui_url('help') ?>">Help &amp; recovery <span aria-hidden="true">↗</span></a></header>
   <?php if ($uiSection === 'snapshots'): ?><nav class="ui-tabs" aria-label="Snapshot views"><a <?= $uiTab === 'browse' ? 'aria-current="page"' : '' ?> href="<?= zfsas_ui_url('snapshots') ?>">Browse snapshots</a><a <?= $uiTab === 'automation' ? 'aria-current="page"' : '' ?> href="<?= zfsas_ui_url('snapshots', 'automation') ?>">Automation</a></nav><?php endif; ?>
   <div id="workspace-notice" role="status" aria-live="polite"></div>
-  <script src="/plugins/zfs.snapsync/js/workspace.js"></script>
+  <script src="/plugins/zfs.snapsync/js/workspace.js?v=<?= (int) filemtime(__DIR__ . '/../js/workspace.js') ?>"></script>
   <script src="/plugins/zfs.snapsync/js/workspace-requests.js"></script>
   <?php
   switch ($uiSection) {

@@ -58,3 +58,11 @@ file_put_contents('/var/log/zfs_snapsync.last.log', str_repeat("bounded log\n", 
 $log = ui_json('workspace-log.php');
 check_ui($log['ok'] && strlen($log['content']) <= 131072 && substr_count($log['content'], "\n") <= 200, 'Log response is not bounded');
 echo "PASS: legacy routes, allowlisted shell/logs, unavailable sources, send identities, stale migration, read-only runtime polling and bounded logs\n";
+
+foreach (['overview','snapshots','replication','activity','tools','help'] as $section) {
+    $html=ui_endpoint('workspace.php','section='.$section);
+    check_ui(str_contains($html,'data-section="'.$section.'"'), 'Navigation selected wrong section: '.$section);
+}
+$source=file_get_contents($plugin.'/php/workspace-summary.php');
+check_ui(!str_contains($source, "$"."replication ? '/Settings/ZFSSnapSync?section=activity'"), 'Replication workflow links back to Activity');
+echo "PASS: primary workspace routes and replication workflow destination\n";

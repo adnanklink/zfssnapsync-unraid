@@ -4,7 +4,7 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current testing release: `2026.09.22.04` · Requires Unraid 6.12.0 or newer**
+**Current testing release: `2026.09.22.05` · Requires Unraid 6.12.0 or newer**
 
 SnapSync is a standalone plugin under active development. Local replication uses the new coordinator; network replication and some recovery integration remain unfinished. Start testing with disposable datasets. See [Testing and known limitations](#testing-and-known-limitations) before enabling unattended work.
 
@@ -164,6 +164,8 @@ The traced native anchor-cleanup fixture ran with `/boot` read-only and recorded
 Remaining work includes native network replication, independently shared cleanup ownership, broader automatic replanning and recovery, complete per-mutation Auto Snapshot ownership, and all-path release acceptance. These limits are tracked in the [standalone roadmap](docs/standalone-development.md), [implementation record](docs/job-coordination-progress.md), and [reliability audit](docs/reliability-audit.md).
 
 For initial host testing, use disposable source and destination datasets. Exercise a snapshot run, a local transfer, Cancel/Resume, and recovery behavior before enabling recurring work. Keep low-space anchor cleanup off until you have reviewed its retention tradeoff.
+
+Saved replication jobs have **Pause schedule / Resume schedule** controls. Pausing persists across reboot and prevents future runs; already accepted work may finish. Use Activity → Details → Cancel run to stop a run.
 
 ## Unraid navigation
 

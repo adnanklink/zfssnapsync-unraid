@@ -241,7 +241,7 @@
 </div>
 
 <script type="application/json" id="automation-options"><?php echo json_encode([(int) $logPollIntervalMs, $logApiUrl, $logStreamApiUrl, $runApiUrl, $saveApiUrl, $diagnosticsApiUrl, $sendSettingsUrl, $migrateDatasetsUrl, $snapshotManagerEmbeddedUrl, $initialSection], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
-<script src="/plugins/zfs.snapsync/js/automation.js"></script>
+<script src="/plugins/zfs.snapsync/js/automation.js?v=<?= (int) filemtime(__DIR__ . '/../../js/automation.js') ?>"></script>
 <script src="/plugins/zfs.snapsync/js/dataset-discovery.js"></script>
 
 

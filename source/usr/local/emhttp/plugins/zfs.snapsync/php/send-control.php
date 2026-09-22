@@ -185,3 +185,20 @@ function zfsas_ops_dataset_gates($dataset)
     }
     return $locks;
 }
+
+function zfsas_ops_pause_schedule($scheduleId, &$error = null)
+{
+    $error = null;
+    if (!is_string($scheduleId) || !preg_match('/^[a-f0-9]{12}$/D', $scheduleId)) { $error='Invalid schedule ID.'; return false; }
+    $lock = zfsas_ops_state_lock();
+    if (!$lock) { $error='Unable to lock schedule controls.'; return false; }
+    try {
+        $config = zfsas_send_parse_config_file(zfsas_ops_plugin_config_dir() . '/zfs_send.conf', zfsas_send_defaults());
+        $jobs = zfsas_send_parse_jobs($config['SEND_JOBS'] ?? '', $errors, $warnings);
+        if (!in_array($scheduleId, array_column($jobs,'id'), true)) { $error='Schedule no longer exists. Reload replication settings.'; return false; }
+        $path = zfsas_ops_control_path('paused',$scheduleId);
+        if (is_file($path)) { return true; }
+        if (!zfsas_ops_persist_control($path,'explicit_pause')) { $error='Unable to persist schedule pause.'; return false; }
+        return true;
+    } finally { flock($lock, LOCK_UN); fclose($lock); }
+}

@@ -21,6 +21,7 @@
 
 <section class="ui-card"><div class="ui-card-heading"><div><h2>Replication jobs</h2><p class="muted">Each job keeps its own checkpoint chain for safe incremental transfers.</p></div><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
 <p id="dataset-discovery-status" role="status" aria-live="polite">Discovering ZFS datasets…</p>
+<p class="muted">Pause schedule prevents future runs and survives reboot. Already accepted runs may finish; use Activity to cancel a run.</p>
 <div id="replication-job-list"></div>
 <div id="replication-job-storage" hidden><?php if (count($formJobs) === 0) : ?>
         <div class="zfsas-send-empty">No ZFS send jobs are configured yet. Add one below, then save.</div>
@@ -256,4 +257,4 @@ echo json_encode($displaySpecs ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | 
 <script src="/plugins/zfs.snapsync/js/dataset-discovery.js"></script>
 
 
-<script src="/plugins/zfs.snapsync/js/replication-editor.js"></script>
+<script src="/plugins/zfs.snapsync/js/replication-editor.js?v=<?= (int) filemtime(__DIR__ . '/../../js/replication-editor.js') ?>"></script>

@@ -25,7 +25,7 @@ if (!zfsas_ops_ensure_storage_dirs()) {
 }
 
 $action = trim((string) ($_POST['action'] ?? ''));
-if (!in_array($action, ['retry', 'clear_failed', 'cancel', 'resume'], true)) {
+if (!in_array($action, ['retry', 'clear_failed', 'cancel', 'resume', 'pause'], true)) {
     zfsas_emit_marked_json([
         'ok' => false,
         'error' => 'Unknown send queue action.',
@@ -41,6 +41,10 @@ if ($jobId === '') {
 }
 
 $error = null;
+if ($action === 'pause') {
+    if (!zfsas_ops_pause_schedule($jobId, $error)) { zfsas_emit_marked_json(['ok'=>false,'error'=>$error],409); }
+    zfsas_emit_marked_json(['ok'=>true,'message'=>'Schedule paused. Already accepted runs may finish; cancel an active run separately in Activity.']);
+}
 if ($action === 'resume') {
     if (!zfsas_ops_resume_schedule($jobId, $error)) {
         zfsas_emit_marked_json(['ok' => false, 'error' => $error ?: 'Unable to resume schedule.'], 409);

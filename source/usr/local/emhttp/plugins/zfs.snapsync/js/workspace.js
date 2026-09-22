@@ -22,13 +22,22 @@
     event.currentTarget.setAttribute('aria-expanded',String(open));
     root.querySelector('#workspace-navigation').classList.toggle('is-open',open);
   });
+  function workflowUrl(value) {
+    const url=new URL(value,location.origin);
+    if(url.origin===location.origin && url.pathname==='/Settings/ZFSSnapSync' && location.pathname==='/ZFSSnapSyncTab')url.pathname='/ZFSSnapSyncTab';
+    return url.pathname+url.search+url.hash;
+  }
   window.ZfsasUI = {
+    workflowUrl,
+
     notice(message, error=false) { const node=root.querySelector('#workspace-notice'); node.textContent=message; node.className=message ? 'ui-notice'+(error?' error':'') : ''; },
     open(dialog, trigger=document.activeElement) { dialog._trigger=trigger; dialog.showModal(); },
     close(dialog) { dialog.close(); },
     escape(value) { const node=document.createElement('span'); node.textContent=String(value ?? ''); return node.innerHTML; }
   };
   root.addEventListener('click', event => {
+    const link=event.target.closest('a[href]');
+    if(link && link.id!=='interface-reload'){const url=new URL(link.href,location.origin);if(url.origin===location.origin && url.pathname==='/Settings/ZFSSnapSync')link.href=workflowUrl(link.href);}
     const close=event.target.closest('[data-close-dialog]'); if(close) close.closest('dialog').close();
   });
   // Native dialogs provide keyboard trapping and Escape; restore the invoking

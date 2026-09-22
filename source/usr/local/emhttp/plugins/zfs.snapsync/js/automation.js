@@ -922,7 +922,7 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
   var manualRunBusy = false;
   if (openSendSettingsBtn) {
     openSendSettingsBtn.addEventListener('click', function () {
-      window.location.href = sendSettingsUrl;
+      window.location.href = ZfsasUI.workflowUrl(sendSettingsUrl);
     });
   }
 

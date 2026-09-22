@@ -2,7 +2,7 @@ const {chromium}=require('/opt/zfsas-tests/node_modules/playwright-core');
 const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.snapsync');
-const summary={ok:true,generatedAt:1700000000,timezone:'UTC',sources:{configuration:{available:true},coordinator:{available:true}},operations:[{id:'coordinator:batch',nativeId:'batch-run',type:'batch',title:'Snapshot batch',state:'running',createdAt:1699999999,actions:['cancel'],url:'?section=snapshots',logType:'batch'},{id:'coordinator:example',nativeId:'example',type:'auto',title:'Automatic snapshots',state:'running',createdAt:1700000000,actions:['cancel'],url:'?section=snapshots&tab=automation',logType:'auto'},{id:'replication:recovery',nativeId:'recovery',type:'replication',title:'Interrupted snapshot creation',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['clear_failed'],url:'?section=replication',logType:'replication'}],schedules:[],pausedSchedules:[]};
+const summary={ok:true,generatedAt:1700000000,timezone:'UTC',sources:{configuration:{available:true},coordinator:{available:true}},operations:[{id:'coordinator:batch',nativeId:'batch-run',type:'batch',title:'Snapshot batch',state:'running',createdAt:1699999999,actions:['cancel'],url:'?section=snapshots',logType:'batch'},{id:'coordinator:example',nativeId:'example',type:'auto',title:'Automatic snapshots',state:'running',createdAt:1700000000,actions:['cancel'],url:'?section=snapshots&tab=automation',logType:'auto'},{id:'replication:recovery',nativeId:'recovery',type:'replication',title:'Interrupted snapshot creation',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['clear_failed'],url:'?section=replication',logType:'replication'}],schedules:[{id:'abcdef123456',type:'replication',paused:false,preview:{nextScheduledText:'Tomorrow'}}],pausedSchedules:[]};
 summary.operations[2].source='tank/'+ 'long-dataset-name-'.repeat(30);
 summary.operations.push({id:'coordinator:transfer',nativeId:'transfer',type:'replication',title:'Active transfer',state:'running',phase:'transfer',progress:42,message:'42 MiB sent · 8.0 MiB/s',actions:[],url:'?section=activity'});
 summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'replication',coordinator:true,manual:true,title:'Native replication',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['retry'],url:'?section=activity'});
@@ -22,7 +22,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  }
  if(url.pathname.endsWith('save-send-settings.php')) data={ok:true,saved:true,schedulerApplied:true,revision:'saved',errors:[],jobs:[{id:'abcdef123456',source:'tank/anchor-test',destination:'backup/anchor-test'}]};
  if(url.pathname.endsWith('save-interface-settings.php')) data={ok:true,enabled:true,revision:'saved-revision'};
- if(url.pathname.endsWith('send-queue-action.php'))mutationRequests++;
+ if(url.pathname.endsWith('send-queue-action.php')){mutationRequests++;const params=new URLSearchParams(route.request().postData()||'');if(['pause','resume'].includes(params.get('action')))summary.schedules[0].paused=params.get('action')==='pause';}
  if(url.pathname.endsWith('workspace-summary.php')){summaryRequests++;data=summary;}
  if(url.pathname.endsWith('migrate-datasets-status.php') && url.searchParams.get('dataset'))data.preview={folders:[]};
  return route.fulfill({contentType:'text/plain',body:'ZFSAS_JSON_BEGIN'+JSON.stringify(data)+'ZFSAS_JSON_END'});
@@ -72,6 +72,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
 await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.getElementById('operation-detail').open);assert(await button.evaluate(el=>el===document.activeElement));
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});const previous=summaryRequests;await page.waitForTimeout(2200);assert.equal(summaryRequests,previous,'Hidden Overview polled');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});}
  if(query==='section=activity'){
+ assert.equal(await page.evaluate(()=>{history.replaceState(null,'','/ZFSSnapSyncTab?section=activity');const result=ZfsasUI.workflowUrl('/Settings/ZFSSnapSync?section=replication');history.replaceState(null,'','/?section=activity');return result;}),'/ZFSSnapSyncTab?section=replication');
  assert.equal(await page.locator('[data-operation="coordinator:transfer"] progress').getAttribute('value'),'42');
  assert.match(await page.locator('[data-operation="coordinator:transfer"]').textContent(),/8.0 MiB\/s/);
  await page.locator('[data-operation="coordinator:native"] button').click();
@@ -119,12 +120,15 @@ await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.get
  await policy.selectOption('older_anchors');await page.locator('#cancel-job-edit').click();
  await page.getByRole('button',{name:'Edit',exact:true}).last().click();
  assert.equal(await policy.inputValue(),'retention_only','Cancel did not restore cleanup policy');
- await policy.selectOption('older_anchors');await page.locator('#finish-job-edit').click();
+ await policy.selectOption('older_anchors');await page.locator('#finish-job-edit').click();await page.waitForFunction(()=>!document.getElementById('edit-job-dialog').open && document.querySelector('#zfsas_send_jobs_body select[name^="job_cleanup_policy["]'));
  assert.equal(await page.locator('#zfsas_send_jobs_body select[name^="job_cleanup_policy["]').last().inputValue(),'older_anchors','Editor lost explicit opt-in');
  await page.getByRole('button',{name:'Save replication',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('[name^="job_id["]').value==='abcdef123456');
  assert.equal(await page.locator('#replication-job-list .ui-badge').last().textContent(),'Configured');
  assert.equal(await page.locator('#zfsas_send_form').getAttribute('data-dirty'),'false');
+ const pause=page.getByRole('button',{name:'Pause schedule',exact:true});await pause.click();
+ await page.getByRole('button',{name:'Resume schedule',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Resume schedule',exact:true}).click();await page.getByRole('button',{name:'Pause schedule',exact:true}).waitFor();
  }
  if(query==='section=tools'){
  assert(!(await page.locator('[name=show_tab]').isChecked()));

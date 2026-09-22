@@ -14,9 +14,17 @@
       const item=document.createElement('tr');
       const path=document.createElement('td'); const code=document.createElement('code');code.textContent=value('source')+' → '+value('destination');path.append(code);
       const when=document.createElement('td'); const freq=row.querySelector('[name^="job_frequency["]');when.textContent=freq?.selectedOptions[0]?.textContent || 'Configure schedule';
-      const next=document.createElement('small');next.className='ui-operation-kind';next.textContent=schedule?.preview.nextScheduledText || (id?'Next occurrence unavailable':'Starts after Save');when.append(next);
+      const next=document.createElement('small');next.className='ui-operation-kind';next.textContent=schedule?.paused?'Paused until Resume':schedule?.preview?.nextScheduledText || (id?'Next occurrence unavailable':'Starts after Save');when.append(next);
       const state=document.createElement('td');const badge=document.createElement('span');badge.className='ui-badge';badge.textContent=schedule?.paused?'Paused':id?'Configured':'Unsaved';state.append(badge);
-      if(schedule?.paused){const resume=document.createElement('button');resume.type='button';resume.textContent='Resume';resume.addEventListener('click',async()=>{resume.disabled=true;try{await ZfsasRequests.request('replication-resume','/plugins/zfs.snapsync/php/send-queue-action.php',{action:'resume',job_id:id});status.refresh();}catch(error){ZfsasUI.notice(error.message,true);resume.disabled=false;}});state.append(resume);}
+      if(id && schedule){const control=document.createElement('button');control.type='button';control.textContent=schedule.paused?'Resume schedule':'Pause schedule';control.addEventListener('click',async()=>{
+        control.disabled=true;
+        try {
+          const action=schedule.paused?'resume':'pause';
+          const response=await ZfsasRequests.request('replication-schedule-control','/plugins/zfs.snapsync/php/send-queue-action.php',{action,job_id:id});
+          schedule.paused=action==='pause';render(true);ZfsasUI.notice(response.message);status.refresh();
+        }catch(error){ZfsasUI.notice(error.message,true);control.disabled=false;}
+      });state.append(control);}
+
       const actions=document.createElement('td');const button=document.createElement('button');button.type='button';button.textContent='Edit';button.addEventListener('click',()=>open(row,button));actions.append(button);
       item.append(path,when,state,actions);table.tBodies[0].append(item);
     }

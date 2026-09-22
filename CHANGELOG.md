@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.05 (2026-09-22)
+
+- Fix replication Open workflow links and preserve the top-level SnapSync navigation context.
+- Add explicit persistent Pause schedule / Resume schedule controls to saved replication jobs. Pausing does not cancel already accepted work.
+
 ### 2026.09.22.04 (2026-09-22)
 
 - Version the Activity script URL so installed updates replace cached scroll-reset code.

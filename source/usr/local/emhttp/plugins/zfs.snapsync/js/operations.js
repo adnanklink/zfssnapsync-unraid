@@ -87,7 +87,7 @@
     if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
     const drawer=$('operation-detail'), scroll=drawer.scrollTop;
     if (content.contains(document.activeElement)) return;
-    const markup='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(op.url)+'">Open workflow →</a>';
+    const markup='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(ZfsasUI.workflowUrl(op.url))+'">Open workflow →</a>';
     if(metadata.dataset.operation!==op.id || metadata.dataset.markup!==markup){
       metadata.innerHTML=markup;metadata.dataset.markup=markup;metadata.dataset.operation=op.id;
     }
