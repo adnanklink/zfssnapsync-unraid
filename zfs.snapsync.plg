@@ -1,7 +1,11 @@
 <?xml version='1.0' standalone='yes'?>
-<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.22.07" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.22.08" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
-### 2026.09.22.07 (2026-09-22)
+### 2026.09.22.08 (2026-09-22)
+- Show job-specific logs and retain original ZFS errors with clear failure explanations and next actions.
+- Add reviewed recovery for interrupted local replication, resuming original snapshots without creating fresh ones.
+- Direct repeated Run Now to recovery and check interrupted receivers before creating source snapshots.
+- Keep recovery reviews and diagnostic history in RAM; label shared logs separately.
 - Add source retention for native local replication: new jobs default to three checkpoints; existing jobs require review before enabling cleanup.
 - Run source cleanup only after verified replication, preserving receiver bases, recovery references, holds, clones and foreign snapshots.
 - Add reversible Needs attention dismissal without releasing recovery protections or deleting history.
@@ -36,9 +40,9 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
 
-  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.22.07-noarch-1.txz" Min="6.12.0">
-    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.22.07-noarch-1.txz</URL>
-    <MD5>803ef8417959fe84c7a7dffc1c8f0ad7</MD5>
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.22.08-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.22.08-noarch-1.txz</URL>
+    <MD5>52c37193554e2880e74c3013dbd02ee1</MD5>
   </FILE>
 
   <FILE Run="/bin/bash">
@@ -46,10 +50,10 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 set -euo pipefail
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
-PKG_FILE="zfs-snapsync-2026.09.22.07-noarch-1.txz"
+PKG_FILE="zfs-snapsync-2026.09.22.08-noarch-1.txz"
 PKG_PATH="${PKG_DIR}/${PKG_FILE}"
 PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/${PKG_FILE}"
-PKG_MD5="803ef8417959fe84c7a7dffc1c8f0ad7"
+PKG_MD5="52c37193554e2880e74c3013dbd02ee1"
 PKG_NAME="zfs-snapsync"
 
 if command -v upgradepkg >/dev/null 2>&1; then
