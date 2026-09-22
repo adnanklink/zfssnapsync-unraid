@@ -70,6 +70,8 @@ An example local replication job being configured before Save.
 
 </details>
 
+In **Needs attention**, open an alert and choose **Dismiss from Needs attention** to acknowledge it. Its failed/recovery record and snapshot protections remain intact in Activity, where **Restore to Needs attention** reverses dismissal. Changed failures appear again. Dismissals stay in RAM for the current boot.
+
 ## Snapshots and retention
 
 Auto Snapshot creates snapshots for selected datasets and applies three retention windows. Defaults are:

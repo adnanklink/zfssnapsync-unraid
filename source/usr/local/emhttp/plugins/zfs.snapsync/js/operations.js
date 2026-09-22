@@ -4,6 +4,7 @@
   const overview=document.querySelector('.zfsas-workspace').dataset.section==='overview';
   const terminal=new Set(['complete','completed','failed','canceled','skipped','recorded']);
   let snapshot=null, selected=null, busy=false, logPoll=null;
+  const needsAttention=op=>op.needsAttention ?? ((op.state==='failed'||op.recoveryRequired)&&!op.attentionDismissed);
   const active=operation=>!terminal.has(operation.state);
   const date=epoch=>epoch ? new Date(epoch*1000).toLocaleString(undefined,{timeZone:snapshot?.timezone || 'UTC',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not recorded';
   const label=operation=>operation.state==='canceling'?'Stopping · cancellation saved':operation.stateLabel || ({retry_wait:'Waiting to retry',complete:'Completed',running:'Running',queued:'Queued',failed:'Failed',canceled:'Canceled',waiting:'Waiting'}[operation.state] || operation.state);
@@ -18,7 +19,7 @@
     $('activity-updated').textContent='Updated '+date(data.generatedAt);
     if(overview) {
       $('summary-active').textContent=data.operations.filter(active).length+(available?'':' + ?');
-      $('summary-attention').textContent=data.operations.filter(op=>op.state==='failed'||op.recoveryRequired).length+(available?'':' + ?');
+      $('summary-attention').textContent=data.operations.filter(needsAttention).length+(available?'':' + ?');
       $('summary-paused').textContent=data.sources.configuration?.available?data.pausedSchedules.length:'Unavailable';
       const upcoming=$('upcoming-schedules');
       if (!upcoming.contains(document.activeElement)) { upcoming.replaceChildren();
@@ -34,7 +35,7 @@
       }
       const attention=$('attention-list');
       if (!attention.contains(document.activeElement)) { attention.replaceChildren();
-      const failures=data.operations.filter(op=>op.state==='failed'||op.recoveryRequired).slice(0,4);
+      const failures=data.operations.filter(needsAttention).slice(0,4);
       for(const op of failures) { const button=document.createElement('button');button.type='button';button.className='ui-attention-item';button.textContent=op.title+' · '+(op.source||label(op));button.addEventListener('click',()=>open(op.id,button));attention.append(button); }
       if(!failures.length) attention.innerHTML='<div class="ui-empty"><strong>'+ (available?'No reported failures':'Status is incomplete')+'</strong>'+ (available?'Nothing needs attention in the available recent records.':'Some sources are unavailable. See the notices above.')+'</div>';
     }
@@ -47,7 +48,7 @@
     let operations=snapshot.operations;
     const type=$('activity-type')?.value,state=$('activity-state')?.value;
     if(type) operations=operations.filter(op=>op.type===type);
-    if(state) operations=operations.filter(op=>state==='active'?active(op):state==='failed'?(op.state==='failed'||op.recoveryRequired):state==='complete'?['complete','completed'].includes(op.state):op.state===state);
+    if(state) operations=operations.filter(op=>state==='active'?active(op):state==='failed'?needsAttention(op):state==='complete'?['complete','completed'].includes(op.state):op.state===state);
     if(overview) operations=operations.slice(0,8);
     const body=$('operation-rows'), existing=new Map([...body.querySelectorAll('[data-operation]')].map(row=>[row.dataset.operation,row]));
     body.querySelector('[data-empty]')?.remove();
@@ -82,6 +83,7 @@
   function detail(op) {
     $('operation-title').textContent=op.title;
     const entries=[['Status',label(op)],['Phase',(op.phase || '—').replaceAll('_',' ')],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId],...(op.sourceCleanupOf?[['Replication run',op.sourceCleanupOf]]:[]),...(op.sourceCleanupRunId?[['Source cleanup run',op.sourceCleanupRunId]]:[])];
+    if(op.attentionDismissed)entries.push(['Needs attention','Dismissed for this alert; history and recovery protections remain intact.']);
     if(op.sourceCleanupOf)for(const [label,key] of [['Protected checkpoints','protectedReasons'],['Skipped checkpoints','skippedReasons']])entries.push([label,Object.entries(op.sourceCleanup?.[key]||{}).map(([reason,count])=>reason+' ('+count+')').join('; ')||'None recorded']);
     const content=$('operation-body');
     let metadata=$('operation-metadata');
@@ -96,10 +98,10 @@
     }
     drawer.scrollTop=scroll;
     const actions=$('operation-actions');
-    const fingerprint=JSON.stringify([op.id,op.actions]);
+    const fingerprint=JSON.stringify([op.id,op.actions,op.attentionToken]);
     if(actions.dataset.fingerprint!==fingerprint) {
       actions.replaceChildren();actions.dataset.fingerprint=fingerprint;
-      for(const action of op.actions) {const button=document.createElement('button');button.type='button';button.textContent={cancel:'Cancel run',retry:'Retry',clear_failed:'Clear failed record'}[action];if(action==='cancel')button.className='ui-danger';button.addEventListener('click',()=>perform(op,action));actions.append(button);}
+      for(const action of op.actions) {const button=document.createElement('button');button.type='button';button.textContent={cancel:'Cancel run',retry:'Retry',clear_failed:'Clear failed record',dismiss_attention:'Dismiss from Needs attention',restore_attention:'Restore to Needs attention'}[action];if(action==='cancel')button.className='ui-danger';button.addEventListener('click',()=>perform(op,action));actions.append(button);}
       const log=document.createElement('button');log.type='button';log.textContent='Show available log';log.addEventListener('click',()=>showDetailLog(op));actions.append(log);
       if(op.logDownloadUrl){const link=document.createElement('a');link.className='btn';link.textContent='Download failure log';link.href=op.logDownloadUrl;actions.append(link);}
     }
@@ -112,6 +114,11 @@
     if(action==='clear_failed' && op.recoveryRequired && !window.confirm('Clear this recovery record after reviewing the preserved snapshots? Clearing releases its cleanup protection; it does not verify or remove those snapshots.'))return;
     busy=true; $('operation-actions').querySelectorAll('button').forEach(button=>button.disabled=true);
     try {
+      if(action==='dismiss_attention'||action==='restore_attention'){
+        const data=await ZfsasRequests.request('operation-action',base+'attention-action.php',{action,operation_id:op.id,attention_token:op.attentionToken});
+        $('operation-action-message').textContent=data.message;
+        return;
+      }
       const coordinator=op.coordinator===true||op.type==='auto'||op.type==='batch';
       const data=await ZfsasRequests.request('operation-action',base+(coordinator?'coordinator-action.php':'send-queue-action.php'),coordinator?{action,run_id:op.nativeId}:{action,job_id:op.nativeId});
       $('operation-action-message').textContent=action==='cancel'?'Cancellation saved. Waiting for verified worker shutdown.':data.message||'Request accepted.';

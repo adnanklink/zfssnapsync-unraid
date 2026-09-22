@@ -6,6 +6,7 @@ require_once __DIR__ . '/migrate-datasets-helpers.php';
 require_once __DIR__ . '/config-service.php';
 require_once __DIR__ . '/send-schedule.php';
 require_once __DIR__ . '/transfer-progress.php';
+require_once __DIR__ . '/attention-state.php';
 
 function zfsas_workspace_summary(): array
 {
@@ -40,6 +41,7 @@ function zfsas_workspace_summary(): array
                 'phase' => in_array($run['state'], $terminal, true) ? '' : ($phase ?: (implode(', ', $run['blockedReasons'] ?? []) ?: 'Queued')),
                 'blocked' => $run['blockedReasons'] ?? [], 'retryAt' => $run['nextRetry'] ?? null,
                 'recoveryRequired' => $run['recoveryRequired'] ?? false,
+                'attentionVersion'=>hash('sha256',json_encode(array_map(static fn($task)=>[$task['id'],$task['attemptCount'] ?? 0,$task['state'],$task['result'] ?? null],$run['taskStatus'] ?? []),JSON_THROW_ON_ERROR)),
                 'actions' => !in_array($run['state'], array_merge($terminal, ['canceling']), true) ? ['cancel'] : (!empty($run['canRetry']) ? ['retry'] : []),
                 'url' => ($replication ? '/Settings/ZFSSnapSync?section=replication' : '/Settings/ZFSSnapSync?section=snapshots') . ($auto ? '&tab=automation' : ''),
                 'logType' => $auto ? 'auto' : ($replication ? 'replication' : 'batch')];
@@ -52,6 +54,7 @@ function zfsas_workspace_summary(): array
             $actions = [];
             foreach (['canCancel' => 'cancel', 'canRetry' => 'retry', 'canClear' => 'clear_failed'] as $key => $action) { if (!empty($job[$key])) { $actions[] = $action; } }
             $result['operations'][] = ['id' => 'replication:' . $job['id'], 'nativeId' => $job['id'], 'type' => 'replication',
+                'attentionVersion'=>$job['attentionVersion'] ?? '',
                 'parentId' => $job['parentRunId'], 'scheduleId' => $job['scheduleId'],
                 'title' => $job['typeLabel'], 'source' => $job['source'], 'destination' => $job['destination'],
                 'state' => $job['stateLabel'] === 'Canceled' ? 'canceled' : $job['state'], 'stateLabel' => $job['stateLabel'], 'phase'=>$job['phase'],
@@ -70,6 +73,7 @@ function zfsas_workspace_summary(): array
             $active = in_array($state, ['preparing','stopping_containers','migrating','waiting_for_space','restarting_containers','retrying_container_start'], true);
             $stale = $active && !zfsas_migrate_is_pid_running((int) ($status['PID'] ?? 0));
             $result['operations'][] = ['id' => 'migration:current', 'nativeId' => 'current', 'type' => 'migration',
+                'attentionVersion'=>hash('sha256',json_encode($status,JSON_THROW_ON_ERROR)),
                 'title' => 'Dataset migration', 'source' => $status['DATASET'] ?? '', 'destination' => '',
                 'state' => $stale ? 'failed' : ($active ? 'running' : $state), 'stateLabel' => $stale ? 'Recovery required' : str_replace('_', ' ', $state),
                 'message' => $stale ? 'Worker stopped before completion. Review the migration recovery state.' : ($status['MESSAGE'] ?? ''),
@@ -102,6 +106,9 @@ function zfsas_workspace_summary(): array
             ?: ($b['createdAt'] ?? 0) <=> ($a['createdAt'] ?? 0);
     });
     $result['operations'] = array_slice($result['operations'], 0, 120);
+    try { $dismissals=zfsas_attention_read(); }
+    catch (Throwable $error) { $dismissals=[];$result['sources']['attention']=['available'=>false,'message'=>'Attention acknowledgements are unavailable; all current alerts are shown.']; }
+    $result['operations']=zfsas_attention_project($result['operations'],$dismissals);
     return $result;
 }
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { zfsas_emit_marked_json(zfsas_workspace_summary()); }

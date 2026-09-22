@@ -15,6 +15,7 @@ bash tests/reliability/local_send_cutover.sh
 php tests/reliability/transfer_progress.php
 php tests/reliability/pause_schedule.php
 php tests/reliability/interface_settings.php
+php tests/reliability/attention.php
 php tests/reliability/settings_endpoints.php
 php tests/reliability/snapshots.php
 php tests/reliability/inventory_cache.php

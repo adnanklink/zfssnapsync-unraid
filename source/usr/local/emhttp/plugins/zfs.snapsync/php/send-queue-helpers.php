@@ -792,6 +792,7 @@ function zfsas_ops_send_queue_status_payload($limit = 120, $activityOrder = fals
             'destination' => (string) ($job['DESTINATION_ROOT'] ?? ''),
             'includeChildren' => ((string) ($job['INCLUDE_CHILDREN'] ?? '0') === '1'),
             'requestedAt' => (string) ($job['REQUESTED_AT'] ?? ''),
+            'attentionVersion' => hash('sha256',json_encode($job,JSON_THROW_ON_ERROR)),
             'lastMessage' => zfsas_ops_send_job_display_message($job),
             'lastError' => (string) ($job['LAST_ERROR'] ?? ''),
             'rawMessage' => zfsas_ops_send_job_raw_message($job),
@@ -1336,6 +1337,7 @@ function zfsas_ops_retry_send_job($jobId, &$error = null)
         $job['RETRY_AT'] = '0';
         $job['LAST_ERROR'] = '';
         $job['LAST_MESSAGE'] = 'Queued retry.';
+        $job['ATTENTION_REVISION'] = bin2hex(random_bytes(16));
         $job['WORKER_PID'] = '';
         $job['PROGRESS_PERCENT'] = '5';
         if (!zfsas_ops_write_job_file($job['__path'], $job)) {

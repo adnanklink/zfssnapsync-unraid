@@ -7,6 +7,8 @@ It answers one question: "What changed for me?"
 
 ### Unreleased
 
+- Add reversible dismissal of Needs attention alerts without clearing operation history or releasing recovery protections.
+
 - Add source checkpoint retention to local replication: new jobs default to keeping three checkpoints; existing jobs remain on Keep all until reviewed and enabled.
 - Protect receiver bases, recovery references, holds, clones and foreign snapshots. Run cleanup only after fully verified replication, with separate linked Activity results.
 - Add paginated five-minute source-retention reviews and preserve runtime cleanup state in RAM only.
