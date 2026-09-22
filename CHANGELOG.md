@@ -5,6 +5,13 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### Unreleased
+
+- Show job-specific steps and retained ZFS errors in Details, with the failure and next action separated from successful steps. Label shared logs clearly.
+- Add five-minute reviewed recovery for configured local replication jobs, including original interrupted snapshots from earlier Run Now attempts. Preserve completed work and require fresh approval after changed configuration or identities.
+- Check receiver interruption state before creating scheduled source snapshots. Direct repeated Run Now requests to known recovery issues.
+- Preserve earlier transfer errors when a later attempt reports only an unfinished receive; support recovery and Run Now command IDs on plain HTTP Unraid interfaces.
+
 ### 2026.09.22.07 (2026-09-22)
 
 - Keep waiting replication status steady during resource rechecks and prevent progress updates from changing operation-row height.

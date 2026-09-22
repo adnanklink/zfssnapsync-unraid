@@ -1,4 +1,11 @@
 <?php
+require_once __DIR__.'/operation-diagnostics.php';
+final class ZfsasReplicationCommandError extends RuntimeException
+{
+    public string $diagnostic;
+    public function __construct(string $message,string $diagnostic,int $code){$this->diagnostic=zfsas_diagnostic_text($diagnostic);parent::__construct($message,$code);}
+}
+
 /** Read-only preparation for the standalone replication pipeline. */
 final class ZfsasReplicationInspection
 {
@@ -78,7 +85,7 @@ final class ZfsasReplicationInspection
             }
             $output .= stream_get_contents($pipes[1]); $error .= stream_get_contents($pipes[2]);
             if (strlen($output) > 8 * 1048576 || strlen($error) > 65536) { throw new RuntimeException('Inspection output exceeds the bounded inventory limit.'); }
-            if ($exit !== 0) { throw new RuntimeException(in_array($exit,[124,137],true) ? 'ZFS inspection timed out.' : 'ZFS inspection failed; receiver or dataset metadata is unavailable.'); }
+            if ($exit !== 0) { throw new ZfsasReplicationCommandError(in_array($exit,[124,137],true) ? 'ZFS inspection timed out.' : 'ZFS inspection failed; receiver or dataset metadata is unavailable.',$error,(int)$exit); }
             return in_array('-nvt',$arguments,true) ? $output . $error : $output;
         } finally { foreach ($pipes as $pipe) { fclose($pipe); } proc_close($process); }
     }
@@ -124,7 +131,7 @@ final class ZfsasReplicationInspection
     {
         if (($request['allowResume'] ?? false) !== true) {
             return ['outcome'=>'validation_failure','recoveryRequired'=>true,
-                'message'=>'Receiver has an interrupted transfer. Explicit validated Retry is required.',
+                'failureCode'=>'interrupted_receive','message'=>'An earlier transfer is unfinished at the destination. Review recovery before sending another snapshot.',
                 'inspection'=>['sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,'resumeRequired'=>true]];
         }
         $metadata = $read(['send','-nvt',$token]); $fields = [];

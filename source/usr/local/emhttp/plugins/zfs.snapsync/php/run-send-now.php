@@ -58,12 +58,13 @@ try {
     zfsas_coordinator_ensure();
     $response=zfsas_coordinator_request(['action'=>'replication_now','commandId'=>$commandId]);
     if (!$response['ok']) { throw new RuntimeException($response['error'] ?? 'Coordinator rejected submission.'); }
+    $recovery=array_filter($response['result']['runs'],static fn($r)=>($r['blocked'] ?? '')==='recovery_required');
     $network=array_filter($jobs,static fn($job)=>($job['transport'] ?? 'local')!=='local');
     $kickError=null;
     $networkQueued=!$network || zfsas_ops_start_queue_kicker($kickError,['--manual-now','--network-only']);
     zfsas_emit_marked_json(['ok'=>true,'commandId'=>$commandId,'runs'=>$response['result']['runs'],
-        'jobCount'=>count($jobs),'networkQueued'=>$networkQueued,
-        'message'=>$networkQueued ? 'Replication requests accepted. Follow progress in Activity.' : 'Local requests accepted; network queue failed: '.$kickError]);
+        'recoveryRequired'=>array_values($recovery),'jobCount'=>count($jobs),'networkQueued'=>$networkQueued,
+        'message'=>$recovery ? 'Interrupted transfers need review. Use Review recovery on the affected configuration; other eligible requests were accepted.' : ($networkQueued ? 'Replication requests accepted. Follow progress in Activity.' : 'Local requests accepted; network queue failed: '.$kickError)]);
 } catch (Throwable $error) {
     zfsas_emit_marked_json(['ok'=>false,'commandId'=>$commandId,'error'=>$error->getMessage()],503);
 }

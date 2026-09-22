@@ -3,11 +3,13 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/coordinator-socket.php';
 require_once __DIR__ . '/coordinator-executor.php';
 require_once __DIR__ . '/coordinator-retention.php';
+require_once __DIR__ . '/operation-diagnostics.php';
 require_once __DIR__ . '/coordinator-source-retention.php';
 require_once __DIR__ . '/coordinator-auto-admission.php';
 require_once __DIR__ . '/coordinator-deletion.php';
 require_once __DIR__ . '/coordinator-replication-inspect.php';
 require_once __DIR__ . '/coordinator-replication.php';
+require_once __DIR__ . '/coordinator-recovery.php';
 require_once __DIR__ . '/coordinator-scheduled-replication.php';
 require_once __DIR__ . '/coordinator-send-scheduling.php';
 require_once __DIR__ . '/coordinator-batch.php';
@@ -50,6 +52,7 @@ $submitAuto = static function (string $commandId, bool $manual, ?int $occurrence
 };
 $command = static function (array $task) use ($root, $configDir, $journal, $deletion): ?array {
     if (is_file($configDir . '/maintenance')) { return null; }
+    if (str_starts_with($task['parameters']['phase'] ?? '', 'recovery_')) { return zfsas_recovery_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (in_array($task['parameters']['phase'] ?? '',['replication_schedule','replication_snapshot','replication_member','replication_run_verify'],true)) { return zfsas_coordinator_schedule_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) { return zfsas_coordinator_source_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if ($task['kind'] === 'delete') { return $deletion->command($task); }
@@ -104,6 +107,12 @@ foreach ($journal->state['runs'] as $run) {
 }
 $handler = static function (array $request) use ($journal, $executor, $submitAuto, $loadConfig, $deletion, &$config): array {
     $action = $request['action'] ?? '';
+    if ($action==='recovery_status') return zfsas_recovery_status($journal,(string)($request['reviewId'] ?? ''),(int)($request['offset'] ?? 0));
+    if (in_array($action,['review_recovery','retry_reviewed'],true)) {
+        if(!$loadConfig())throw new InvalidArgumentException('Configuration save is in progress. Retry the same request.');
+        return $action==='review_recovery'?zfsas_recovery_begin($journal,$request,$config):zfsas_recovery_execute($journal,(string)($request['reviewId'] ?? ''),$config);
+    }
+    if ($action === 'operation_detail') { return zfsas_operation_detail($journal,(string)($request['runId'] ?? ''),(int)($request['offset'] ?? 0)); }
     if ($action === 'worker_report') {
         $response = $executor->workerReport($request);
         if (str_starts_with($request['type'] ?? '', 'item_')) { zfsas_coordinator_project_batch($journal, $request['taskId']); }
@@ -113,6 +122,10 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         $runs = array_values($journal->state['runs']);
         usort($runs, static fn($a, $b) => $b['createdAt'] <=> $a['createdAt']);
         foreach ($runs as &$run) {
+            $originParameters=$journal->state['tasks'][$run['id'].':prepare']['parameters'] ?? [];
+            $run['recoveryReview']=($originParameters['phase'] ?? '')==='recovery_scan';
+            $run['scheduleId']=$originParameters['job']['id'] ?? null;
+            $run['canReviewRecovery']=!$run['recoveryReview'] && isset($originParameters['job']) && in_array($run['state'],['failed','canceled'],true);
             $run['canRetry'] = $run['manual'] && in_array($run['state'],['failed','canceled'],true) && !empty($journal->state['tasks'][$run['id'].':prepare']['parameters']['replication']);
             $run['nativeReplication']=isset($journal->state['tasks'][$run['id'].':prepare']['parameters']['replication']) || !empty($journal->state['tasks'][$run['id'].':prepare']['parameters']['nativeSchedule']);
             $run['sourceCleanup']=['deleted'=>0,'skipped'=>0,'protected'=>0,'deferred'=>0,'protectedReasons'=>[],'skippedReasons'=>[]];
@@ -149,6 +162,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
             }
             $run['recoveryRequired']=$journal->runRequiresReview($run['id']);
             if (isset($run['recoveryResolvedBy'])) { $run['canRetry']=false; }
+            $run['problem']=zfsas_operation_problem(array_map(static fn($id)=>$journal->state['tasks'][$id],$run['tasks']));
             $run['kinds'] = array_values(array_unique($run['kinds']));
             $run['blockedReasons'] = array_values(array_unique($run['blockedReasons']));
         } unset($run);
@@ -230,7 +244,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         $pauseAuto = false;
         foreach ($run['tasks'] as $taskId) {
             $kind = $journal->state['tasks'][$taskId]['kind'];
-            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']) && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'source_retention_')) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
+            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']) && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'source_retention_') && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'recovery_')) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
             $pauseAuto = $pauseAuto || ($kind === 'auto' && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']));
         }
         $scheduleId=$pauseAuto ? 'auto' : ($journal->state['tasks'][$runId.':prepare']['parameters']['job']['id'] ?? '');

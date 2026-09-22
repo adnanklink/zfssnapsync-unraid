@@ -61,7 +61,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  assert(await page.locator('#operation-rows td:nth-child(2) code').evaluateAll(nodes=>nodes.every(el=>el.getBoundingClientRect().right<=el.closest('td').getBoundingClientRect().right+1)),'Dataset extends into adjacent column');
  if(query==='section=overview')assert(await page.locator('.ui-attention-item').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Attention text overflows');
  }
- if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
+ if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Shared batch log — includes other jobs'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
  const log=page.locator('#operation-detail-log');assert(await log.evaluate(el=>el.scrollTop>0),'Log did not open at newest entries');
  await log.evaluate(el=>el.scrollTop=125);
  await page.locator('#operation-detail').evaluate(el=>el.scrollTop=180);

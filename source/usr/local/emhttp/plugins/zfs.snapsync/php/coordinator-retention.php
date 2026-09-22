@@ -28,6 +28,9 @@ function zfsas_coordinator_prune_artifacts(ZfsasCoordinatorState $journal, strin
             $activeBatches[$task['parameters']['token']] = true;
         }
     }
+    $recoveryInputs=[];
+    foreach($journal->state['tasks'] as $task)if(str_starts_with($task['parameters']['phase'] ?? '', 'recovery_'))$recoveryInputs[hash('sha256',$task['id'])]=true;
+    foreach(glob($root.'/attempt-inputs/*.recovery.json') ?: [] as $path)if(!isset($recoveryInputs[basename($path,'.recovery.json')]))@unlink($path);
     foreach (glob($root . '/attempt-inputs/*.job') ?: [] as $path) {
         $id = basename($path, '.job');
         if (preg_match('/^[a-f0-9]{64}$/D', $id) && !isset($inputs[$id])) { @unlink($path); }

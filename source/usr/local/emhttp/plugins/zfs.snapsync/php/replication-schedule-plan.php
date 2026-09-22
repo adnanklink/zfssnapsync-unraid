@@ -2,9 +2,9 @@
 require_once __DIR__.'/replication-membership.php';
 require_once __DIR__.'/replication-plan.php';
 
-function zfsas_replication_schedule_plan(array $parameters, ?callable $read=null): array
+function zfsas_replication_schedule_plan(array $parameters, ?callable $read=null, ?array $members=null): array
 {
-    $members=zfsas_replication_membership($parameters['job'],$read);
+    $members??=zfsas_replication_membership($parameters['job'],$read);
     $tasks=[];$parents=[];$index=0;
     foreach($members as $member){
         $key=sprintf('%05d',$index++);$snapshot='snapshot-'.$key;$prepare='member-'.$key;

@@ -96,6 +96,12 @@ trait ZfsasCoordinatorWorkerState
                 self::checkedReferences([$reference]);$this->checkReferenceAdmission([$reference]);
                 $this->state['tasks'][$taskId]['references']=[$reference];$this->registerReferences($taskId,[$reference]);
             }
+            if (($this->state['tasks'][$taskId]['parameters']['phase'] ?? '')==='recovery_member_review' && !empty($payload['review']['eligible'])) {
+                $p=$this->state['tasks'][$taskId]['parameters'];$review=$payload['review'];
+                if($review['source']!==$p['source'] || $review['destination']!==$p['destination'] || $review['inspection']['sourceDatasetGuid']!==$p['sourceDatasetGuid'])throw new InvalidArgumentException('Recovery review changed captured membership.');
+                $refs=$review['inspection']['references'];self::checkedReferences($refs);$this->checkReferenceAdmission($refs);
+                $this->state['tasks'][$taskId]['references']=$refs;$this->registerReferences($taskId,$refs);
+            }
             $attempt['reportedResult'] = $payload;
         } elseif ($type === 'plan_chunk') {
             $this->stageWorkerPlan($taskId, $payload);

@@ -26,6 +26,10 @@
       });state.append(control);}
 
       const actions=document.createElement('td');const button=document.createElement('button');button.type='button';button.textContent='Edit';button.addEventListener('click',()=>open(row,button));actions.append(button);
+      if(id && schedule && value('transport')==='local'){
+        const recovery=document.createElement('button');recovery.type='button';recovery.textContent='Review recovery';
+        recovery.addEventListener('click',()=>ZfsasRecovery.open('',id,recovery));actions.append(recovery);
+      }
       item.append(path,when,state,actions);table.tBodies[0].append(item);
     }
     const wrap=document.createElement('div');wrap.className='table-wrap';wrap.append(table);list.append(wrap);

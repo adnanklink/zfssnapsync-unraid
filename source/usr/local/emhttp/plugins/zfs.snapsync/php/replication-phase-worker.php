@@ -5,6 +5,7 @@ require_once __DIR__ . '/replication-plan.php';
 require_once __DIR__ . '/send-helpers.php';
 require_once __DIR__ . '/replication-pressure.php';
 require_once __DIR__ . '/transfer-progress.php';
+require_once __DIR__ . '/operation-diagnostics.php';
 try {
     zfsas_coordinator_worker_report('progress',2,['phase'=>'replication_validation','message'=>'Revalidating captured replication identities.']);
     $path = $argv[1] ?? ''; $task = getenv('ZFSAS_TASK_ID');
@@ -60,7 +61,7 @@ try {
                     zfsas_coordinator_worker_report('progress',$sequence++,['phase'=>'verification','message'=>'Transfer pipeline ended; verifying receiver checkpoint.']);
                     fclose($pipes[2]); $code = proc_close($process);
                     if ($code !== 0) {
-                        $result = ['outcome'=>'transient_failure','recoveryRequired'=>true,'message'=>'Replication pipeline failed; receiver recovery must be validated before another mutation.','exitCode'=>$code];
+                        $result = ['outcome'=>'transient_failure','recoveryRequired'=>true,'message'=>'Replication pipeline failed; receiver recovery must be validated before another mutation.','exitCode'=>$code,'failureCode'=>'transfer_failed','diagnostic'=>zfsas_diagnostic_text($diagnostic)];
                     } else {
                         $result = zfsas_replication_revalidate($parameters);
                         if ($result['outcome'] === 'success' && $result['inspection']['mode'] !== 'already_received') {
@@ -70,7 +71,7 @@ try {
                 }
             } else { throw new InvalidArgumentException('Unknown native replication phase.'); }
         }
-    } catch (InvalidArgumentException $error) { $result=['outcome'=>'validation_failure','message'=>$error->getMessage()]; }
-      catch (RuntimeException $error) { $result=['outcome'=>'transient_failure','message'=>$error->getMessage()]; }
+    } catch (InvalidArgumentException $error) { $result=zfsas_replication_error_result($error,'validation_failure'); }
+      catch (RuntimeException $error) { $result=zfsas_replication_error_result($error,'transient_failure'); }
     zfsas_coordinator_worker_report('result',$sequence ?? 3,$result);
 } catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n"); exit(1); }

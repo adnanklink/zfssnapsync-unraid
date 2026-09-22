@@ -42,6 +42,7 @@ if ($uiStandalone) { ?><!doctype html><html lang="en"><head><meta charset="utf-8
   <div id="workspace-notice" role="status" aria-live="polite"></div>
   <script src="/plugins/zfs.snapsync/js/workspace.js?v=<?= (int) filemtime(__DIR__ . '/../js/workspace.js') ?>"></script>
   <script src="/plugins/zfs.snapsync/js/workspace-requests.js"></script>
+  <script src="/plugins/zfs.snapsync/js/replication-recovery.js?v=<?= (int) filemtime(__DIR__ . '/../js/replication-recovery.js') ?>"></script>
   <?php
   switch ($uiSection) {
       case 'snapshots': require __DIR__ . ($uiTab === 'automation' ? '/settings.php' : '/snapshot-manager-page.php'); break;

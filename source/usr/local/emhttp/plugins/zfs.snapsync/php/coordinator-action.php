@@ -5,9 +5,9 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { zfsas_emit_marked
 $error = null;
 if (!zfsas_validate_csrf_token($error)) { zfsas_emit_marked_json(['ok' => false, 'error' => $error], 403); }
 $action = $_POST['action'] ?? '';
-if (!in_array($action, ['cancel', 'resume', 'retry'], true)) { zfsas_emit_marked_json(['ok' => false, 'error' => 'Invalid action.'], 400); }
+if (!in_array($action, ['cancel', 'resume', 'retry','review_recovery','retry_reviewed'], true)) { zfsas_emit_marked_json(['ok' => false, 'error' => 'Invalid action.'], 400); }
 try {
     zfsas_coordinator_ensure();
-    $response = zfsas_coordinator_request(['action' => $action, 'runId' => (string) ($_POST['run_id'] ?? ''),'scheduleId'=>(string)($_POST['schedule_id'] ?? 'auto')]);
+    $response = zfsas_coordinator_request(['action' => $action, 'runId' => (string) ($_POST['run_id'] ?? ''),'scheduleId'=>(string)($_POST['schedule_id'] ?? 'auto'),'reviewId'=>(string)($_POST['review_id'] ?? ''),'commandId'=>(string)($_POST['command_id'] ?? '')]);
     zfsas_emit_marked_json($response['ok'] ? ['ok' => true] + $response['result'] : $response, $response['ok'] ? 200 : 409);
 } catch (Throwable $error) { zfsas_emit_marked_json(['ok' => false, 'error' => $error->getMessage()], 503); }

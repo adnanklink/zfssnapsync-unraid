@@ -811,3 +811,6 @@
 .zfsas-workspace table.ui-operations-table td:nth-child(3) > .ui-badge {
   display:block; width:max-content; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
 }
+
+.zfsas-workspace #replication-recovery li,.zfsas-workspace #operation-log-panel{overflow-wrap:anywhere;white-space:normal;min-width:0;}
+.zfsas-workspace #replication-recovery li{white-space:pre-wrap;}

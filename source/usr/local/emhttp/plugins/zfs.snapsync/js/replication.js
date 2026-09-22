@@ -801,7 +801,7 @@ const pageOptions = JSON.parse(document.getElementById('replication-options').te
       }
       runBusy = true;
       runButton.disabled = true;
-      pendingRunCommand = pendingRunCommand || ('manual-send-' + crypto.randomUUID());
+      pendingRunCommand = pendingRunCommand || ('manual-send-' + Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join(''));
       setRunStatus('Starting manual ZFS send run...', false);
 
       requestJsonPost(
@@ -816,6 +816,7 @@ const pageOptions = JSON.parse(document.getElementById('replication-options').te
           }
           pendingRunCommand = null;
           setRunStatus((typeof data.message === 'string' && data.message.length > 0) ? data.message : 'Manual ZFS send started.', false);
+          if(data.recoveryRequired?.length===1 && window.ZfsasRecovery){const recovery=data.recoveryRequired[0];ZfsasRecovery.open(recovery.runId,recovery.scheduleId,runButton);}
           loadQueueJobs();
         },
         function (error) {

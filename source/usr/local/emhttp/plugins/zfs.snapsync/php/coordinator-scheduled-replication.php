@@ -40,6 +40,12 @@ function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array
         if (($receipt['context']['scheduleId'] ?? null)!==$job['id']) { throw new InvalidArgumentException('Command ID belongs to another schedule.'); }
         return $receipt;
     }
+    if($manual){
+        foreach(array_reverse($journal->state['runs']) as $prior){
+            $old=$journal->state['tasks'][$prior['id'].':prepare']['parameters'] ?? [];
+            if(($old['job']['id'] ?? '')===$job['id'] && ($old['phase'] ?? '')!=='recovery_scan' && ZfsasCoordinatorState::terminal($prior['state']) && $journal->runRequiresReview($prior['id']))return ['blocked'=>'recovery_required','runId'=>$prior['id'],'scheduleId'=>$job['id']];
+        }
+    }
     if (zfsas_snapshot_prefixes_conflict($config['auto']['PREFIX'] ?? 'snapsync-auto-', $config['send']['SEND_SNAPSHOT_PREFIX'])) {
         throw new InvalidArgumentException('Snapshot prefixes conflict; correct the configuration before replication.');
     }

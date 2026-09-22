@@ -236,7 +236,11 @@ final class ZfsasCoordinatorState
         if (isset($this->state['tasks'][$taskId]['items']) && $outcome !== 'transient_failure') { $result = $this->itemTaskOutcome($taskId); $outcome = $result['outcome']; }
         $task =& $this->state['tasks'][$taskId];
         $task['result'] = $result; $task['attempt'] = null;
+        if(!empty($result['diagnostic']) && in_array($outcome,['transient_failure','validation_failure'],true))$task['lastDiagnostic']=['text'=>$result['diagnostic'],'at'=>$now];
         $this->state['attempts'][$token]['state'] = 'stopped';
+        $this->state['attempts'][$token]['finishedAt']=$now;
+        $this->state['attempts'][$token]['result']=$result;
+        unset($this->state['attempts'][$token]['reportedResult']);
         if ($outcome === 'wait') {
             $reason = $result['reason'] ?? '';
             $task['state'] = 'waiting'; $task['blocked'] = $reason;
@@ -361,6 +365,49 @@ final class ZfsasCoordinatorState
         $run=$this->state['runs'][$successor] ?? null;
         if (!$run || $run['state'] !== 'complete') { return; }
         $parameters=$this->state['tasks'][$successor.':prepare']['parameters'] ?? [];
+        if (($parameters['phase'] ?? '')==='recovery_execute_start') {
+            $review=$this->state['runs'][$parameters['reviewRunId']] ?? null;
+            if (!$review) return;
+            $verified=[];$resumed=[];$changed=false;
+            foreach($review['tasks'] as $id){
+                $r=$this->state['tasks'][$id]['result']['review'] ?? null;
+                if(empty($r['eligible']))continue;
+                $key=$r['source'].'|'.$r['destination'];$verified[$key]=$r;
+                if($r['inspection']['mode']==='resume')$resumed[]=$key;
+            }
+            sort($resumed,SORT_STRING);$resumeDigest=hash('sha256',json_encode($resumed,JSON_THROW_ON_ERROR));
+            foreach($this->state['runs'] as $prior){
+                $origin=$this->state['tasks'][$prior['id'].':prepare']['parameters'] ?? [];
+                if($prior['id']===$successor || !self::terminal($prior['state']) || ($origin['phase'] ?? '')==='recovery_scan'
+                    || ($origin['job']['id'] ?? '')!==($parameters['job']['id'] ?? ''))continue;
+                foreach($prior['tasks'] as $id){
+                    $task=$this->state['tasks'][$id];$p=$task['parameters'];$r=$task['result'] ?? [];
+                    if(isset($task['recoveryResolvedBy']) || (empty($r['recoveryRequired']) && empty($p['inspection']['resumeRequired'])))continue;
+                    $targets=$r['blockedReceivers'] ?? [];
+                    if(isset($r['blockedDigest']) && hash_equals($r['blockedDigest'],$resumeDigest)){
+                        $this->state['tasks'][$id]['recoveryResolvedBy']=$successor;$changed=true;continue;
+                    }
+                    if(!$targets && isset($p['source'],$p['destination']))$targets=[['source'=>$p['source'],'destination'=>$p['destination']]];
+                    if(!$targets && isset($p['replication']))$targets=[['source'=>explode('@',$p['replication']['sourceSnapshot'])[0],'destination'=>$p['replication']['destination']]];
+                    if(!$targets || count($targets)<($r['blockedCount'] ?? 0))continue;
+                    foreach($targets as $target){
+                        $v=$verified[$target['source'].'|'.$target['destination']] ?? null;
+                        if(!$v)continue 2;
+                        foreach(['sourceDatasetGuid','destinationDatasetGuid'] as $field){
+                            $old=$p['inspection'][$field] ?? $r['inspection'][$field] ?? ($field==='sourceDatasetGuid'?($p[$field] ?? null):null);
+                            if($old!==null && $old!==$v['inspection'][$field])continue 3;
+                        }
+                        if(($r['failureCode'] ?? '')!=='interrupted_receive' && empty($r['inspection']['resumeRequired'])){
+                            $expected=$p['replication']['sourceSnapshot'] ?? (isset($p['snapshotName'])?$p['source'].'@'.$p['snapshotName']:'');
+                            if($expected!==$v['snapshot'])continue 2;
+                            if(isset($p['replication']['sourceGuid']) && $p['replication']['sourceGuid']!==$v['request']['sourceGuid'])continue 2;
+                        }
+                    }
+                    $this->state['tasks'][$id]['recoveryResolvedBy']=$successor;$changed=true;
+                }
+            }
+            if($changed)$this->commit();return;
+        }
         $original=$parameters['retryOf'] ?? ''; $prior=$this->state['runs'][$original] ?? null;
         if (!$prior || !self::terminal($prior['state']) || isset($prior['recoveryResolvedBy'])) { return; }
         $old=$this->state['tasks'][$original.':prepare']['parameters']['replication'] ?? [];
@@ -374,8 +421,14 @@ final class ZfsasCoordinatorState
     public function runRequiresReview(string $runId): bool
     {
         if (isset($this->state['runs'][$runId]['recoveryResolvedBy'])) { return false; }
+        $run=$this->state['runs'][$runId];
+        if (($this->state['tasks'][$runId.':prepare']['parameters']['phase'] ?? '')==='recovery_scan') {
+            return !self::terminal($run['state']) || ($run['state']==='complete' && time()<($run['finishedAt'] ?? 0)+300);
+        }
         foreach ($this->state['runs'][$runId]['tasks'] as $id) {
             $task = $this->state['tasks'][$id];
+            if (isset($task['recoveryResolvedBy'])) { continue; }
+            if (!empty($task['parameters']['inspection']['resumeRequired']) && $task['state']!=='complete') { return true; }
             if (!empty($task['result']['recoveryRequired']) || $task['blocked'] === 'recovery_required') { return true; }
             foreach ($task['items'] ?? [] as $itemId) {
                 if (!empty($this->state['items'][$itemId]['result']['recoveryRequired'])) { return true; }
@@ -388,7 +441,13 @@ final class ZfsasCoordinatorState
     {
         $terminal = array_filter($this->state['runs'], fn($run) => self::terminal($run['state']));
         uasort($terminal, fn($a, $b) => $b['finishedAt'] <=> $a['finishedAt']);
-        $changed = false; $count = 0;
+        $changed = false; $count = 0;$neededReviews=[];
+        foreach($this->state['tasks'] as $consumer){
+            $review=$consumer['parameters']['reviewRunId'] ?? null;
+            if(!$review)continue;
+            $owner=$this->state['runs'][$consumer['runId']] ?? null;
+            if($owner && (!self::terminal($owner['state']) || $this->runRequiresReview($owner['id'])))$neededReviews[$review]=true;
+        }
         foreach ($terminal as $id => $run) {
             if ($this->runRequiresReview($id) || !empty($run['sourceCleanupPending'])) { continue; }
             $cleanup=$this->state['runs'][$run['sourceCleanupRunId'] ?? ''] ?? null;
@@ -399,6 +458,7 @@ final class ZfsasCoordinatorState
                 if ($ownerId !== '' && isset($this->state['runs'][$ownerId])
                     && (!self::terminal($this->state['runs'][$ownerId]['state']) || $this->runRequiresReview($ownerId))) { continue 2; }
             }
+            if(isset($neededReviews[$id]))continue;
             if (++$count <= 1000 && $run['finishedAt'] >= $now - 30 * 86400) { continue; }
             foreach ($run['tasks'] as $task) {
                 foreach ($this->state['attempts'] as $token => $attempt) {
