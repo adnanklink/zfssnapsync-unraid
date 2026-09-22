@@ -764,3 +764,28 @@
 }
 .zfsas-workspace #operation-body { min-width:0; overflow-wrap:anywhere; }
 .zfsas-workspace #operation-body dd { min-width:0; white-space:normal; overflow-wrap:anywhere; }
+
+/* Own the column geometry as well as wrapping: host table rules must not size it. */
+.zfsas-workspace table.ui-operations-table { table-layout:fixed; width:100%; min-width:680px; }
+.zfsas-workspace table.ui-operations-table th:nth-child(1) { width:21%; }
+.zfsas-workspace table.ui-operations-table th:nth-child(2) { width:27%; }
+.zfsas-workspace table.ui-operations-table th:nth-child(3) { width:27%; }
+.zfsas-workspace table.ui-operations-table th:nth-child(4) { width:15%; }
+.zfsas-workspace table.ui-operations-table th:nth-child(5) { width:10%; }
+.zfsas-workspace table.ui-operations-table td {
+  min-width:0; max-width:none; white-space:normal; word-break:break-word;
+  overflow-wrap:anywhere; overflow:hidden; height:auto; line-height:1.5;
+}
+.zfsas-workspace table.ui-operations-table td code,
+.zfsas-workspace table.ui-operations-table td strong,
+.zfsas-workspace table.ui-operations-table .ui-transfer-status {
+  display:block; width:100%; min-width:0; max-width:100%; white-space:normal;
+  word-break:break-word; overflow-wrap:anywhere;
+}
+.zfsas-workspace #attention-list { width:100%; min-width:0; overflow:hidden; }
+.zfsas-workspace #attention-list button.ui-attention-item {
+  box-sizing:border-box; display:block; float:none; position:static;
+  width:100%; min-width:0; max-width:100%; height:auto; min-height:38px;
+  white-space:normal; word-break:break-word; overflow-wrap:anywhere; overflow:hidden;
+  line-height:1.5; text-overflow:clip;
+}

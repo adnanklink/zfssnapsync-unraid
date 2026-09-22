@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.03 (2026-09-22)
+
+- Constrain operation table columns and attention messages against host wrapping rules. Narrow screens scroll the table instead of overlapping columns.
+- Version the workspace stylesheet URL so updates load the latest layout automatically.
+
 ### 2026.09.22.02 (2026-09-22)
 
 - Wrap long dataset names and attention messages within their cards and table cells.

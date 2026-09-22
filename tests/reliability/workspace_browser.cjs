@@ -56,7 +56,9 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  for(const selectors of groups){const boxes=await Promise.all(selectors.map(selector=>page.locator(selector).boundingBox()));for(const box of boxes.slice(1)){assert(Math.abs((boxes[0].y+boxes[0].height)-(box.y+box.height))<3,'Misaligned controls: '+selectors.join(', '));}}
  }
  if(query==='section=overview' || query==='section=activity'){
+ await page.addStyleTag({content:'table td{white-space:nowrap;height:24px;} button{white-space:nowrap;} code{white-space:pre;}'});
  assert(await page.locator('#operation-rows td:nth-child(2) code').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Dataset text overflows cell');
+ assert(await page.locator('#operation-rows td:nth-child(2) code').evaluateAll(nodes=>nodes.every(el=>el.getBoundingClientRect().right<=el.closest('td').getBoundingClientRect().right+1)),'Dataset extends into adjacent column');
  if(query==='section=overview')assert(await page.locator('.ui-attention-item').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Attention text overflows');
  }
  if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);

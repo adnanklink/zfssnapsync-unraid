@@ -23,7 +23,7 @@ if (is_file($installed) && preg_match('/<PLUGIN\b[^>]*version="([^"]+)"/', (stri
 $uiStandalone = empty($GLOBALS['zfsas_host_shell']);
 if ($uiStandalone) { ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title><?= zfsas_ui_h($uiSections[$uiSection][0]) ?> · ZFS SnapSync</title></head><body><?php }
 ?>
-<link rel="stylesheet" href="/plugins/zfs.snapsync/css/workspace.css">
+<link rel="stylesheet" href="/plugins/zfs.snapsync/css/workspace.css?v=<?= (int) filemtime(__DIR__ . '/../css/workspace.css') ?>">
 <div class="zfsas-workspace" data-section="<?= zfsas_ui_h($uiSection) ?>" data-csrf="<?= zfsas_ui_h($uiCsrf) ?>">
 <a class="ui-skip" href="#workspace-content">Skip to content</a>
 <aside class="ui-sidebar">
