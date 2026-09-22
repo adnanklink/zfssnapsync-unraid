@@ -87,7 +87,10 @@
     if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
     const drawer=$('operation-detail'), scroll=drawer.scrollTop;
     if (content.contains(document.activeElement)) return;
-    metadata.innerHTML='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(op.url)+'">Open workflow →</a>';
+    const markup='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(op.url)+'">Open workflow →</a>';
+    if(metadata.dataset.operation!==op.id || metadata.dataset.markup!==markup){
+      metadata.innerHTML=markup;metadata.dataset.markup=markup;metadata.dataset.operation=op.id;
+    }
     drawer.scrollTop=scroll;
     const actions=$('operation-actions');
     const fingerprint=JSON.stringify([op.id,op.actions]);
@@ -119,8 +122,10 @@
   }
   async function showDetailLog(op) {
     let output=$('operation-detail-log');if(!output){output=document.createElement('pre');output.id='operation-detail-log';$('operation-body').append(output);}
-    output.textContent='Loading shared log…';
-    try{const data=await ZfsasRequests.request('detail-log',base+'workspace-log.php?type='+encodeURIComponent(op.logType));if(selected===op.id && $('operation-detail').open){if(!output.isConnected)$('operation-body').append(output);output.textContent=data.content||'No log is available for this boot.';output.scrollTop=output.scrollHeight;}}
+    const firstLoad=!output.dataset.loaded;
+    const previousScroll=output.scrollTop, drawer=$('operation-detail'), drawerScroll=drawer.scrollTop;
+    if(firstLoad)output.textContent='Loading shared log…';
+    try{const data=await ZfsasRequests.request('detail-log',base+'workspace-log.php?type='+encodeURIComponent(op.logType));if(selected===op.id && $('operation-detail').open){if(!output.isConnected)$('operation-body').append(output);output.textContent=data.content||'No log is available for this boot.';output.dataset.loaded='1';output.scrollTop=firstLoad?output.scrollHeight:previousScroll;drawer.scrollTop=drawerScroll;}}
     catch(error){output.textContent=error.message;}
   }
   const poll=ZfsasRequests.poll('workspace-summary',()=>ZfsasRequests.request('workspace-summary',base+'workspace-summary.php'),render);

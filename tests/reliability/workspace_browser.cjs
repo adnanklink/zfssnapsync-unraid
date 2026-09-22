@@ -63,7 +63,12 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  }
  if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
  const log=page.locator('#operation-detail-log');assert(await log.evaluate(el=>el.scrollTop>0),'Log did not open at newest entries');
- await log.evaluate(el=>el.scrollTop=125);await page.waitForTimeout(2500);assert.equal(await log.evaluate(el=>el.scrollTop),125,'Status refresh reset log scroll');
+ await log.evaluate(el=>el.scrollTop=125);
+ await page.locator('#operation-detail').evaluate(el=>el.scrollTop=180);
+ const drawerScroll=await page.locator('#operation-detail').evaluate(el=>el.scrollTop);
+ await page.waitForTimeout(4500);
+ assert.equal(await page.locator('#operation-detail').evaluate(el=>el.scrollTop),drawerScroll,'Status refresh reset drawer scroll');
+ assert.equal(await log.evaluate(el=>el.scrollTop),125,'Status refresh reset log scroll');
 await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.getElementById('operation-detail').open);assert(await button.evaluate(el=>el===document.activeElement));
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});const previous=summaryRequests;await page.waitForTimeout(2200);assert.equal(summaryRequests,previous,'Hidden Overview polled');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});}
  if(query==='section=activity'){

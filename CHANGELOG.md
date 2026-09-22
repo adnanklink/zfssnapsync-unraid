@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.04 (2026-09-22)
+
+- Version the Activity script URL so installed updates replace cached scroll-reset code.
+- Preserve outer drawer and log scroll positions, avoid rebuilding unchanged details, and disable drawer scroll anchoring.
+
 ### 2026.09.22.03 (2026-09-22)
 
 - Constrain operation table columns and attention messages against host wrapping rules. Narrow screens scroll the table instead of overlapping columns.
