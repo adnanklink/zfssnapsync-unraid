@@ -5,7 +5,7 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
-### Unreleased
+### 2026.09.22.08 (2026-09-22)
 
 - Show job-specific steps and retained ZFS errors in Details, with the failure and next action separated from successful steps. Label shared logs clearly.
 - Add five-minute reviewed recovery for configured local replication jobs, including original interrupted snapshots from earlier Run Now attempts. Preserve completed work and require fresh approval after changed configuration or identities.
