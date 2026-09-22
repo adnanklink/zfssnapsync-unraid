@@ -3,6 +3,7 @@ const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.snapsync');
 const summary={ok:true,generatedAt:1700000000,timezone:'UTC',sources:{configuration:{available:true},coordinator:{available:true}},operations:[{id:'coordinator:batch',nativeId:'batch-run',type:'batch',title:'Snapshot batch',state:'running',createdAt:1699999999,actions:['cancel'],url:'?section=snapshots',logType:'batch'},{id:'coordinator:example',nativeId:'example',type:'auto',title:'Automatic snapshots',state:'running',createdAt:1700000000,actions:['cancel'],url:'?section=snapshots&tab=automation',logType:'auto'},{id:'replication:recovery',nativeId:'recovery',type:'replication',title:'Interrupted snapshot creation',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['clear_failed'],url:'?section=replication',logType:'replication'}],schedules:[],pausedSchedules:[]};
+summary.operations[2].source='tank/'+ 'long-dataset-name-'.repeat(30);
 summary.operations.push({id:'coordinator:transfer',nativeId:'transfer',type:'replication',title:'Active transfer',state:'running',phase:'transfer',progress:42,message:'42 MiB sent · 8.0 MiB/s',actions:[],url:'?section=activity'});
 summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'replication',coordinator:true,manual:true,title:'Native replication',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['retry'],url:'?section=activity'});
 (async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{
@@ -13,7 +14,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  if(url.pathname.endsWith('.png'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(plugin+url.pathname.replace('/plugins/zfs.snapsync',''))});
  if(/\.(js|css)$/.test(url.pathname))return route.fulfill({contentType:url.pathname.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(plugin+url.pathname.replace('/plugins/zfs.snapsync',''),'utf8')});
  if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
- let data={ok:true,probe:true,spec:{kind:'interval',seconds:21600},status:{},datasets:[{dataset:'tank/data',mountpoint:'/mnt/tank/data',pool:'tank',sendDestination:false}],snapshots:[],jobs:[],pausedSchedules:[],pendingDeleteCount:0,content:'Test log',logTail:[],docker:{runningContainers:[]}};
+ let data={ok:true,probe:true,spec:{kind:'interval',seconds:21600},status:{},datasets:[{dataset:'tank/data',mountpoint:'/mnt/tank/data',pool:'tank',sendDestination:false}],snapshots:[],jobs:[],pausedSchedules:[],pendingDeleteCount:0,content:Array.from({length:200},(_,i)=>'Test log '+i).join('\n'),logTail:[],docker:{runningContainers:[]}};
  if(url.pathname.endsWith('dataset-inventory.php')){
    discoveryRequests++;
    if(discoveryRequests===1){await new Promise(resolve=>setTimeout(resolve,300));data={ok:false,error:'Test discovery failure'};}
@@ -54,7 +55,14 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  const groups=query==='section=activity' ? [['#activity-state','#activity-refresh']] : [['#dataset_pool_filter','#dataset_select_visible','#dataset_clear_visible','#dataset_select_all','#dataset_clear_all'],['#manual_run','#zfsas_save_btn'],['[data-cancel]','[data-resume]']];
  for(const selectors of groups){const boxes=await Promise.all(selectors.map(selector=>page.locator(selector).boundingBox()));for(const box of boxes.slice(1)){assert(Math.abs((boxes[0].y+boxes[0].height)-(box.y+box.height))<3,'Misaligned controls: '+selectors.join(', '));}}
  }
- if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.getElementById('operation-detail').open);assert(await button.evaluate(el=>el===document.activeElement));
+ if(query==='section=overview' || query==='section=activity'){
+ assert(await page.locator('#operation-rows td:nth-child(2) code').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Dataset text overflows cell');
+ if(query==='section=overview')assert(await page.locator('.ui-attention-item').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Attention text overflows');
+ }
+ if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
+ const log=page.locator('#operation-detail-log');assert(await log.evaluate(el=>el.scrollTop>0),'Log did not open at newest entries');
+ await log.evaluate(el=>el.scrollTop=125);await page.waitForTimeout(2500);assert.equal(await log.evaluate(el=>el.scrollTop),125,'Status refresh reset log scroll');
+await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.getElementById('operation-detail').open);assert(await button.evaluate(el=>el===document.activeElement));
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});const previous=summaryRequests;await page.waitForTimeout(2200);assert.equal(summaryRequests,previous,'Hidden Overview polled');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});}
  if(query==='section=activity'){
  assert.equal(await page.locator('[data-operation="coordinator:transfer"] progress').getAttribute('value'),'42');

@@ -751,3 +751,16 @@
 .zfsas-workspace .ui-transfer-status { min-width:150px; max-width:320px; white-space:normal; overflow-wrap:anywhere; }
 .zfsas-workspace .ui-transfer-status small { display:block; margin-top:6px; }
 .zfsas-workspace .ui-transfer-status progress { width:100%; height:10px; margin-top:8px; }
+
+.zfsas-workspace .ui-attention-item {
+  min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere;
+  height:auto; line-height:1.5;
+}
+.zfsas-workspace #operation-rows td {
+  white-space:normal; overflow-wrap:anywhere; height:auto;
+}
+.zfsas-workspace #operation-rows td code {
+  display:block; white-space:normal; overflow-wrap:anywhere; max-width:100%;
+}
+.zfsas-workspace #operation-body { min-width:0; overflow-wrap:anywhere; }
+.zfsas-workspace #operation-body dd { min-width:0; white-space:normal; overflow-wrap:anywhere; }

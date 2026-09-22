@@ -82,11 +82,13 @@
   function detail(op) {
     $('operation-title').textContent=op.title;
     const entries=[['Status',label(op)],['Phase',(op.phase || '—').replaceAll('_',' ')],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId]];
-    const existingLog=$('operation-detail-log');
     const content=$('operation-body');
+    let metadata=$('operation-metadata');
+    if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
+    const drawer=$('operation-detail'), scroll=drawer.scrollTop;
     if (content.contains(document.activeElement)) return;
-    content.innerHTML='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(op.url)+'">Open workflow →</a>';
-    if(existingLog) content.append(existingLog);
+    metadata.innerHTML='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(op.url)+'">Open workflow →</a>';
+    drawer.scrollTop=scroll;
     const actions=$('operation-actions');
     const fingerprint=JSON.stringify([op.id,op.actions]);
     if(actions.dataset.fingerprint!==fingerprint) {
@@ -118,7 +120,7 @@
   async function showDetailLog(op) {
     let output=$('operation-detail-log');if(!output){output=document.createElement('pre');output.id='operation-detail-log';$('operation-body').append(output);}
     output.textContent='Loading shared log…';
-    try{const data=await ZfsasRequests.request('detail-log',base+'workspace-log.php?type='+encodeURIComponent(op.logType));if(selected===op.id && $('operation-detail').open){if(!output.isConnected)$('operation-body').append(output);output.textContent=data.content||'No log is available for this boot.';}}
+    try{const data=await ZfsasRequests.request('detail-log',base+'workspace-log.php?type='+encodeURIComponent(op.logType));if(selected===op.id && $('operation-detail').open){if(!output.isConnected)$('operation-body').append(output);output.textContent=data.content||'No log is available for this boot.';output.scrollTop=output.scrollHeight;}}
     catch(error){output.textContent=error.message;}
   }
   const poll=ZfsasRequests.poll('workspace-summary',()=>ZfsasRequests.request('workspace-summary',base+'workspace-summary.php'),render);

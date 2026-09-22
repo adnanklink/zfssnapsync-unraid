@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.02 (2026-09-22)
+
+- Wrap long dataset names and attention messages within their cards and table cells.
+- Open operation logs at the newest entries and preserve log scrolling during status refreshes.
+
 ### 2026.09.22.01 (2026-09-22)
 
 - Update newly saved replication job IDs and badges immediately without refreshing.
