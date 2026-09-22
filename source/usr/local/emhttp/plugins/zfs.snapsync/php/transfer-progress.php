@@ -30,6 +30,16 @@ function zfsas_run_progress(array $run, int $now): array
     $empty = ['messages'=>[], 'percent'=>null, 'phase'=>''];
     if (in_array($run['state'], ['complete','failed','canceled','skipped','recorded'], true)) { return $empty; }
     $tasks = array_values(array_filter($run['taskStatus'] ?? [], static fn($task)=>in_array($task['state'], ['launching','running','stopping','waiting','retry_wait'], true)));
+    // Retrying a resource check is not transfer activity. Keep the previous
+    // wait visible until a worker reports that actual execution has begun.
+    foreach ($tasks as &$task) {
+        if (in_array($task['state'],['launching','running'],true)
+            && ($task['result']['outcome'] ?? '')==='wait'
+            && ($task['state']==='launching' || in_array($task['progress']['phase'] ?? '',['','resource_admission'],true))) {
+            $task['state']='waiting';$task['blocked']=$task['result']['reason'] ?? 'resource';
+        }
+    }
+    unset($task);
     $running = array_values(array_filter($tasks, static fn($task)=>$task['state']==='running'));
     $current = $running ?: $tasks;
     $phases = []; $messages = []; $percent = null;
@@ -43,6 +53,15 @@ function zfsas_run_progress(array $run, int $now): array
         if (!empty($sample['message'])) { $messages[] = $sample['message']; }
         if (count($current)===1) { $percent = $sample['percent'] ?? null; }
     }
-    return ['messages'=>array_values(array_unique($messages)), 'percent'=>$percent,
+    $stateLabel=null;
+    if (!$running && $current && !array_filter($current,static fn($task)=>in_array($task['state'],['launching','stopping'],true))) {
+        $retry=(bool)array_filter($current,static fn($task)=>$task['state']==='retry_wait');
+        $stateLabel=$retry?'Waiting to retry':'Waiting';
+        $waitMessages=['resource'=>'Waiting for another operation to release the dataset.',
+            'dependency'=>'Waiting for prerequisite work to finish.','array'=>'Waiting for the array.',
+            'configuration'=>'Waiting for configuration to become available.','space'=>'Waiting for space approval.'];
+        foreach (array_unique($phases) as $phase) { if(isset($waitMessages[$phase]))$messages[]=$waitMessages[$phase]; }
+    } elseif (!$current && !empty($run['taskStatus'])) { $stateLabel='Queued'; }
+    return ['stateLabel'=>$stateLabel,'messages'=>array_values(array_unique($messages)), 'percent'=>$percent,
         'phase'=>implode(', ', array_unique($phases))];
 }

@@ -60,19 +60,25 @@
       row.cells[0].querySelector('strong').textContent=op.title;
       row.cells[0].querySelector('small').textContent=op.parentId?'Run '+op.parentId:op.type;
       row.cells[1].querySelector('code').textContent=[op.source,op.destination].filter(Boolean).join(' → ') || 'Configured datasets';
-      const badge=row.cells[2].firstChild;badge.dataset.state=op.state;badge.textContent=label(op);
+      const badge=row.cells[2].firstChild;badge.dataset.state=['Waiting','Waiting to retry','Queued'].includes(op.stateLabel)?'waiting':op.state;badge.textContent=label(op);
       let activity=row.cells[2].querySelector('.ui-transfer-status');
-      if(!activity){activity=document.createElement('div');activity.className='ui-transfer-status';row.cells[2].append(activity);}
-      activity.replaceChildren();
-      if(active(op)){
-        const phase=document.createElement('small');phase.textContent=(op.phase || (op.blocked||[]).join(', ') || '').replaceAll('_',' ');activity.append(phase);
-        if(op.type==='replication'){
-          const bar=document.createElement('progress');bar.max=100;bar.setAttribute('aria-label','Estimated transfer progress');
-          if(Number.isFinite(op.progress))bar.value=Math.max(0,Math.min(100,op.progress));
-          if(Number.isFinite(op.progress) || op.phase?.includes('transfer'))activity.append(bar);
-          const message=document.createElement('small');message.textContent=op.message || '';activity.append(message);
-        }
+      if(!activity){
+        activity=document.createElement('div');activity.className='ui-transfer-status';
+        activity.innerHTML='<small class="ui-transfer-phase"></small><progress max="100" aria-label="Estimated transfer progress"></progress><small class="ui-transfer-message"></small>';
+        row.cells[2].append(activity);
       }
+      const phase=activity.querySelector('.ui-transfer-phase'),bar=activity.querySelector('progress'),message=activity.querySelector('.ui-transfer-message');
+      const phaseText=active(op)?(op.phase || (op.blocked||[]).join(', ') || '').replaceAll('_',' '):'';
+      const messageText=active(op)&&op.type==='replication'?op.message || '':'';
+      if(phase.textContent!==phaseText)phase.textContent=phaseText;
+      if(message.textContent!==messageText)message.textContent=messageText;
+      phase.title=phaseText;message.title=messageText;
+      activity.classList.toggle('is-replication',op.type==='replication');
+      // Reserve the same bar/text space while queued, checking resources and
+      // transferring. Updating samples must not move the rows below this one.
+      const showBar=active(op)&&op.type==='replication'&&(Number.isFinite(op.progress)||op.phase?.includes('transfer'));
+      bar.style.visibility=showBar?'visible':'hidden';bar.setAttribute('aria-hidden',showBar?'false':'true');
+      if(Number.isFinite(op.progress))bar.value=Math.max(0,Math.min(100,op.progress));else bar.removeAttribute('value');
       row.cells[3].textContent=date(op.createdAt);
       // Avoid detaching focused rows on routine refresh.
       if(row.parentElement!==body) body.append(row);

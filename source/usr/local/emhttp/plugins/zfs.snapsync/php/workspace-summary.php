@@ -35,7 +35,7 @@ function zfsas_workspace_summary(): array
             if ($sourceCleanup) { $c=$run['sourceCleanup'];array_unshift($details,sprintf('Source cleanup: %d deleted, %d skipped, %d protected, %d datasets deferred.',$c['deleted'],$c['skipped'],$c['protected'],$c['deferred'])); }
             $result['operations'][] = ['id' => 'coordinator:' . $run['id'], 'nativeId' => $run['id'], 'coordinator'=>true,'manual'=>$run['manual'] ?? false,'type' => $auto ? 'auto' : ($replication ? 'replication' : 'batch'),
                 'title' => $sourceCleanup ? 'Source cleanup' : ($auto ? 'Automatic snapshots' : ($replication ? 'Replication' : 'Snapshot batch')), 'source' => implode(', ', array_unique($datasets)),
-                'destination' => '', 'state' => $run['state'], 'message' => implode(' ', array_unique($details)),
+                'destination' => '', 'state' => $run['state'], 'stateLabel'=>$display['stateLabel'] ?? null, 'message' => implode(' ', array_unique($details)),
                 'sourceCleanup'=>$run['sourceCleanup'] ?? null,'sourceCleanupRunId'=>$run['sourceCleanupRunId'] ?? null,'sourceCleanupOf'=>$run['sourceCleanupOf'] ?? null,
                 'cleanup'=>$run['cleanup'] ?? null, 'createdAt' => $run['createdAt'], 'finishedAt' => $run['finishedAt'], 'progress' => in_array($run['state'], $terminal, true) ? null : $progress,
                 'phase' => in_array($run['state'], $terminal, true) ? '' : ($phase ?: (implode(', ', $run['blockedReasons'] ?? []) ?: 'Queued')),

@@ -297,3 +297,9 @@ The instrumented daemon run recorded 138,020 file/write/metadata syscall lines w
 Activity retains dismissed operations and exposes Restore to Needs attention. New operation identities, changed failure/recovery evidence, and repeated legacy retry attempts receive a new alert fingerprint; stale clients cannot acknowledge a replacement alert. A missing or unreadable acknowledgement store shows alerts rather than hiding them. Host reboot discards acknowledgements along with ordinary runtime history.
 
 Coverage: `attention.php` checks display-only projection, restoration, changed identities, read-only reads and bounded storage. `attention_endpoints.php` exercises actual POST/CSRF/stale-identity checks and proves the recovery job is byte-for-byte unchanged and no coordinator is launched. `attention_browser.cjs` verifies counts/cards, retained Activity history and recovery warnings, restoration and page reload.
+
+## Stable operation status layout (unreleased)
+
+Resource-admission retries retain their previous Waiting presentation until a worker reports actual execution. This is a read-only display projection; scheduler state, admission checks and retry timing are unchanged. The operation table reuses progress/text nodes and reserves fixed space for replication phase, progress and two message lines, including while queued or completed. Full messages remain in Details and text tooltips.
+
+`transfer_progress.php` covers waiting/launching/running admission checks and the transition to actual transfer progress. `operation_layout_browser.cjs` checks row positions through long/short messages, waiting, transfer and completion in Overview and Activity at desktop and narrow widths, while ensuring active transfer percentages and existing progress nodes are preserved.

@@ -26,3 +26,13 @@ $run=['state'=>'running','taskStatus'=>[array_replace($task,['state'=>'waiting',
 check(zfsas_run_progress($run,105)['phase']==='resource_contention');
 check(zfsas_run_progress($run,105)['messages']===[]);
 echo "PASS: active phase projection, parallel estimates, stale speed expiry and terminal suppression\n";
+
+$waiting=['kind'=>'send','phase'=>'replication_transfer','state'=>'waiting','blocked'=>'resource',
+    'result'=>['outcome'=>'wait','reason'=>'resource'],'progress'=>['phase'=>'resource_admission','message'=>'Checking dataset ownership.'],'progressAt'=>100];
+$baseline=zfsas_run_progress(['state'=>'running','taskStatus'=>[$waiting]],105);
+check($baseline['stateLabel']==='Waiting');
+foreach(['launching','running','waiting'] as $state){$waiting['state']=$state;check(zfsas_run_progress(['state'=>'running','taskStatus'=>[$waiting]],105)===$baseline);}
+$waiting['state']='running';$waiting['progress']=['phase'=>'transfer','percent'=>42,'message'=>'8.0 MiB/s'];
+$actual=zfsas_run_progress(['state'=>'running','taskStatus'=>[$waiting]],105);
+check($actual['percent']===42&&$actual['phase']==='transfer'&&$actual['stateLabel']===null);
+echo "PASS: resource rechecks keep a stable waiting status until real transfer progress starts\n";

@@ -7,6 +7,8 @@ It answers one question: "What changed for me?"
 
 ### Unreleased
 
+- Keep waiting replication status steady during resource rechecks and prevent progress updates from changing operation-row height.
+
 - Add reversible dismissal of Needs attention alerts without clearing operation history or releasing recovery protections.
 
 - Add source checkpoint retention to local replication: new jobs default to keeping three checkpoints; existing jobs remain on Keep all until reviewed and enabled.
