@@ -17,6 +17,7 @@ php tests/reliability/pause_schedule.php
 php tests/reliability/interface_settings.php
 php tests/reliability/settings_endpoints.php
 php tests/reliability/snapshots.php
+php tests/reliability/inventory_cache.php
 php tests/reliability/batch_item_recovery.php
 php tests/reliability/coordinator_state.php
 php tests/reliability/coordinator_references.php

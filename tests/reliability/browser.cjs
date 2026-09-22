@@ -15,6 +15,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     const all = () => Array.from({length: 10000 + Number(addNew)}, (_, i) => row(i));
     await page.route('http://zfsas.test/**', async route => {
       const url = new URL(route.request().url());
+      if (url.pathname.endsWith('.png')) return route.fulfill({contentType:'image/png',body:fs.readFileSync(plugin+'/images/'+path.basename(url.pathname))});
       if (url.pathname.endsWith('.css')) return route.fulfill({contentType:'text/css',body:fs.readFileSync(plugin+'/css/'+path.basename(url.pathname),'utf8')});
       if (url.pathname.endsWith('.js')) return route.fulfill({contentType: 'application/javascript', body: fs.readFileSync(plugin + '/js/' + path.basename(url.pathname), 'utf8')});
       if (url.pathname === '/') return route.fulfill({contentType: 'text/html', body: execFileSync('php', [plugin + '/php/snapshot-manager-page.php'], {encoding:'utf8'})});

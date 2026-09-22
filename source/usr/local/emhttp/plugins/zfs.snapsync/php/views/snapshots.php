@@ -39,4 +39,4 @@
 <div class="toolbar"><button id="approve">Approve exact snapshots</button><button id="retry-failed">Review failed eligible items for retry</button><button id="close-review">Close review</button></div>
 <div class="table-wrap"><table><thead><tr><th>Snapshot</th><th>GUID</th><th>State</th><th>Reason or error</th></tr></thead><tbody id="review-items"></tbody></table></div>
 <div class="toolbar"><button id="review-prev">Previous items</button><span id="review-page"></span><button id="review-next">Next items</button></div></section>
-<script src="/plugins/zfs.snapsync/js/snapshot-selection.js"></script><script src="/plugins/zfs.snapsync/js/snapshot-manager.js"></script>
+<script src="/plugins/zfs.snapsync/js/snapshot-selection.js"></script><script src="/plugins/zfs.snapsync/js/snapshot-manager.js?v=<?= (int) filemtime(__DIR__ . '/../../js/snapshot-manager.js') ?>"></script>

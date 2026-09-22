@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.06 (2026-09-22)
+
+- Reduce snapshot viewer metadata rescans: inventories stay in RAM for up to a minute, with background browsing refresh every 30 seconds.
+- Allow cold inventories up to a minute in the browser, bound ZFS metadata commands, and show a clear loading message. Fresh action validation still bypasses the display cache.
+
 ### 2026.09.22.05 (2026-09-22)
 
 - Fix replication Open workflow links and preserve the top-level SnapSync navigation context.

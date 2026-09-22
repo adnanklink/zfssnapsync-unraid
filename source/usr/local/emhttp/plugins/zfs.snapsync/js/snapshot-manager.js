@@ -22,7 +22,7 @@
     }
     const controller = new AbortController(); resources.set(resource, controller);
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 20000);
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, resource === 'inventory' ? 60000 : 20000);
     const params = new URLSearchParams();
     Object.keys(data).forEach(key => {
       if (Array.isArray(data[key])) data[key].forEach(value => params.append(key + '[]', value));
@@ -99,7 +99,9 @@
   }
   async function loadSnapshots(replace = false) {
     if (!selection.dataset || !visible()) return;
+    if (resources.has('inventory') && !replace) return;
     const stamp = selection.stamp();
+    $('counts').textContent = 'Loading snapshot metadata… Large or busy datasets can take up to a minute.';
     try {
       const payload = await request('inventory', 'snapshot-manager-dataset.php', Object.assign({dataset: selection.dataset}, filters()), 'GET', replace);
       if (!payload || !selection.accepts(stamp) || payload.dataset !== stamp.dataset) return;
@@ -108,7 +110,7 @@
       $('counts').textContent = payload.matching + ' matching / ' + payload.total + ' total snapshots';
       $('page-text').textContent = 'Page ' + page + ' of ' + pages;
       $('previous').disabled = page <= 1; $('next').disabled = page >= pages;
-    } catch (error) { if (error.name !== 'AbortError' && selection.accepts(stamp)) notice(error.message, true); }
+    } catch (error) { if (error.name !== 'AbortError' && selection.accepts(stamp)) { $('counts').textContent = 'Snapshot metadata unavailable.'; notice(error.message, true); } }
   }
   function datasetOptions() {
     const query = $('dataset-search').value.toLowerCase(), pool = $('pool').value;
@@ -261,6 +263,7 @@
   $('review-prev').addEventListener('click', () => { reviewPage--; batchStatus(true); });
   $('review-next').addEventListener('click', () => { reviewPage++; batchStatus(true); });
   document.addEventListener('visibilitychange', () => { if (visible()) { loadSnapshots(); batchStatus(); } });
-  window.setInterval(() => { if (visible()) { loadSnapshots(); batchStatus(); } }, 5000);
+  window.setInterval(() => { if (visible()) { batchStatus(); } }, 5000);
+  window.setInterval(() => { if (visible()) loadSnapshots(); }, 30000);
   loadDatasets();
 }());

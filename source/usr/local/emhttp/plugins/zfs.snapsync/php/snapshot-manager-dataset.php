@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/snapshot-manager-helpers.php';
+if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
+@set_time_limit(55);
 $dataset = zfsas_sm_trim($_GET['dataset'] ?? '');
 $rows = zfsas_sm_dataset_snapshots($dataset, $error);
 if ($error !== null) { zfsas_emit_marked_json(['ok' => false, 'error' => $error, 'dataset' => $dataset], 400); }

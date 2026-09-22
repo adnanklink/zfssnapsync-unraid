@@ -48,15 +48,18 @@ function zfsas_sm_dataset_snapshots($dataset, &$error = null, $fresh = false)
         $rows = $cached['rows'];
     } else {
         // One property inventory; holds use bounded argument lists, never one process per snapshot.
-        $lines = zfsas_sm_exec_lines('zfs list -H -p -t snapshot -o name,creation,used,written,userrefs,guid,createtxg,clones -d 1 ' . escapeshellarg($dataset), $rc);
-        if ($rc !== 0) { $error = 'Unable to read snapshot metadata.'; return []; }
+        $deadline = microtime(true) + 45;
+        $lines = zfsas_sm_exec_lines('timeout -k 2 40 zfs list -H -p -t snapshot -o name,creation,used,written,userrefs,guid,createtxg,clones -d 1 ' . escapeshellarg($dataset), $rc);
+        if ($rc !== 0) { $error = in_array($rc, [124,137], true) ? 'Snapshot metadata scan timed out. The pool may be busy; wait for heavy transfers to finish and retry.' : 'Unable to read snapshot metadata.'; return []; }
         $held = []; $tags = [];
         foreach ($lines as $line) {
             $p = explode("\t", $line);
             if ((int) ($p[4] ?? 0) > 0) { $held[] = $p[0]; }
         }
         foreach (array_chunk($held, 200) as $chunk) {
-            $holdLines = zfsas_sm_exec_lines('zfs holds -H ' . implode(' ', array_map('escapeshellarg', $chunk)), $rc);
+            $remaining = (int) floor($deadline - microtime(true));
+            if ($remaining < 1) { $error = 'Snapshot hold inspection timed out. Retry when the pool is less busy.'; return []; }
+            $holdLines = zfsas_sm_exec_lines('timeout -k 2 ' . $remaining . ' zfs holds -H ' . implode(' ', array_map('escapeshellarg', $chunk)), $rc);
             if ($rc !== 0) { continue; }
             foreach ($holdLines as $line) {
                 $p = explode("\t", $line);
@@ -64,7 +67,7 @@ function zfsas_sm_dataset_snapshots($dataset, &$error = null, $fresh = false)
             }
         }
         $rows = zfsas_sm_inventory_rows($dataset, $lines, $tags);
-        zfsas_sm_write_json_file($path, ['dataset' => $dataset, 'expires' => microtime(true) + 5, 'rows' => $rows]);
+        zfsas_sm_write_json_file($path, ['dataset' => $dataset, 'expires' => microtime(true) + 60, 'rows' => $rows]);
     }
     $autoPrefix = zfsas_read_auto_snapshot_prefix(zfsas_sm_plugin_config_dir());
     $prefixes = zfsas_known_send_prefixes(zfsas_sm_plugin_config_dir());
