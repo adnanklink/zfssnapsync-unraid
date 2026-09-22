@@ -12,7 +12,7 @@
       const value=name=>row.querySelector('[name^="job_'+name+'["]')?.value || '';
       const id=value('id'), schedule=summary?.schedules.find(item=>item.id===id);
       const item=document.createElement('tr');
-      const path=document.createElement('td'); const code=document.createElement('code');code.textContent=value('source')+' → '+value('destination');path.append(code);
+      const path=document.createElement('td'); const code=document.createElement('code');code.textContent=value('source')+' → '+value('destination');path.append(code);const retention=document.createElement('small');retention.className='ui-operation-kind';const keep=value('source_keep');retention.textContent=keep&&keep!=='0'?'Source: keep latest '+keep+' + protected checkpoints':'Source: keep all snapshots';path.append(retention);
       const when=document.createElement('td'); const freq=row.querySelector('[name^="job_frequency["]');when.textContent=freq?.selectedOptions[0]?.textContent || 'Configure schedule';
       const next=document.createElement('small');next.className='ui-operation-kind';next.textContent=schedule?.paused?'Paused until Resume':schedule?.preview?.nextScheduledText || (id?'Next occurrence unavailable':'Starts after Save');when.append(next);
       const state=document.createElement('td');const badge=document.createElement('span');badge.className='ui-badge';badge.textContent=schedule?.paused?'Paused':id?'Configured':'Unsaved';state.append(badge);

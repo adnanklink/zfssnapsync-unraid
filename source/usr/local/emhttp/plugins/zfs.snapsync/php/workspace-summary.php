@@ -17,6 +17,8 @@ function zfsas_workspace_summary(): array
         if (!$response['ok']) { throw new RuntimeException('Coordinator status unavailable.'); }
         $result['sources']['coordinator'] = ['available' => true];
         foreach ($response['result']['runs'] ?? [] as $run) {
+            if (!empty($run['sourceReview'])) { continue; }
+            $sourceCleanup=!empty($run['sourceCleanupOf']);
             $kinds = $run['kinds'] ?? [];
             $replication = in_array('send',$kinds,true) || in_array('prepare',$kinds,true) || in_array('finalize',$kinds,true);
             if (!in_array('auto', $kinds, true) && !in_array('batch', $kinds, true) && !$replication) { continue; }
@@ -29,9 +31,11 @@ function zfsas_workspace_summary(): array
                 if (!empty($task['result']['message'])) { $resultMessages[] = $task['result']['message']; }
             }
             if (!$details) { $details = $resultMessages; }
+            if ($sourceCleanup) { $c=$run['sourceCleanup'];array_unshift($details,sprintf('Source cleanup: %d deleted, %d skipped, %d protected, %d datasets deferred.',$c['deleted'],$c['skipped'],$c['protected'],$c['deferred'])); }
             $result['operations'][] = ['id' => 'coordinator:' . $run['id'], 'nativeId' => $run['id'], 'coordinator'=>true,'manual'=>$run['manual'] ?? false,'type' => $auto ? 'auto' : ($replication ? 'replication' : 'batch'),
-                'title' => $auto ? 'Automatic snapshots' : ($replication ? 'Replication' : 'Snapshot batch'), 'source' => implode(', ', array_unique($datasets)),
+                'title' => $sourceCleanup ? 'Source cleanup' : ($auto ? 'Automatic snapshots' : ($replication ? 'Replication' : 'Snapshot batch')), 'source' => implode(', ', array_unique($datasets)),
                 'destination' => '', 'state' => $run['state'], 'message' => implode(' ', array_unique($details)),
+                'sourceCleanup'=>$run['sourceCleanup'] ?? null,'sourceCleanupRunId'=>$run['sourceCleanupRunId'] ?? null,'sourceCleanupOf'=>$run['sourceCleanupOf'] ?? null,
                 'cleanup'=>$run['cleanup'] ?? null, 'createdAt' => $run['createdAt'], 'finishedAt' => $run['finishedAt'], 'progress' => in_array($run['state'], $terminal, true) ? null : $progress,
                 'phase' => in_array($run['state'], $terminal, true) ? '' : ($phase ?: (implode(', ', $run['blockedReasons'] ?? []) ?: 'Queued')),
                 'blocked' => $run['blockedReasons'] ?? [], 'retryAt' => $run['nextRetry'] ?? null,

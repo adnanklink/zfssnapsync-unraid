@@ -38,12 +38,13 @@
               <th>Transport</th>
               <th>Destination free-space target</th>
               <th>Low-space retention</th>
+              <th>Source snapshots</th>
               <th style="width:90px;">Remove</th>
             </tr>
           </thead>
           <tbody id="zfsas_send_jobs_body">
             <?php foreach ($formJobs as $index => $job) : ?>
-              <tr>
+              <tr data-source-keep="<?php echo (int)zfsas_source_policy($config,$job)['keep']; ?>">
                 <td>
                   <input type="hidden" name="job_id[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['id']); ?>">
                   <select name="job_source[<?php echo (int) $index; ?>]" class="zfsas-send-select">
@@ -175,7 +176,7 @@
         </div>
       </div>
     </details>
-<dialog id="new-job-dialog" aria-labelledby="new-job-title"><div class="ui-dialog-header"><h2 id="new-job-title">Add replication job</h2><button type="button" data-close-dialog>Cancel</button></div><p class="muted">Add the job to this form, then Save replication to activate it.</p>      <div class="zfsas-send-add-row">
+<dialog id="new-job-dialog" aria-labelledby="new-job-title"><div class="ui-dialog-header"><h2 id="new-job-title">Add replication job</h2><button type="button" data-close-dialog>Cancel</button></div><p class="muted">New local jobs default to keeping three source checkpoints. Choose Keep all in Edit to disable source cleanup. Existing checkpoints require review before enabling cleanup. Save replication to activate the job.</p>      <div class="zfsas-send-add-row">
         <div class="zfsas-send-field">
           <label for="new_job_source">Source dataset</label>
           <select id="new_job_source" name="new_job_source" class="zfsas-send-select">
@@ -247,7 +248,8 @@
 <p class="ui-footnote">Monitor transfers and review failures in <a href="/Settings/ZFSSnapSync?section=activity&type=replication">Activity</a>.</p>
 </div>
 <script type="application/json" id="replication-options"><?php echo json_encode([$saveApiUrl, $runApiUrl, $queueStatusApiUrl, $queueStreamApiUrl, $queueActionApiUrl, $queueLogDownloadApiUrl], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
-<script src="/plugins/zfs.snapsync/js/replication.js"></script>
+<script src="/plugins/zfs.snapsync/js/source-retention.js?v=<?= (int) filemtime(__DIR__ . '/../../js/source-retention.js') ?>"></script>
+<script src="/plugins/zfs.snapsync/js/replication.js?v=<?= (int) filemtime(__DIR__ . '/../../js/replication.js') ?>"></script>
 <script id="send-schedule-specs" type="application/json"><?php
 $displaySpecs = [];
 foreach ($formJobs as $job) { $displaySpecs[$job['id']] = zfsas_send_schedule_spec($config, $job); }

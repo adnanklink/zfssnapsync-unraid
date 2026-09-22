@@ -555,7 +555,7 @@ const pageOptions = JSON.parse(document.getElementById('replication-options').te
   function requestJsonPost(url, bodyParams, onSuccess, onError) {
     var xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
-    xhr.timeout = 15000;
+    xhr.timeout = url === saveApiUrl ? 45000 : 15000;
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');

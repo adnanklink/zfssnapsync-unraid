@@ -791,3 +791,9 @@
 }
 
 .zfsas-workspace #operation-detail, .zfsas-workspace #operation-detail-log { overflow-anchor:none; scroll-behavior:auto; }
+
+/* Source retention reviews stay readable within the replication editor. */
+.zfsas-workspace .source-retention-control input[type=number]{width:7em;}
+.zfsas-workspace .source-review-list{max-height:18rem;overflow:auto;padding-left:1.5rem;}
+.zfsas-workspace .source-review-list li,.zfsas-workspace .source-review-status{white-space:normal;overflow-wrap:anywhere;}
+.zfsas-workspace .source-review-status{margin-top:.6rem;}

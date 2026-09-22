@@ -81,7 +81,8 @@
   }
   function detail(op) {
     $('operation-title').textContent=op.title;
-    const entries=[['Status',label(op)],['Phase',(op.phase || '—').replaceAll('_',' ')],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId]];
+    const entries=[['Status',label(op)],['Phase',(op.phase || '—').replaceAll('_',' ')],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId],...(op.sourceCleanupOf?[['Replication run',op.sourceCleanupOf]]:[]),...(op.sourceCleanupRunId?[['Source cleanup run',op.sourceCleanupRunId]]:[])];
+    if(op.sourceCleanupOf)for(const [label,key] of [['Protected checkpoints','protectedReasons'],['Skipped checkpoints','skippedReasons']])entries.push([label,Object.entries(op.sourceCleanup?.[key]||{}).map(([reason,count])=>reason+' ('+count+')').join('; ')||'None recorded']);
     const content=$('operation-body');
     let metadata=$('operation-metadata');
     if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
@@ -90,6 +91,8 @@
     const markup='<dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+'<p class="ui-notice">'+escape(op.message||'No additional message recorded.')+'</p>'+(op.recoveryRequired?'<p class="error">Recovery requires review. Open the workflow before taking further action.</p>':'')+'<a href="'+escape(ZfsasUI.workflowUrl(op.url))+'">Open workflow →</a>';
     if(metadata.dataset.operation!==op.id || metadata.dataset.markup!==markup){
       metadata.innerHTML=markup;metadata.dataset.markup=markup;metadata.dataset.operation=op.id;
+      const related=op.sourceCleanupRunId||op.sourceCleanupOf;
+      if(related){const button=document.createElement('button');button.type='button';button.textContent=op.sourceCleanupRunId?'View source cleanup':'View completed replication';button.addEventListener('click',()=>{if(snapshot.operations.some(item=>item.id==='coordinator:'+related))open('coordinator:'+related,button);else ZfsasUI.notice('Related run details are outside the current history window.');});metadata.append(button);}
     }
     drawer.scrollTop=scroll;
     const actions=$('operation-actions');
@@ -104,7 +107,7 @@
   function open(id,trigger) {const op=snapshot.operations.find(item=>item.id===id);if(!op)return;if(selected!==id)$('operation-detail-log')?.remove();selected=id;$('operation-action-message').textContent='';detail(op);ZfsasUI.open($('operation-detail'),trigger);}
   async function perform(op,action) {
     if(busy)return;
-    if(action==='cancel' && !window.confirm(op.manual && op.type==='replication'?'Cancel this manual replication run? Completed receiver snapshots will be preserved.':op.type==='batch'?'Cancel this batch and its pending operations? Completed results will remain available.':'Cancel this whole run? Its schedule will remain paused until Resume.'))return;
+    if(action==='cancel' && !window.confirm(op.sourceCleanupOf?'Cancel the remaining source cleanup? Replication has completed; snapshots already deleted cannot be restored.':op.manual && op.type==='replication'?'Cancel this manual replication run? Completed receiver snapshots will be preserved.':op.type==='batch'?'Cancel this batch and its pending operations? Completed results will remain available.':'Cancel this whole run? Its schedule will remain paused until Resume.'))return;
     if(action==='retry' && op.coordinator===true && !window.confirm('Retry this captured snapshot and destination? Any interrupted receive will be validated before resuming.'))return;
     if(action==='clear_failed' && op.recoveryRequired && !window.confirm('Clear this recovery record after reviewing the preserved snapshots? Clearing releases its cleanup protection; it does not verify or remove those snapshots.'))return;
     busy=true; $('operation-actions').querySelectorAll('button').forEach(button=>button.disabled=true);
