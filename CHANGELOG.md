@@ -5,6 +5,12 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### Unreleased
+
+- Add source checkpoint retention to local replication: new jobs default to keeping three checkpoints; existing jobs remain on Keep all until reviewed and enabled.
+- Protect receiver bases, recovery references, holds, clones and foreign snapshots. Run cleanup only after fully verified replication, with separate linked Activity results.
+- Add paginated five-minute source-retention reviews and preserve runtime cleanup state in RAM only.
+
 ### 2026.09.22.06 (2026-09-22)
 
 - Reduce snapshot viewer metadata rescans: inventories stay in RAM for up to a minute, with background browsing refresh every 30 seconds.

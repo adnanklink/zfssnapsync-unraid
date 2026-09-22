@@ -108,6 +108,18 @@ SnapSync verifies destination identity, snapshot GUIDs, incremental bases, and r
 
 SSH jobs currently use the existing network execution path; native coordinator SSH integration is unfinished. The incomplete spiped transport is hidden from the WebGUI. The local low-space policy below does not apply to network jobs.
 
+### Source snapshot retention
+
+New local jobs default to **Keep latest 3** source checkpoints per job and dataset. Choose **Keep all** or a count from 1–1,000 in **Edit → Source snapshots**. Existing jobs remain on Keep all until explicitly enabled. A new job with no existing owned checkpoints can be saved directly; an existing checkpoint backlog requires **Review source snapshots → Use this retention policy → Save replication** within five minutes. Reducing the count or expanding an existing authorization also requires review.
+
+Source cleanup runs only after the entire replication run succeeds, including every recursive member. Activity shows a separate **Source cleanup** operation linked to the completed replication, with deleted/skipped counts and protection reasons. Cleanup failure does not repeat or undo a successful transfer. Saving a policy does not immediately delete snapshots.
+
+Cleanup uses SnapSync creation properties and dataset/snapshot GUIDs, never a prefix alone. It preserves the newest requested count, the verified checkpoint, incremental bases for all configured receivers (including paused jobs), active/recovery references, ZFS holds, and clones. These protections may retain more than the configured count. Unknown metadata, unavailable receivers, remote consumers, and unresolved resume tokens defer affected cleanup. New recursive members require review before source cleanup gains authority over them.
+
+Older checkpoints from unsuccessful transfers may be removed once a newer checkpoint is fully verified, unless recovery or another protection still needs them. Untagged snapshots and snapshots made by other tools remain unmanaged. If an external script needs a SnapSync-created checkpoint, place a ZFS hold on it; SnapSync cannot discover an arbitrary script's future intentions.
+
+Source cleanup currently applies only to native local configured jobs, including Run Now. Snapshot Manager manual sends do not grant source cleanup authority. Review manifests, deletion results and pending cleanup live in RAM. Reboot discards them; cleanup requires a new successful replication and fresh inspection. The saved retention policy survives reboot.
+
 ### Optional low-space anchor cleanup
 
 Local jobs default to **Preserve retained snapshots**. You can enable **Delete older retained snapshots when space is needed** for an individual job. Saving that choice authorizes future automatic removal of older daily/weekly restore points when ordinary retention cannot provide enough space.

@@ -26,6 +26,8 @@ php tests/reliability/replication_membership.php
 php tests/reliability/replication_snapshot.php
 php tests/reliability/replication_cleanup.php
 php tests/reliability/retention_anchor_policy.php
+php tests/reliability/source_retention.php
+php tests/reliability/coordinator_source_retention.php
 php tests/reliability/coordinator_pressure.php
 php tests/reliability/pressure_faults.php
 php tests/reliability/pressure_preflight.php

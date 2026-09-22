@@ -256,3 +256,36 @@ separate from these injected fault cases.
 Save returns committed jobs so generated IDs reach the form before its dirty baseline resets. Native sends use `zfs send -vP` stderr reports for stream estimates and sent bytes; a bounded parser reports at most once per two seconds using monotonic elapsed time for speed. Progress follows the existing attempt-token and sequence validation and RAM journal. No stream payload is read by PHP and no new flash writes are introduced. Activity projects only active task measurements and expires samples after ten seconds; transfer completion remains receiver verification, not reaching an estimated byte count. Multiple active members show their messages without inventing a combined percentage.
 
 Parser fixtures, immediate-save browser assertions, Activity progress rendering and the existing worker protocol suite cover this change. The OpenZFS output format is documented in https://openzfs.github.io/openzfs-docs/man/v2.4/8/zfs-send.8.html and implemented in `lib/libzfs/libzfs_sendrecv.c`. New native worker execution is required for byte/rate metrics; legacy network workers retain their existing progress availability.
+
+
+## Source checkpoint retention (unreleased)
+
+Source policies are stored as the versioned `SEND_SOURCE_RETENTION` field in the existing atomic, revision-checked send configuration. Missing policies mean Keep all. GUI new local jobs propose three checkpoints; Save captures current source identities and permits future cleanup only when no tagged backlog exists. Existing backlogs, lowered counts and changed scopes require a five-minute review. A deleted/re-added job cannot silently adopt its previous tagged snapshots.
+
+Successful native replication journals a pending source-cleanup event in the same commit as terminal completion. A separate idempotent child run releases the transfer's own reference protections without weakening active/recovery references. Its required anchors are registered in the reference index. Deletion admission fences conflicting future references, uses the global deletion executor and source/receiver dataset gates, and records each completed/skipped item through the current attempt token. Cleanup runs retain their parent evidence and never turn successful replication into a failed send.
+
+The count is a minimum retention target, not a hard cap. Local ownership properties, actual source dataset GUID, snapshot GUID/transaction, current policy revision, receiver bases/resume state, holds and clones are checked. Remote/unreachable consumers or unresolved resume tokens defer cleanup for the affected source. Source cleanup uses single-snapshot destruction only. External ZFS commands do not participate in plugin locks; external consumers must use holds on snapshots they need. As with other deletion paths, ZFS offers no atomic name-plus-GUID conditional destroy.
+
+Flash-write inventory for this feature:
+
+| Record/action | Storage and write rule |
+| --- | --- |
+| Source policy and reviewed dataset identities | `/boot/config/plugins/zfs.snapsync/zfs_send.conf`, explicit configuration Save only |
+| Cleanup cancellation | Existing persistent control decision, explicit Cancel only |
+| Reviews and paginated preview inventories | `/tmp/zfs-snapsync-source-reviews`, expire after five minutes; hourly artifact pruning |
+| Completion events, chunk plans, item outcomes | Existing RAM coordinator journal and attempt captures |
+| Ownership and deletion locks | Existing RAM runtime paths under `/var/run` |
+| Ownership evidence | Existing ZFS snapshot creation properties; no additional flash cursor |
+
+Reboot loses pending cleanup, reviews and history. The saved policy remains, but a new fully successful replication and current metadata inspection are required before cleanup. Coordinator restart within the same boot recovers the journal only after surviving worker shutdown; acknowledged item results are excluded from subsequent attempts. An unacknowledged destruction is rechecked against current metadata, never recreated from an absent snapshot.
+
+Verification added:
+
+- `source_retention.php`: count selection, ownership, lagging/unsupported receivers, resume blockers, holds/clones, superseded failures, preflight identity changes, authorization binding/expiry and 10,000-snapshot bounded planning.
+- `coordinator_source_retention.php`: completion publication/restart boundaries, idempotence, reference admission races, stale worker reports, per-item recovery, parent outcome isolation and complete RAM loss.
+- `source_retention_endpoints.php`: actual asynchronous review/status/save endpoints, CSRF, unchanged flash on preview, reduced-count rejection, omitted old form fields and disabling.
+- `source_retention_browser.cjs`: Chromium review pagination, wrapped paths, explicit approval/save, tuning preservation, canceled edits and stale-response rejection.
+- `source_retention_daemon.php`: actual coordinator/adapters with fake ZFS, 101 deletions across chunks, recovery-protected reference, live counts and idle polling against read-only `/boot`. Run separately with plugin/sbin mounted at production paths and mount capability. Optional `ZFSAS_TRACE=1` uses a strace loader bundle at `/trace-tools` and records file/write/metadata syscalls under `/trace-output`.
+- `source_retention_zfs.sh`: passed against disposable file-backed pools with read-only `/boot`; native completion handoff, latest-three cleanup, lagging receiver, hold/clone protection, superseded failed checkpoint, foreign snapshot/data preservation and subsequent incremental transfer. Use the same explicit disposable-pool prerequisites as the existing ZFS integration fixture.
+
+The instrumented daemon run recorded 138,020 file/write/metadata syscall lines with zero `/boot` write or metadata-change attempts. Existing stage-one and reliability suites, all configuration/workspace/snapshot browser suites, PHP/Bash checks and ShellCheck pass. The full existing disposable-ZFS suite also passes (full/incremental transfer, recursive verification, quota prerequisite cleanup, cancellation and validated resume). A temporary package passed the source inventory verification; no test pools remained afterward. Release artifacts and installation are separate from these source changes.
