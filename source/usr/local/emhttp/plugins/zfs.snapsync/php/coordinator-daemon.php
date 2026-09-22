@@ -126,7 +126,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
                     if ($task['state']==='failed') { $run['cleanup']['stopReason']=$task['result']['message'] ?? ''; }
                 }
                 $run['kinds'][] = $task['kind'];
-                $run['taskStatus'][] = array_intersect_key($task, array_flip(['id','kind','dataset','state','attemptCount','retryAt','blocked','dependencies','references','progress','result']));
+                $run['taskStatus'][] = ['phase'=>$task['parameters']['phase'] ?? $task['kind']] + array_intersect_key($task, array_flip(['id','kind','dataset','state','attemptCount','retryAt','blocked','dependencies','references','progress','progressAt','result']));
                 if ($task['blocked'] !== '') { $run['blockedReasons'][] = $task['blocked']; }
                 if ($task['retryAt'] !== null) { $run['nextRetry'] = min($run['nextRetry'] ?? PHP_INT_MAX, $task['retryAt']); }
                 $run['recoveryRequired'] = $run['recoveryRequired'] || $task['blocked'] === 'recovery_required' || !empty($task['result']['recoveryRequired']);

@@ -5,6 +5,7 @@ require_once __DIR__ . '/send-queue-helpers.php';
 require_once __DIR__ . '/migrate-datasets-helpers.php';
 require_once __DIR__ . '/config-service.php';
 require_once __DIR__ . '/send-schedule.php';
+require_once __DIR__ . '/transfer-progress.php';
 
 function zfsas_workspace_summary(): array
 {
@@ -20,15 +21,19 @@ function zfsas_workspace_summary(): array
             $replication = in_array('send',$kinds,true) || in_array('prepare',$kinds,true) || in_array('finalize',$kinds,true);
             if (!in_array('auto', $kinds, true) && !in_array('batch', $kinds, true) && !$replication) { continue; }
             $auto = in_array('auto', $kinds, true) && empty($run['nativeReplication']);
-            $details = []; $datasets = [];
+            $display = zfsas_run_progress($run, time());
+            $details = $display['messages']; $datasets = []; $resultMessages = [];
+            $progress = $display['percent']; $phase = $display['phase'];
             foreach ($run['taskStatus'] ?? [] as $task) {
                 if (!empty($task['dataset'])) { $datasets[] = $task['dataset']; }
-                if (!empty($task['result']['message'])) { $details[] = $task['result']['message']; }
+                if (!empty($task['result']['message'])) { $resultMessages[] = $task['result']['message']; }
             }
+            if (!$details) { $details = $resultMessages; }
             $result['operations'][] = ['id' => 'coordinator:' . $run['id'], 'nativeId' => $run['id'], 'coordinator'=>true,'manual'=>$run['manual'] ?? false,'type' => $auto ? 'auto' : ($replication ? 'replication' : 'batch'),
                 'title' => $auto ? 'Automatic snapshots' : ($replication ? 'Replication' : 'Snapshot batch'), 'source' => implode(', ', array_unique($datasets)),
                 'destination' => '', 'state' => $run['state'], 'message' => implode(' ', array_unique($details)),
-                'cleanup'=>$run['cleanup'] ?? null, 'createdAt' => $run['createdAt'], 'finishedAt' => $run['finishedAt'], 'progress' => null,
+                'cleanup'=>$run['cleanup'] ?? null, 'createdAt' => $run['createdAt'], 'finishedAt' => $run['finishedAt'], 'progress' => in_array($run['state'], $terminal, true) ? null : $progress,
+                'phase' => in_array($run['state'], $terminal, true) ? '' : ($phase ?: (implode(', ', $run['blockedReasons'] ?? []) ?: 'Queued')),
                 'blocked' => $run['blockedReasons'] ?? [], 'retryAt' => $run['nextRetry'] ?? null,
                 'recoveryRequired' => $run['recoveryRequired'] ?? false,
                 'actions' => !in_array($run['state'], array_merge($terminal, ['canceling']), true) ? ['cancel'] : (!empty($run['canRetry']) ? ['retry'] : []),
@@ -45,7 +50,7 @@ function zfsas_workspace_summary(): array
             $result['operations'][] = ['id' => 'replication:' . $job['id'], 'nativeId' => $job['id'], 'type' => 'replication',
                 'parentId' => $job['parentRunId'], 'scheduleId' => $job['scheduleId'],
                 'title' => $job['typeLabel'], 'source' => $job['source'], 'destination' => $job['destination'],
-                'state' => $job['stateLabel'] === 'Canceled' ? 'canceled' : $job['state'], 'stateLabel' => $job['stateLabel'],
+                'state' => $job['stateLabel'] === 'Canceled' ? 'canceled' : $job['state'], 'stateLabel' => $job['stateLabel'], 'phase'=>$job['phase'],
                 'message' => $job['rawMessage'], 'createdAt' => strtotime($job['requestedAt']) ?: null,
                 'progress' => $job['progressVisible'] ? $job['progress'] : null, 'blocked' => [],
                 'retryAt' => (int) $job['retryAt'] ?: null, 'actions' => $actions, 'recoveryRequired' => $job['recoveryRequired'],

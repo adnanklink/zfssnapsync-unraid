@@ -60,6 +60,18 @@
       row.cells[0].querySelector('small').textContent=op.parentId?'Run '+op.parentId:op.type;
       row.cells[1].querySelector('code').textContent=[op.source,op.destination].filter(Boolean).join(' → ') || 'Configured datasets';
       const badge=row.cells[2].firstChild;badge.dataset.state=op.state;badge.textContent=label(op);
+      let activity=row.cells[2].querySelector('.ui-transfer-status');
+      if(!activity){activity=document.createElement('div');activity.className='ui-transfer-status';row.cells[2].append(activity);}
+      activity.replaceChildren();
+      if(active(op)){
+        const phase=document.createElement('small');phase.textContent=(op.phase || (op.blocked||[]).join(', ') || '').replaceAll('_',' ');activity.append(phase);
+        if(op.type==='replication'){
+          const bar=document.createElement('progress');bar.max=100;bar.setAttribute('aria-label','Estimated transfer progress');
+          if(Number.isFinite(op.progress))bar.value=Math.max(0,Math.min(100,op.progress));
+          if(Number.isFinite(op.progress) || op.phase?.includes('transfer'))activity.append(bar);
+          const message=document.createElement('small');message.textContent=op.message || '';activity.append(message);
+        }
+      }
       row.cells[3].textContent=date(op.createdAt);
       // Avoid detaching focused rows on routine refresh.
       if(row.parentElement!==body) body.append(row);
@@ -69,7 +81,7 @@
   }
   function detail(op) {
     $('operation-title').textContent=op.title;
-    const entries=[['Status',label(op)],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId]];
+    const entries=[['Status',label(op)],['Phase',(op.phase || '—').replaceAll('_',' ')],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId]];
     const existingLog=$('operation-detail-log');
     const content=$('operation-body');
     if (content.contains(document.activeElement)) return;

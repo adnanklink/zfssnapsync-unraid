@@ -5,6 +5,12 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.22.01 (2026-09-22)
+
+- Update newly saved replication job IDs and badges immediately without refreshing.
+- Show native replication phases, transfer progress bars, bytes sent and sampled MiB/s in Activity. Hide stale measurements and keep transfer estimates below 100% pending verified completion.
+- Transfer measurements require a newly started native worker; existing and network workers may provide fewer metrics.
+
 ### 2026.09.21.01 (2026-09-21)
 
 - Fix overlapping replication editor fields by isolating the vertical form from Unraid table sizing and wrapping rules.

@@ -3,6 +3,7 @@ const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.snapsync');
 const summary={ok:true,generatedAt:1700000000,timezone:'UTC',sources:{configuration:{available:true},coordinator:{available:true}},operations:[{id:'coordinator:batch',nativeId:'batch-run',type:'batch',title:'Snapshot batch',state:'running',createdAt:1699999999,actions:['cancel'],url:'?section=snapshots',logType:'batch'},{id:'coordinator:example',nativeId:'example',type:'auto',title:'Automatic snapshots',state:'running',createdAt:1700000000,actions:['cancel'],url:'?section=snapshots&tab=automation',logType:'auto'},{id:'replication:recovery',nativeId:'recovery',type:'replication',title:'Interrupted snapshot creation',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['clear_failed'],url:'?section=replication',logType:'replication'}],schedules:[],pausedSchedules:[]};
+summary.operations.push({id:'coordinator:transfer',nativeId:'transfer',type:'replication',title:'Active transfer',state:'running',phase:'transfer',progress:42,message:'42 MiB sent · 8.0 MiB/s',actions:[],url:'?section=activity'});
 summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'replication',coordinator:true,manual:true,title:'Native replication',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['retry'],url:'?section=activity'});
 (async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{
  for(const query of ['section=overview','section=snapshots','section=snapshots&tab=automation','section=replication','section=activity','section=tools','section=tools&tab=migrator','section=help']){
@@ -18,6 +19,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
    if(discoveryRequests===1){await new Promise(resolve=>setTimeout(resolve,300));data={ok:false,error:'Test discovery failure'};}
    if(discoveryRequests===3) await new Promise(resolve=>setTimeout(resolve,1200));
  }
+ if(url.pathname.endsWith('save-send-settings.php')) data={ok:true,saved:true,schedulerApplied:true,revision:'saved',errors:[],jobs:[{id:'abcdef123456',source:'tank/anchor-test',destination:'backup/anchor-test'}]};
  if(url.pathname.endsWith('save-interface-settings.php')) data={ok:true,enabled:true,revision:'saved-revision'};
  if(url.pathname.endsWith('send-queue-action.php'))mutationRequests++;
  if(url.pathname.endsWith('workspace-summary.php')){summaryRequests++;data=summary;}
@@ -55,6 +57,8 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Show available log'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.getElementById('operation-detail').open);assert(await button.evaluate(el=>el===document.activeElement));
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});const previous=summaryRequests;await page.waitForTimeout(2200);assert.equal(summaryRequests,previous,'Hidden Overview polled');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});}
  if(query==='section=activity'){
+ assert.equal(await page.locator('[data-operation="coordinator:transfer"] progress').getAttribute('value'),'42');
+ assert.match(await page.locator('[data-operation="coordinator:transfer"]').textContent(),/8.0 MiB\/s/);
  await page.locator('[data-operation="coordinator:native"] button').click();
  page.once('dialog',async dialog=>{assert.match(dialog.message(),/validated before resuming/);await dialog.accept();});
  const [nativeRequest]=await Promise.all([page.waitForRequest(request=>request.url().endsWith('coordinator-action.php')),page.getByRole('button',{name:'Retry',exact:true}).click()]);
@@ -102,6 +106,10 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  assert.equal(await policy.inputValue(),'retention_only','Cancel did not restore cleanup policy');
  await policy.selectOption('older_anchors');await page.locator('#finish-job-edit').click();
  assert.equal(await page.locator('#zfsas_send_jobs_body select[name^="job_cleanup_policy["]').last().inputValue(),'older_anchors','Editor lost explicit opt-in');
+ await page.getByRole('button',{name:'Save replication',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('[name^="job_id["]').value==='abcdef123456');
+ assert.equal(await page.locator('#replication-job-list .ui-badge').last().textContent(),'Configured');
+ assert.equal(await page.locator('#zfsas_send_form').getAttribute('data-dirty'),'false');
  }
  if(query==='section=tools'){
  assert(!(await page.locator('[name=show_tab]').isChecked()));

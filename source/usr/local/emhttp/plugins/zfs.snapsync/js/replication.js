@@ -749,6 +749,15 @@ const pageOptions = JSON.parse(document.getElementById('replication-options').te
       saveForm,
       saveApiUrl,
       function (data) {
+        if (data.saved && Array.isArray(data.jobs)) {
+          saveForm.querySelectorAll('[name^="job_id["]').forEach(input => {
+            const row = input.closest('tr');
+            const source = row.querySelector('[name^="job_source["]')?.value;
+            const destination = row.querySelector('[name^="job_destination["]')?.value.trim();
+            const job = data.jobs.find(job => job.source === source && job.destination === destination);
+            if (job) input.value = job.id;
+          });
+        }
         saveForm.dispatchEvent(new CustomEvent('zfsas:saved', {detail: data}));
         renderFeedback((data.errors || []).concat(data.schedulerApplied === false ? (data.notices || []) : []));
         if (!Array.isArray(data.errors) || data.errors.length === 0) {

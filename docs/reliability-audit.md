@@ -250,3 +250,9 @@ shared-reference protection, external space recovery, and quota/freeing failures
 The complete reliability suite and the extended chunk-traversal fixture pass.
 Production code was unchanged; previous real-ZFS/flash-trace evidence remains
 separate from these injected fault cases.
+
+## Replication visibility (2026-09-22)
+
+Save returns committed jobs so generated IDs reach the form before its dirty baseline resets. Native sends use `zfs send -vP` stderr reports for stream estimates and sent bytes; a bounded parser reports at most once per two seconds using monotonic elapsed time for speed. Progress follows the existing attempt-token and sequence validation and RAM journal. No stream payload is read by PHP and no new flash writes are introduced. Activity projects only active task measurements and expires samples after ten seconds; transfer completion remains receiver verification, not reaching an estimated byte count. Multiple active members show their messages without inventing a combined percentage.
+
+Parser fixtures, immediate-save browser assertions, Activity progress rendering and the existing worker protocol suite cover this change. The OpenZFS output format is documented in https://openzfs.github.io/openzfs-docs/man/v2.4/8/zfs-send.8.html and implemented in `lib/libzfs/libzfs_sendrecv.c`. New native worker execution is required for byte/rate metrics; legacy network workers retain their existing progress availability.

@@ -62,6 +62,7 @@ trait ZfsasCoordinatorWorkerState
                 throw new InvalidArgumentException('Invalid bounded progress report.');
             }
             $this->state['tasks'][$taskId]['progress'] = $payload;
+            $this->state['tasks'][$taskId]['progressAt'] = $now;
         } elseif ($type === 'result') {
             self::checkedWorkerOutcome($payload);
             if (($payload['outcome'] ?? '') === 'success' && !empty($this->state['tasks'][$taskId]['parameters']['nativePlan']) && !isset($this->state['tasks'][$taskId]['planFingerprint'])) { throw new InvalidArgumentException('Native preparation cannot succeed without its expected child plan.'); }

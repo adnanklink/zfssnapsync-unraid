@@ -48,5 +48,6 @@
   $('zfsas_add_send_job').addEventListener('click',()=>{if(!document.getElementById('new_job_source').value && !document.getElementById('new_job_destination').value){add.close();render();}});
   $('zfsas_send_form').addEventListener('change',()=>{if(!edit.open)render();});
   const status=ZfsasRequests.poll('replication-status',()=>ZfsasRequests.request('replication-status','/plugins/zfs.snapsync/php/workspace-summary.php'),data=>{summary=data;if(!edit.open&&!add.open&&!list.contains(document.activeElement))render();return false;});
+  $('zfsas_send_form').addEventListener('zfsas:saved', event=>{if(event.detail.saved){render(true);status.refresh();}});
   render();
 })();
