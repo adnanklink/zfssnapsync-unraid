@@ -1,7 +1,10 @@
 <?xml version='1.0' standalone='yes'?>
-<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.22.08" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.23.01" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
-### 2026.09.22.08 (2026-09-22)
+### 2026.09.23.01 (2026-09-23)
+- Detect coordinator compatibility and explain unavailable recovery and job logs.
+- Refresh only when attempts finish; refuse busy updates before package replacement and verify activation.
+- Show expandable replication stages and dataset pages, with explicit loading errors and retry.
 - Show job-specific logs and retain original ZFS errors with clear failure explanations and next actions.
 - Add reviewed recovery for interrupted local replication, resuming original snapshots without creating fresh ones.
 - Direct repeated Run Now to recovery and check interrupted receivers before creating source snapshots.
@@ -40,9 +43,9 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
 
-  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.22.08-noarch-1.txz" Min="6.12.0">
-    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.22.08-noarch-1.txz</URL>
-    <MD5>52c37193554e2880e74c3013dbd02ee1</MD5>
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.23.01-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.23.01-noarch-1.txz</URL>
+    <MD5>f5839ae26a0f0b681dd4b4d58e90a2cd</MD5>
   </FILE>
 
   <FILE Run="/bin/bash">
@@ -50,10 +53,10 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 set -euo pipefail
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
-PKG_FILE="zfs-snapsync-2026.09.22.08-noarch-1.txz"
+PKG_FILE="zfs-snapsync-2026.09.23.01-noarch-1.txz"
 PKG_PATH="${PKG_DIR}/${PKG_FILE}"
 PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/${PKG_FILE}"
-PKG_MD5="52c37193554e2880e74c3013dbd02ee1"
+PKG_MD5="f5839ae26a0f0b681dd4b4d58e90a2cd"
 PKG_NAME="zfs-snapsync"
 
 if command -v upgradepkg >/dev/null 2>&1; then
@@ -95,6 +98,15 @@ if ! verify_md5; then
   verify_md5
 fi
 
+# Serialize installers and extract the incoming lifecycle code before replacement.
+mkdir -p /var/run/zfs-snapsync-coordinator
+exec 9>/var/run/zfs-snapsync-coordinator/install.lock
+flock -n 9 || { echo 'Another installation is running.' >&2; exit 1; }
+STAGED="$(mktemp -d /tmp/zfs-snapsync-install.XXXXXX)"
+trap 'rm -rf "$STAGED"' EXIT
+tar -xJf "$PKG_PATH" -C "$STAGED"
+php "$STAGED/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php" prepare
+
 "${UPGRADEPKG}" --install-new "${PKG_PATH}"
 
 if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
@@ -108,12 +120,14 @@ if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
 fi
 
 if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh ]; then
-  /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh || true
+  /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh
 fi
 
 if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh ]; then
-  /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh || true
+  /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh
 fi
+# Some package managers ignore doinst.sh failures. Verify activation explicitly.
+php /usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php verify
     ]]></INLINE>
   </FILE>
 
