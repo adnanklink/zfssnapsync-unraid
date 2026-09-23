@@ -10,7 +10,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
   try {
     const page = await browser.newPage({viewport: {width: 1400, height: 900}});
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    let addNew = false, captures = [], datasetRequests = 0;
+    let addNew = false, captures = [], datasetRequests = 0, singleActions = [];
     const row = (i, dataset = 'tank/data') => ({dataset, snapshot: dataset + '@auto-' + String(i).padStart(5, '0'), snapshotName: 'auto-' + String(i).padStart(5, '0'), guid: String(i + 1), identity: dataset + '@auto-' + String(i).padStart(5, '0') + '#' + (i + 1), createdEpoch: i, createdText: String(i), usedBytes: i % 2, writtenBytes: i % 3, usedText: i % 2 + ' B', writtenText: i % 3 + ' B', metadataComplete: true, pendingAction: i === 2 ? 'delete' : '', eligibility: {delete: '', hold: '', release: 'No plugin hold', send: '', rollback: ''}});
     const all = () => Array.from({length: 10000 + Number(addNew)}, (_, i) => row(i));
     await page.route('http://zfsas.test/**', async route => {
@@ -37,6 +37,9 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
           const items = JSON.parse(post.get('items')); assert(items.length <= 500); captures.push(...items);
           payload = {ok: true, token: 'a'.repeat(32), dataset: 'tank/data', action: post.get('operation'), state: post.get('seal') === '1' ? 'review' : 'draft', selected: captures.length, eligible: captures.length, counts: {queued: captures.length, completed: 0, skipped: 0, failed: 0}, expires: Math.floor(Date.now()/1000)+300, page: 1, pages: Math.ceil(captures.length/100), items: captures.slice(0, 100).map(r => ({...r, candidate: true, state: 'queued', reason: 'Selected snapshot'}))};
         } else payload = {ok: false, error: 'Unexpected test action ' + action};
+      } else if (url.pathname.endsWith('snapshot-manager-action.php')) {
+        singleActions.push(new URLSearchParams(route.request().postData() || ''));
+        payload = {ok:true, message:'Submitted'};
       } else throw Error('Unexpected URL ' + url);
       await route.fulfill({contentType: 'application/json', body: JSON.stringify(payload)});
     });
@@ -79,6 +82,19 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     await page.waitForTimeout(350);
     assert.equal(await page.locator('#dataset-title').textContent(), 'tank/data');
     assert((await page.locator('[data-select]').first().getAttribute('data-select')).startsWith('tank/data@'));
+    for (const action of ['restore','send']) {
+      page.once('dialog', async dialog => {
+        assert(dialog.message().includes(action === 'restore' ? 'NEW writable' : 'read-only'));
+        await dialog.accept('backup/new-target');
+      });
+      await page.locator('[data-single="' + action + '"]').first().click();
+      await page.waitForFunction(() => document.querySelector('#snapshots'));
+      await page.waitForTimeout(150);
+    }
+    assert.equal(singleActions.length,2);
+    assert.equal(singleActions[0].get('action'),'restore');
+    assert.equal(singleActions[1].get('action'),'send');
+    assert.notEqual(singleActions[0].get('command_id'),singleActions[1].get('command_id'));
     assert.deepEqual(errors, []);
     assert(datasetRequests > 6);
     console.log('PASS: Chromium 10,000 rows, disabled Shift ranges, cross-page and frozen matching selection, 500-item uploads, filters, out-of-order dataset responses');

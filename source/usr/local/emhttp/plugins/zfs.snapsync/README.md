@@ -13,3 +13,9 @@ Cleanup previews default to Auto Snapshot-managed snapshots. Zero-change and con
 Cancel persists the decision for the whole replication run before terminating processes and pauses its schedule until Resume. Receives no longer force rollback or destroy destinations to reseed. Prefix overlap is rejected on both settings pages and on the server. Restore tuning defaults requires Save and preserves datasets, prefixes, connections and schedule pauses. Concurrent/stale settings saves are rejected. The UI uses bounded polling and asynchronous dataset discovery.
 
 Upgrade/removal preserves queue records and lock files and verifies process shutdown. Failed upgrade shutdown leaves a maintenance marker under the plugin configuration directory; resolve the reported process issue and rerun installation.
+
+### Backup protection and writable restores
+
+Backup sends set the destination dataset to `readonly=on`; native local sends also protect existing receivers before transfer and verify the property at completion, including already-received retries. Scheduled recovery retries remain backup operations. Network backup receive commands request the same read-only property. This applies when work runs, not as an installation-time sweep of existing datasets. It does not undo existing receiver divergence.
+
+In Snapshot Manager, **Send** creates a protected backup. **Restore** sends the selected snapshot to a **new writable dataset** below an existing parent. Choose the snapshot on the surviving backup; the original source need not exist. Restore does not replace an existing dataset, change the backup's properties, or recursively restore child datasets. Retry preserves the original backup/restore purpose. Receives remain unmounted (`-u`); mount a restored dataset at the intended path when ready to activate it. This is a single-snapshot restore action, not a complete disaster-recovery wizard.

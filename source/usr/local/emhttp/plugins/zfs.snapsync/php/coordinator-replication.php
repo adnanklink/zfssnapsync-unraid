@@ -48,6 +48,7 @@ function zfsas_coordinator_submit_replication(ZfsasCoordinatorState $journal, ar
     $replication = $request['replication'] ?? [];
     if (!is_array($replication)) { throw new InvalidArgumentException('Captured replication request required.'); }
     ZfsasReplicationInspection::validate($replication);
+    if (($replication['purpose'] ?? 'backup') === 'restore' && empty($replication['createDestination'])) { throw new InvalidArgumentException('Restore requires a new destination dataset.'); }
     $sourceDatasetGuid = $request['sourceDatasetGuid'] ?? '';
     if (!is_string($sourceDatasetGuid) || !preg_match('/^[0-9]{1,20}$/D',$sourceDatasetGuid)
         || !is_string($request['revision'] ?? null) || !preg_match('/^[a-f0-9]{64}$/D',$request['revision'])) {
@@ -84,7 +85,9 @@ function zfsas_coordinator_replication_receipt(ZfsasCoordinatorState $journal, a
 
 function zfsas_replication_selection_digest(array $request): string
 {
-    return hash('sha256',json_encode([$request['sourceSnapshot'] ?? null,$request['sourceGuid'] ?? null,$request['destination'] ?? null],JSON_THROW_ON_ERROR));
+    $selection=[$request['sourceSnapshot'] ?? null,$request['sourceGuid'] ?? null,$request['destination'] ?? null];
+    if (($request['purpose'] ?? 'backup') !== 'backup') { $selection[]=$request['purpose']; }
+    return hash('sha256',json_encode($selection,JSON_THROW_ON_ERROR));
 }
 
 function zfsas_coordinator_retry_replication(ZfsasCoordinatorState $journal, string $runId, string $revision, array $sendConfig): array

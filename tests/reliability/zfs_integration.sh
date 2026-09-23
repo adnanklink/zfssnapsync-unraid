@@ -100,6 +100,7 @@ zfs send "$source_dataset@base" | zfs receive -u "$target_pool/native"
 zfs snapshot "$target_pool@unrelated-native"
 php "$ROOT/tests/reliability/native_replication.php" "$source_dataset" "$target_pool/native" "$target_pool@unrelated-native"
 php "$ROOT/tests/reliability/native_replication.php" "$source_dataset" "$target_pool/native-full" "$target_pool@unrelated-native" full
+php "$ROOT/tests/reliability/native_replication.php" "$target_pool/native-full" "$source_pool/restored" "$target_pool@unrelated-native" restore
 run_pipeline_with_status 'Real incremental transfer' "$source_dataset@base" "$source_dataset@next" "$destination"
 snapshots_have_same_guid "$source_dataset@next" "$destination@next" local
 # Native preparation proves completion without replay and rejects receiver divergence.

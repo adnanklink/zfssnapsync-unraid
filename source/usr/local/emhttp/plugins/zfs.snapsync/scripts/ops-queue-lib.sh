@@ -2979,7 +2979,7 @@ build_ssh_receive_command() {
   is_valid_dataset_name "$destination" || return 1
   # -s preserves partial receive state and exposes receive_resume_token after
   # an interrupted stream, allowing zfs send -t to resume rather than resend.
-  remote_receive="zfs receive -s -u -- $(shell_quote_word "$destination")"
+  remote_receive="zfs receive -s -u -o readonly=on -- $(shell_quote_word "$destination")"
   build_ssh_zfs_command "$remote_receive" "$result_var"
 }
 
@@ -2998,7 +2998,7 @@ build_spiped_receive_command() {
   is_valid_spiped_key_path "$key_path" || return 1
 
   listen_addr="${listen_host}:${listen_port}"
-  built_command="spiped -d -s '$(shell_quote_word "$listen_addr")' -k $(shell_quote_word "$key_path") | zfs receive -s -u -- $(shell_quote_word "$destination")"
+  built_command="spiped -d -s '$(shell_quote_word "$listen_addr")' -k $(shell_quote_word "$key_path") | zfs receive -s -u -o readonly=on -- $(shell_quote_word "$destination")"
   printf -v "$result_var" '%s' "$built_command"
 }
 
@@ -3254,7 +3254,7 @@ run_pipeline_with_status() {
   fi
   if [[ "$send_transport" == "local" || "$send_transport" == "ssh" ]]; then
     if [[ "$send_transport" == local ]]; then
-      receive_command="zfs receive -s -u -- $(shell_quote_word "$destination")"
+      receive_command="zfs receive -s -u -o readonly=on -- $(shell_quote_word "$destination")"
     elif ! build_ssh_receive_command "$destination" receive_command; then
       log "Unsupported ZFS send transport '$send_transport' requested for $description; SSH receiver settings are incomplete or invalid."
       return 1
@@ -3309,7 +3309,7 @@ run_pipeline_with_status() {
     return 1
   fi
   if [[ "$send_transport" == "local" ]]; then
-    receive_command="zfs receive -s -u -- $(shell_quote_word "$destination")"
+    receive_command="zfs receive -s -u -o readonly=on -- $(shell_quote_word "$destination")"
   fi
 
   if [[ -z "$base_snapshot" ]] && zfs_guid_for_transport "$destination" "$send_transport" >/dev/null; then

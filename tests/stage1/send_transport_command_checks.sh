@@ -410,7 +410,7 @@ case "$remote_command" in
     printf '%s\n' "backup/data"
     exit 0
     ;;
-  *"zfs receive -s -u -- backup/data"*)
+  *"zfs receive -s -u -o readonly=on -- backup/data"*)
     cat >/dev/null
     exit 0
     ;;

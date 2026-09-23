@@ -11,10 +11,11 @@ final class ZfsasReplicationInspection
 {
     public static function validate(array $request): void
     {
-        if (array_diff(array_keys($request), ['sourceSnapshot','sourceGuid','destination','destinationGuid','destinationParentGuid','createDestination','allowResume','transport'])
+        if (array_diff(array_keys($request), ['sourceSnapshot','sourceGuid','destination','destinationGuid','destinationParentGuid','createDestination','allowResume','transport','purpose'])
             || ($request['transport'] ?? 'local') !== 'local') {
             throw new InvalidArgumentException('This inspection phase requires a local receiver.');
         }
+        if (!in_array($request['purpose'] ?? 'backup', ['backup','restore'], true)) { throw new InvalidArgumentException('Invalid receive purpose.'); }
         foreach (['sourceSnapshot','destination'] as $field) {
             if (!is_string($request[$field] ?? null)) { throw new InvalidArgumentException('Missing replication target.'); }
         }

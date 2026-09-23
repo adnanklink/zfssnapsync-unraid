@@ -22,9 +22,18 @@ try {
         $result = zfsas_replication_revalidate($parameters);
         if ($result['outcome'] === 'success') {
             $complete = $result['inspection']['mode'] === 'already_received';
+            $readonly = ($parameters['replication']['purpose'] ?? 'backup') === 'restore' ? 'off' : 'on';
+            // Apply only under the worker's dataset gates after identity validation.
+            // Protect existing backups before transfer, including already-received retries.
+            if (($phase === 'replication_transfer' || $phase === 'replication_verify')
+                && $result['inspection']['destinationDatasetGuid'] !== null) {
+                ZfsasReplicationInspection::command(['set','readonly='.$readonly,$parameters['replication']['destination']]);
+            }
             if ($phase === 'replication_verify') {
                 if (!$complete) { throw new InvalidArgumentException('Expected receiver checkpoint is absent; replication is not complete.'); }
-                $result['message'] = 'Verified expected receiver snapshot and dataset GUIDs.';
+                $actual = trim(ZfsasReplicationInspection::command(['get','-H','-o','value','readonly','--',$parameters['replication']['destination']]));
+                if ($actual !== $readonly) { throw new RuntimeException('Receiver readonly policy could not be verified.'); }
+                $result['message'] = 'Verified expected receiver snapshot and dataset GUIDs. '.($readonly === 'on' ? 'Backup destination is read-only.' : 'Restored destination is writable; mount it when ready.');
             } elseif (in_array($phase,['replication_space','replication_transfer'],true)) {
                 if (!$complete) { $result = zfsas_replication_space($parameters); }
                 if (!$complete && $phase === 'replication_space' && ($result['outcome'] ?? '')==='validation_failure' && ($result['reason'] ?? '')==='space') {
@@ -43,8 +52,8 @@ try {
                     $request = $parameters['replication'];
                     $resumeToken = $parameters['inspection']['mode'] === 'resume' ? zfsas_replication_resume_token($parameters) : '';
                     $process = proc_open(['/bin/bash','-o','pipefail','-c',
-                        'if [[ -n "$5" ]]; then zfs send -vP -t "$5"; elif [[ -n "$1" ]]; then zfs send -vP -i "$1" "$2"; else zfs send -vP "$2"; fi | { if [[ "$4" == 0 ]]; then cat; else mbuffer -q -R "$4"; fi; } | zfs receive -s -u -- "$3"','snapsync-transfer',
-                        $parameters['inspection']['base']['snapshot'] ?? '',$request['sourceSnapshot'],$request['destination'],$rate,$resumeToken],
+                        'if [[ -n "$5" ]]; then zfs send -vP -t "$5"; elif [[ -n "$1" ]]; then zfs send -vP -i "$1" "$2"; else zfs send -vP "$2"; fi | { if [[ "$4" == 0 ]]; then cat; else mbuffer -q -R "$4"; fi; } | zfs receive -s -u -o "readonly=$6" -- "$3"','snapsync-transfer',
+                        $parameters['inspection']['base']['snapshot'] ?? '',$request['sourceSnapshot'],$request['destination'],$rate,$resumeToken,$readonly],
                         [0=>['file','/dev/null','r'],1=>['file','/dev/null','w'],2=>['pipe','w']],$pipes);
                     if (!is_resource($process)) { throw new RuntimeException('Cannot launch replication pipeline.'); }
                     // Drain diagnostics without retaining unbounded output or any

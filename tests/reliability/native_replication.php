@@ -16,11 +16,20 @@ $selectedName=($argv[4]??'')==='resume' ? 'large' : 'next';
 $request=['action'=>'replication','commandId'=>'native-real-send-'.substr(hash('sha256',$argv[2]),0,12),'revision'=>zfsas_config_revision($config),
  'sourceDatasetGuid'=>$read($argv[1]),'replication'=>['sourceSnapshot'=>$argv[1].'@'.$selectedName,'sourceGuid'=>$read($argv[1].'@'.$selectedName),
  'destination'=>$argv[2]]];
-if (($argv[4]??'')==='full') { $request['replication'] += ['createDestination'=>true,'destinationParentGuid'=>$read(substr($argv[2],0,strrpos($argv[2],'/')))]; }
+if (in_array($argv[4]??'', ['full','restore'],true)) { $request['replication'] += ['createDestination'=>true,'destinationParentGuid'=>$read(substr($argv[2],0,strrpos($argv[2],'/')))]; }
 else { $request['replication']['destinationGuid']=$read($argv[2]); }
+if (($argv[4]??'')==='restore') { $request['replication']['purpose']='restore'; }
 $daemon=proc_open([PHP_BINARY,$plugin.'/coordinator-daemon.php'],[1=>['file','/tmp/snapsync-native-daemon.log','a'],2=>['file','/tmp/snapsync-native-daemon.log','a']],$pipes);
 try{
  until(function(){try{return rpc(['action'=>'status']);}catch(Throwable $e){return false;}});
+ if (($argv[4]??'')==='restore') {
+  $post=['csrf_token'=>'fixture','action'=>'restore','dataset'=>$argv[1],'snapshots'=>[$request['replication']['sourceSnapshot']], 'guid'=>$request['replication']['sourceGuid'],'destination'=>$argv[2],'command_id'=>$request['commandId']];
+  $runner='/tmp/restore-endpoint.php';file_put_contents($runner,'<?php $GLOBALS["csrf_token"]="fixture"; $_SERVER["REQUEST_METHOD"]="POST"; $_POST=json_decode($argv[2],true); require $argv[1];');
+  $endpoint=proc_open([PHP_BINARY,$runner,$plugin.'/snapshot-manager-action.php',json_encode($post)],[1=>['pipe','w'],2=>['pipe','w']],$epipes);
+  $output=stream_get_contents($epipes[1]);$errors=stream_get_contents($epipes[2]);fclose($epipes[1]);fclose($epipes[2]);proc_close($endpoint);
+  check((bool)preg_match('/ZFSAS_JSON_BEGIN\s*(.*?)\s*ZFSAS_JSON_END/s',$output,$match),'Bad restore endpoint response: '.$output.$errors);
+  $response=json_decode($match[1],true);check(!empty($response['ok']),json_encode($response));
+ }
  $receipt=rpc($request);$submittedReceipt=$receipt;check(rpc($request)===$receipt,'Duplicate submission changed operation');
  $run=until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $run){if($run['id']===$receipt['runId'] && ZfsasCoordinatorState::terminal($run['state']))return $run;}return false;});
  if (($argv[4]??'')==='resume') {
@@ -30,14 +39,21 @@ try{
   foreach(rpc(['action'=>'status'])['runs'] as $prior){if($prior['id']===$original)check(!$prior['recoveryRequired'],'Verified successor retained stale recovery protection');}
  }
  check($run['state']==='complete',json_encode($run));
- check(zfsas_native_manual_send($request['replication']['sourceSnapshot'],$request['replication']['sourceGuid'],$argv[2],$request['commandId'])===$submittedReceipt,'UI retry after receiver creation duplicated or rejected the accepted command');
+ check(zfsas_native_manual_send($request['replication']['sourceSnapshot'],$request['replication']['sourceGuid'],$argv[2],$request['commandId'],$request['replication']['purpose'] ?? 'backup')===$submittedReceipt,'UI retry after receiver creation duplicated or rejected the accepted command');
  check(count($run['taskStatus'])===4,'Native graph omitted a phase');
  foreach($run['taskStatus'] as $task){check($task['state']==='complete' && $task['result']['outcome']==='success','Child completion lacks explicit success');}
+ check(trim(ZfsasReplicationInspection::command(['get','-H','-o','value','readonly',$argv[2]]))===((($argv[4]??'')==='restore')?'off':'on'),'Wrong receive readonly policy');
  check($read($argv[2].'@'.$selectedName)===$request['replication']['sourceGuid'],'Native transfer checkpoint differs');
  check($read($argv[3])!=='' ,'Unrelated receiver snapshot disappeared');
+ ZfsasReplicationInspection::command(['set','readonly='.(($argv[4]??'')==='restore'?'on':'off'),$argv[2]]);
+ if (($argv[4]??'')==='restore') {
+  check(trim(ZfsasReplicationInspection::command(['get','-H','-o','value','readonly',$argv[1]]))==='on','Restore changed surviving backup protection');
+  try { zfsas_native_manual_send($request['replication']['sourceSnapshot'],$request['replication']['sourceGuid'],$argv[2],'restore-existing-rejected','restore'); throw new RuntimeException('Restore accepted existing destination'); } catch (InvalidArgumentException $expected) {}
+ }
  $request['commandId'].='-already';$receipt=rpc($request);
  $run=until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $run){if($run['id']===$receipt['runId'] && ZfsasCoordinatorState::terminal($run['state']))return $run;}return false;});
  check($run['state']==='complete' && count($run['taskStatus'])===2,'Completed target was retransferred instead of verified');
+ check(trim(ZfsasReplicationInspection::command(['get','-H','-o','value','readonly',$argv[2]]))===((($argv[4]??'')==='restore')?'off':'on'),'Already-received verification did not restore policy');
  file_put_contents('/var/local/emhttp/var.ini','mdState="STOPPED"');
  $request['commandId'].='-cancel';
  $receipt=rpc($request);

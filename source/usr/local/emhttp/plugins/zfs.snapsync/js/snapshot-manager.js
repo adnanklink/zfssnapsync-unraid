@@ -81,7 +81,7 @@
       if ((row.clones || []).length) badges.push('Clone dependencies');
       return '<tr><td><input type="checkbox" data-index="' + index + '" data-select="' + escape(row.identity) + '" aria-label="Select ' + escape(row.snapshotName) + '" ' + (selection.items.has(row.identity) ? 'checked ' : '') + (!selection.selectable(row) ? 'disabled' : '') + '></td>' +
         '<td><code>' + escape(row.snapshotName) + '</code></td><td>' + escape(row.createdText) + '</td><td>' + escape(row.usedText) + '</td><td>' + escape(row.writtenText) + '</td><td>' + badges.map(badge => '<span class="badge">' + escape(badge) + '</span>').join(' ') + '</td><td>' +
-        ['send', 'rollback'].map(action => '<button data-single="' + action + '" data-index="' + index + '" title="' + escape(row.eligibility[action] || '') + '" ' + (row.eligibility[action] ? 'disabled' : '') + '>' + (action === 'send' ? 'Send' : 'Rollback') + '</button>').join(' ') + '</td></tr>';
+        ['send', 'restore', 'rollback'].map(action => '<button data-single="' + action + '" data-index="' + index + '" title="' + escape(row.eligibility[action === 'restore' ? 'send' : action] || '') + '" ' + (row.eligibility[action === 'restore' ? 'send' : action] ? 'disabled' : '') + '>' + (action === 'send' ? 'Send' : action === 'restore' ? 'Restore' : 'Rollback') + '</button>').join(' ') + '</td></tr>';
     }).join('') || '<tr><td colspan="7">No matching snapshots.</td></tr>';
     const body = $('snapshots');
     if (body._html !== html) {
@@ -214,15 +214,15 @@
     if (button) perform(async stamp => {
       const row = rows[Number(button.dataset.index)], action = button.dataset.single;
       const data = {dataset: stamp.dataset, action, snapshots: [row.snapshot], guid: row.guid};
-      if (action === 'send') {
-        const destination = window.prompt('Destination dataset for ' + row.snapshot + ':');
+      if (action === 'send' || action === 'restore') {
+        const destination = window.prompt((action === 'restore' ? 'Restore to a NEW writable dataset (parent must exist). The restored dataset will remain unmounted. Snapshot: ' : 'Backup destination (will be made read-only). Snapshot: ') + row.snapshot + '\nDestination dataset:');
         if (!destination) return; data.destination = destination;
-        const key = row.snapshot + '#' + row.guid + '|' + destination;
+        const key = action + '|' + row.snapshot + '#' + row.guid + '|' + destination;
         if (!pendingSendCommands.has(key)) pendingSendCommands.set(key, 'manual-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join(''));
         data.command_id = pendingSendCommands.get(key);
       }
       const payload = await request('action', 'snapshot-manager-action.php', data, 'POST');
-      if (action === 'send') pendingSendCommands.delete(row.snapshot + '#' + row.guid + '|' + data.destination);
+      if (action === 'send' || action === 'restore') pendingSendCommands.delete(action + '|' + row.snapshot + '#' + row.guid + '|' + data.destination);
       if (!selection.accepts(stamp)) return;
       if (payload.token) renderBatch(payload); else { notice(payload.message); loadSnapshots(true); }
     });

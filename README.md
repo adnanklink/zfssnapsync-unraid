@@ -240,3 +240,9 @@ SnapSync is developed independently. Please report SnapSync-specific issues in t
 ## License
 
 [MIT License](LICENSE). Original copyright and license notices are retained.
+
+### Backup protection and writable restores
+
+Backup sends set the destination dataset to `readonly=on`; native local sends also protect existing receivers before transfer and verify the property at completion, including already-received retries. Scheduled recovery retries remain backup operations. Network backup receive commands request the same read-only property. This applies when work runs, not as an installation-time sweep of existing datasets. It does not undo existing receiver divergence.
+
+In Snapshot Manager, **Send** creates a protected backup. **Restore** sends the selected snapshot to a **new writable dataset** below an existing parent. Choose the snapshot on the surviving backup; the original source need not exist. Restore does not replace an existing dataset, change the backup's properties, or recursively restore child datasets. Retry preserves the original backup/restore purpose. Receives remain unmounted (`-u`); mount a restored dataset at the intended path when ready to activate it. This is a single-snapshot restore action, not a complete disaster-recovery wizard.

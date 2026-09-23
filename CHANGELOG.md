@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.23.05 (2026-09-23)
+
+- Protect backup receive destinations as read-only, including native retries and completed-transfer verification.
+- Add Snapshot Manager Restore to send a surviving backup snapshot to a new writable dataset. Preserve restore intent during retries; leave restored datasets unmounted for deliberate activation.
+
 ### 2026.09.23.04 (2026-09-23)
 
 - Keep Unraid's PHP-FPM, nginx and nchan services running during plugin activation so the installer can finish registration and report success without disconnecting itself.

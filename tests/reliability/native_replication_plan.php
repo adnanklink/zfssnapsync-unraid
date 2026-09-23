@@ -37,3 +37,19 @@ $lookup=zfsas_coordinator_replication_receipt($j,['commandId'=>'native']+$reques
 check($lookup['found'] && $lookup['receipt']===$receipt,'Pruning lost submission idempotency context');
 check(zfsas_coordinator_submit_replication($j,$request,$revision,['SEND_RATE_LIMIT'=>'40M'])===$receipt,'Pruning recreated accepted operation');
 echo "PASS: native manual admission pins selection, immutable settings and receipts, atomic checkpoint publication, ordered space/transfer graph and cancellation fencing\n";
+
+$restore=$request;$restore['commandId']='restore';
+$restore['replication']['purpose']='restore';
+reject(fn()=>zfsas_coordinator_submit_replication($j,$restore,$revision));
+unset($restore['replication']['destinationGuid']);
+$restore['replication']+=['createDestination'=>true,'destinationParentGuid'=>'21'];
+$r=zfsas_coordinator_submit_replication($j,$restore,$revision);
+check($j->state['tasks'][$r['runId'].':prepare']['parameters']['replication']['purpose']==='restore','Restore purpose lost at admission');
+$full=$inspection;$full['mode']='full';$full['destinationDatasetGuid']=null;$full['base']=null;
+foreach(zfsas_replication_plan($restore['replication'],$full,$revision)['tasks'] as $t){check($t['parameters']['replication']['purpose']==='restore','Restore purpose lost in worker graph');}
+reject(fn()=>zfsas_coordinator_replication_receipt($j,['commandId'=>'restore']+array_replace($restore['replication'],['purpose'=>'backup'])));
+$j->cancel($r['runId'],time());
+$retry=zfsas_coordinator_retry_replication($j,$r['runId'],$revision,[]);
+check($j->state['tasks'][$retry['runId'].':prepare']['parameters']['replication']['purpose']==='restore','Restore retry became a backup');
+reject(fn()=>ZfsasReplicationInspection::validate(array_replace($request['replication'],['purpose'=>'unknown'])));
+echo "PASS: restore new-target admission, intent propagation, retry preservation and receipt isolation\n";
