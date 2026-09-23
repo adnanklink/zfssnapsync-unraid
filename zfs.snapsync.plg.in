@@ -2,6 +2,7 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Keep the WebGUI and installer connection running while completing activation.
 - Activate explicitly after package replacement, even when the package manager skips its hook.
 - Avoid duplicate activation and verify the running coordinator before reporting success.
 - Safely retry installations left in maintenance after a failed hook.

@@ -5,6 +5,10 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.23.04 (2026-09-23)
+
+- Keep Unraid's PHP-FPM, nginx and nchan services running during plugin activation so the installer can finish registration and report success without disconnecting itself.
+
 ### 2026.09.23.03 (2026-09-23)
 
 - Run package activation explicitly from the plugin installer after package replacement finishes, including when the package manager skips its installation hook.

@@ -4,7 +4,12 @@ set -euo pipefail
 [[ -f /.dockerenv ]] || exit 77
 plugin=/usr/local/emhttp/plugins/zfs.snapsync
 config=/boot/config/plugins/zfs.snapsync
-mkdir -p "$plugin" "$config" /var/log/packages /tmp/install-bin
+mkdir -p "$plugin" "$config" /var/log/packages /tmp/install-bin /etc/rc.d
+# Service reloads would terminate the real installer's reporting connection.
+for service in rc.php-fpm rc.nginx; do
+  printf '#!/bin/bash\necho invoked > /tmp/webgui-restarted\nexit 91\n' > "/etc/rc.d/$service"
+  chmod +x "/etc/rc.d/$service"
+done
 cp -a source/usr/local/emhttp/plugins/zfs.snapsync/. "$plugin/"
 printf 'DATASETS=""\nPREFIX="auto-"\n' > "$config/zfs_snapsync.conf"
 printf 'SEND_SNAPSHOT_PREFIX="send-"\n' > "$config/zfs_send.conf"
@@ -110,4 +115,5 @@ rm /tmp/fail-cron-activation
 bash /tmp/install-manifest.sh >/tmp/install-output 2>/tmp/install-hidden-errors || { cat /tmp/install-output; exit 1; }
 [[ -f /var/run/zfs-snapsync-coordinator/installation-ready && ! -f "$config/maintenance" && ! -s /tmp/install-hidden-errors ]]
 grep -q 'zfs_snapsync_coordinator watchdog' /etc/cron.d/zfs_snapsync
-echo 'PASS: stdout-only errors, busy preflight preserves release, failed/skipped hook barriers survive, watchdog preserves blockers, idle retry succeeds without manual flag removal'
+[[ ! -e /tmp/webgui-restarted ]]
+echo 'PASS: WebGUI stays running, stdout-only errors, busy preflight preserves release, failed/skipped hook barriers survive, watchdog preserves blockers, idle retry succeeds without manual flag removal'

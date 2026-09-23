@@ -39,8 +39,7 @@ INSTALL_STAGE='applying schedules'
 if command -v update_cron >/dev/null 2>&1; then update_cron; fi
 INSTALL_STAGE='starting and verifying the coordinator'
 php "${PLUGIN_DIR}/php/coordinator-lifecycle.php" activate
-INSTALL_STAGE='refreshing the WebGUI runtime'
-if [[ -x /etc/rc.d/rc.php-fpm ]]; then /etc/rc.d/rc.php-fpm reload; fi
-if [[ -x /etc/rc.d/rc.nginx ]]; then /etc/rc.d/rc.nginx reload; fi
+# Unraid's installer reports through the WebGUI/nchan services. Restarting
+# those services here interrupts the caller before plugin registration finishes.
 : > /var/run/zfs-snapsync-coordinator/installation-ready
 echo 'Package installed and coordinator activation verified.'
