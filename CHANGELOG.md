@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.23.03 (2026-09-23)
+
+- Run package activation explicitly from the plugin installer after package replacement finishes, including when the package manager skips its installation hook.
+- Defer the package hook during plugin-managed updates to avoid duplicate activation. Keep the final coordinator handshake check and safe maintenance retry.
+
 ### 2026.09.23.02 (2026-09-23)
 
 - Allow an explicit installation retry to reuse an installation-owned maintenance barrier, while repeating all worker and coordinator ownership checks before replacing files.

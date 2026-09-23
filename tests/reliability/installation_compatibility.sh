@@ -65,15 +65,12 @@ cp /var/run/zfs-snapsync-coordinator/refresh.json /tmp/hook-blocker-before
 php "$plugin/php/coordinator-lifecycle.php" watchdog >/tmp/watchdog-output 2>&1 && exit 1
 cmp /var/run/zfs-snapsync-coordinator/refresh.json /tmp/hook-blocker-before
 [[ "$(cat "$config/maintenance")" == installation ]]
-# A skipped hook also fails the explicit verification step.
+# With a skipped package hook, explicit activation must still propagate failures.
 rm -f /tmp/run-install-hook
-for helper in repair-permissions sync-cron migrate-runtime-state; do printf '#!/bin/bash\nexit 0\n' > "$plugin/scripts/$helper.sh"; done
 expect_failure
-grep -q 'installation hook failed' /tmp/install-output
+grep -q 'applying permissions and configuration (exit 17)' /tmp/install-output
 [[ "$(cat "$config/maintenance")" == installation ]]
-cp /var/run/zfs-snapsync-coordinator/refresh.json /tmp/install-blocker-before
-php "$plugin/php/coordinator-lifecycle.php" watchdog >/tmp/watchdog-output 2>&1 && exit 1
-cmp /var/run/zfs-snapsync-coordinator/refresh.json /tmp/install-blocker-before
+for helper in repair-permissions sync-cron migrate-runtime-state; do printf '#!/bin/bash\nexit 0\n' > "$plugin/scripts/$helper.sh"; done
 # Retrying with surviving work must keep the barrier and leave files intact.
 rm -f /tmp/package-replaced
 setsid /usr/local/sbin/zfs_snapsync_send_worker &
@@ -85,10 +82,14 @@ expect_failure
 kill -- -"$worker"
 wait "$worker" || true
 trap - EXIT
-# Successful hook, matching handshake and registration are all required.
-: > /tmp/run-install-hook
+# Skipped package hook: manifest must activate and verify the service itself.
+rm -f /tmp/run-install-hook
 bash /tmp/install-manifest.sh >/tmp/install-output 2>/tmp/install-hidden-errors || { cat /tmp/install-output; exit 1; }
 [[ -f /var/run/zfs-snapsync-coordinator/installation-ready && ! -f "$config/maintenance" ]]
+# When the package hook runs, it must defer to the manifest (one activation only).
+: > /tmp/run-install-hook
+bash /tmp/install-manifest.sh >/tmp/install-output 2>/tmp/install-hidden-errors || { cat /tmp/install-output; exit 1; }
+[[ "$(grep -c 'Package installed and coordinator activation verified.' /tmp/install-output)" == 1 ]]
 # Exercise real configuration, migration and cron helpers, not only hook stubs.
 for helper in repair-permissions sync-cron migrate-runtime-state; do
   cp "source/usr/local/emhttp/plugins/zfs.snapsync/scripts/$helper.sh" "$plugin/scripts/$helper.sh"

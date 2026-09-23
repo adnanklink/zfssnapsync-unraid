@@ -28,3 +28,7 @@ The real-pool run passed with syscall tracing: no flash-writing file calls after
 An explicit retry reuses an existing maintenance file only when its contents are exactly `installation`. It leaves that barrier in place throughout the repeated idle and ownership checks; active workers still prevent package replacement. Other maintenance owners remain blocked. Hook failures are recorded in RAM and watchdog checks during installation preserve their original reason. The manifest and hook merge stderr into stdout because Unraid forwards stdout to its installer display. Stage-specific failure messages identify the failing preflight or activation step.
 
 The installation fixture separately captures stdout and stderr, exercises busy retries, skipped and failed hooks, real permission/migration/cron helpers, and successful retry without manually removing maintenance.
+
+## Explicit activation (2026.09.23.03)
+
+Plugin-managed updates pass `ZFSAS_DEFER_ACTIVATION=1` to `upgradepkg`, then invoke `post-install.sh` explicitly after package registration. A package manager that skips `doinst.sh` therefore still receives full activation. If it invokes the hook, the hook defers activation until replacement finishes. Direct package installs continue to invoke activation through `doinst.sh`. Final readiness and coordinator handshake verification remain mandatory. Fixtures cover both skipped and executed package hooks, exactly one activation, and failures in the explicit activation path.
