@@ -1,7 +1,9 @@
 <?xml version='1.0' standalone='yes'?>
-<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.23.02" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.23.03" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
-### 2026.09.23.02 (2026-09-23)
+### 2026.09.23.03 (2026-09-23)
+- Activate explicitly after package replacement, even when the package manager skips its hook.
+- Avoid duplicate activation and verify the running coordinator before reporting success.
 - Safely retry installations left in maintenance after a failed hook.
 - Display preflight and activation errors in Unraid, and retain the original failure reason.
 - Detect coordinator compatibility and explain unavailable recovery and job logs.
@@ -45,9 +47,9 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
 
-  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.23.02-noarch-1.txz" Min="6.12.0">
-    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.23.02-noarch-1.txz</URL>
-    <MD5>0aa7bb35cc8310a01ce22f1ccfaacf3b</MD5>
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.23.03-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.23.03-noarch-1.txz</URL>
+    <MD5>1a6188263f29b681cb3a087409d48a7b</MD5>
   </FILE>
 
   <FILE Run="/bin/bash">
@@ -66,10 +68,10 @@ install_failed() {
 trap install_failed ERR
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
-PKG_FILE="zfs-snapsync-2026.09.23.02-noarch-1.txz"
+PKG_FILE="zfs-snapsync-2026.09.23.03-noarch-1.txz"
 PKG_PATH="${PKG_DIR}/${PKG_FILE}"
 PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/${PKG_FILE}"
-PKG_MD5="0aa7bb35cc8310a01ce22f1ccfaacf3b"
+PKG_MD5="1a6188263f29b681cb3a087409d48a7b"
 PKG_NAME="zfs-snapsync"
 
 if command -v upgradepkg >/dev/null 2>&1; then
@@ -129,12 +131,12 @@ php "$STAGED/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php
 
 INSTALL_STAGE='installing the package and running its activation hook'
 echo 'Idle preflight passed; installing the package…'
-"${UPGRADEPKG}" --install-new "${PKG_PATH}"
+ZFSAS_DEFER_ACTIVATION=1 "${UPGRADEPKG}" --install-new "${PKG_PATH}"
 
 INSTALL_STAGE='verifying package registration'
 if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
   echo "Package registration missing after install; retrying with --reinstall." >&2
-  "${UPGRADEPKG}" --install-new --reinstall "${PKG_PATH}"
+  ZFSAS_DEFER_ACTIVATION=1 "${UPGRADEPKG}" --install-new --reinstall "${PKG_PATH}"
 fi
 
 if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
@@ -142,15 +144,9 @@ if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
   exit 1
 fi
 
-INSTALL_STAGE='applying plugin permissions and configuration'
-if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh ]; then
-  /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh
-fi
-
-INSTALL_STAGE='applying schedules'
-if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh ]; then
-  /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh
-fi
+INSTALL_STAGE='running package activation explicitly'
+echo 'Activating the installed package…'
+/bin/bash /usr/local/emhttp/plugins/zfs.snapsync/scripts/post-install.sh
 INSTALL_STAGE='verifying coordinator activation'
 # Some package managers ignore doinst.sh failures. Verify activation explicitly.
 php /usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php verify
