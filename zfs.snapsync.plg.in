@@ -2,6 +2,8 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Safely retry installations left in maintenance after a failed hook.
+- Display preflight and activation errors in Unraid, and retain the original failure reason.
 - Detect coordinator compatibility and explain unavailable recovery and job logs.
 - Refresh only when attempts finish; refuse busy updates before package replacement and verify activation.
 - Show expandable replication stages and dataset pages, with explicit loading errors and retry.
@@ -50,7 +52,18 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <FILE Run="/bin/bash">
     <INLINE><![CDATA[
-set -euo pipefail
+# Unraid forwards stdout from inline scripts to the WebGUI, not stderr.
+exec 2>&1
+set -Eeuo pipefail
+INSTALL_STAGE='initializing installation'
+install_failed() {
+  local status="$?"
+  trap - ERR
+  echo "ERROR: ZFS SnapSync installation failed while ${INSTALL_STAGE} (exit ${status})."
+  echo 'The preceding message gives the blocker. Existing work must finish before installation can continue.'
+  exit "$status"
+}
+trap install_failed ERR
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
 PKG_FILE="zfs-snapsync-__VERSION__-noarch-1.txz"
@@ -88,27 +101,37 @@ verify_md5() {
   fi
 }
 
+INSTALL_STAGE='downloading the package'
 if [[ ! -f "${PKG_PATH}" ]]; then
   download_pkg
 fi
 
+INSTALL_STAGE='verifying the package checksum'
 if ! verify_md5; then
   rm -f "${PKG_PATH}"
   download_pkg
   verify_md5
 fi
 
+INSTALL_STAGE='acquiring the installation lock'
+echo 'Checking installation ownership…'
 # Serialize installers and extract the incoming lifecycle code before replacement.
 mkdir -p /var/run/zfs-snapsync-coordinator
 exec 9>/var/run/zfs-snapsync-coordinator/install.lock
 flock -n 9 || { echo 'Another installation is running.' >&2; exit 1; }
+INSTALL_STAGE='staging the incoming package in RAM'
 STAGED="$(mktemp -d /tmp/zfs-snapsync-install.XXXXXX)"
 trap 'rm -rf "$STAGED"' EXIT
 tar -xJf "$PKG_PATH" -C "$STAGED"
+INSTALL_STAGE='checking coordinator and worker ownership before replacement'
+echo 'Checking whether existing work has finished…'
 php "$STAGED/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php" prepare
 
+INSTALL_STAGE='installing the package and running its activation hook'
+echo 'Idle preflight passed; installing the package…'
 "${UPGRADEPKG}" --install-new "${PKG_PATH}"
 
+INSTALL_STAGE='verifying package registration'
 if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
   echo "Package registration missing after install; retrying with --reinstall." >&2
   "${UPGRADEPKG}" --install-new --reinstall "${PKG_PATH}"
@@ -119,13 +142,16 @@ if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
   exit 1
 fi
 
+INSTALL_STAGE='applying plugin permissions and configuration'
 if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh ]; then
   /usr/local/emhttp/plugins/zfs.snapsync/scripts/repair-permissions.sh
 fi
 
+INSTALL_STAGE='applying schedules'
 if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh ]; then
   /usr/local/emhttp/plugins/zfs.snapsync/scripts/sync-cron.sh
 fi
+INSTALL_STAGE='verifying coordinator activation'
 # Some package managers ignore doinst.sh failures. Verify activation explicitly.
 php /usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php verify
     ]]></INLINE>

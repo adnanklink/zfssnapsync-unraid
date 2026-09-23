@@ -62,10 +62,16 @@ function zfsas_lifecycle(string $mode): void
             return;
         }
         if($mode==='prepare') {
-            if(is_file($maintenance)) throw new RuntimeException('Installation maintenance already exists; resolve the previous installation first.');
-            if(!is_dir(dirname($maintenance))) mkdir(dirname($maintenance),0755,true);
-            if(file_put_contents($maintenance,'installation')===false) throw new RuntimeException('Cannot establish installation admission barrier.');
-            $createdMaintenance=true;
+            if(is_file($maintenance)) {
+                // A failed hook leaves this exact installation-owned barrier in place.
+                // An explicit retry may reuse it, but must repeat every idle/ownership
+                // check before replacing files. Never remove the barrier to retry.
+                if(file_get_contents($maintenance)!=='installation') throw new RuntimeException('Maintenance belongs to another operation; installation cannot replace its barrier.');
+            } else {
+                if(!is_dir(dirname($maintenance))) mkdir(dirname($maintenance),0755,true);
+                if(file_put_contents($maintenance,'installation')===false) throw new RuntimeException('Cannot establish installation admission barrier.');
+                $createdMaintenance=true;
+            }
             if(is_file($runtime.'/installation-ready'))unlink($runtime.'/installation-ready');
         } elseif(is_file($maintenance) && $mode!=='activate') { throw new RuntimeException('Explicit installation maintenance is active.'); }
         try { $hello=zfsas_coordinator_request(['action'=>'handshake'],$runtime.'/control.sock',1); }
@@ -120,7 +126,8 @@ function zfsas_lifecycle(string $mode): void
         } while(microtime(true)<$deadline);
         throw new RuntimeException('Package installed, but coordinator activation failed. Inspect the coordinator log; watchdog will retry.');
     } catch(Throwable $error) {
-        $mark('blocked',$error->getMessage());
+        // Polling watchdogs must not erase an explicit install's more useful failure.
+        if($mode!=='watchdog' || !is_file($maintenance) || !is_file($runtime.'/refresh.json')) $mark('blocked',$error->getMessage());
         if($createdMaintenance) unlink($maintenance); // Aborted before package replacement.
         throw $error;
     } finally { flock($lock,LOCK_UN);fclose($lock); }

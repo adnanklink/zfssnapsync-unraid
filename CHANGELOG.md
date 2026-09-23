@@ -5,6 +5,12 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.23.02 (2026-09-23)
+
+- Allow an explicit installation retry to reuse an installation-owned maintenance barrier, while repeating all worker and coordinator ownership checks before replacing files.
+- Show preflight and activation errors in Unraid’s installer output, including the failed installation stage.
+- Preserve the original installation failure in RAM instead of replacing it with a generic watchdog maintenance message.
+
 ### 2026.09.23.01 (2026-09-23)
 
 - Detect older or mismatched coordinators and explain when job logs or recovery are unavailable. Failed loads now show a local error and retry option instead of remaining on Loading.

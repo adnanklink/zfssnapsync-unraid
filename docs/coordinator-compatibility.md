@@ -22,3 +22,9 @@ Run production-path fixtures only in disposable containers. The added tests are:
 - `coordinator_refresh_zfs.sh`: two unique file-backed disposable pools, a throttled real stream, a pending refresh, queued work, unchanged stream count and receiver GUID, stable receipts, and read-only `/boot`.
 
 The real-pool run passed with syscall tracing: no flash-writing file calls after the read-only marker across 79,988 trace lines. Both test pools were removed and a subsequent pool listing was empty. Existing reliability, stage-one, workspace endpoint, recovery/workspace/layout/attention browser suites, PHP/Bash syntax, ShellCheck error checks, and temporary package-content verification also passed. Generated release artifacts were not updated.
+
+## Installation retry fix (2026.09.23.02)
+
+An explicit retry reuses an existing maintenance file only when its contents are exactly `installation`. It leaves that barrier in place throughout the repeated idle and ownership checks; active workers still prevent package replacement. Other maintenance owners remain blocked. Hook failures are recorded in RAM and watchdog checks during installation preserve their original reason. The manifest and hook merge stderr into stdout because Unraid forwards stdout to its installer display. Stage-specific failure messages identify the failing preflight or activation step.
+
+The installation fixture separately captures stdout and stderr, exercises busy retries, skipped and failed hooks, real permission/migration/cron helpers, and successful retry without manually removing maintenance.
