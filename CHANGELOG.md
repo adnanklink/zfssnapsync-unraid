@@ -5,7 +5,7 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
-### Unreleased
+### 2026.09.23.01 (2026-09-23)
 
 - Detect older or mismatched coordinators and explain when job logs or recovery are unavailable. Failed loads now show a local error and retry option instead of remaining on Loading.
 - Refresh supported coordinators only after existing attempts and their process groups finish. Reject busy installations before replacing files, preserve RAM history and queued work, and verify installation hooks and service activation.
