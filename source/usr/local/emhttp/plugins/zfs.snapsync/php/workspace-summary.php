@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/response-helpers.php';
 require_once __DIR__ . '/coordinator-socket.php';
+require_once __DIR__.'/coordinator-service.php';
 require_once __DIR__ . '/send-queue-helpers.php';
 require_once __DIR__ . '/migrate-datasets-helpers.php';
 require_once __DIR__ . '/config-service.php';
@@ -16,6 +17,7 @@ function zfsas_workspace_summary(): array
     try {
         $response = zfsas_coordinator_request(['action' => 'status'], '/var/run/zfs-snapsync-coordinator/control.sock', .5);
         if (!$response['ok']) { throw new RuntimeException('Coordinator status unavailable.'); }
+        $result['service']=zfsas_service_compatibility($response['result']['service'] ?? null);
         $result['sources']['coordinator'] = ['available' => true];
         foreach ($response['result']['runs'] ?? [] as $run) {
             if (!empty($run['sourceReview']) || !empty($run['recoveryReview'])) { continue; }

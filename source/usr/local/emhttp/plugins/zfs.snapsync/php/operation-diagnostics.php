@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__."/operation-stages.php";
 /** Bounded, read-only projections of coordinator evidence. */
 function zfsas_diagnostic_text(string $text): string
 {
@@ -44,7 +45,7 @@ function zfsas_operation_problem(array $tasks): ?array
         'phase'=>$p['phase'] ?? $task['phase'] ?? $task['kind'],'failedCount'=>count($failures),
         'diagnostic'=>$diagnostic, 'diagnosticAvailable'=>$diagnostic!==''];
 }
-function zfsas_operation_detail(ZfsasCoordinatorState $journal,string $id,int $offset=0): array
+function zfsas_operation_detail(ZfsasCoordinatorState $journal,string $id,int $offset=0,string $stage="",int $stageOffset=0): array
 {
     $run=$journal->state['runs'][$id] ?? null;
     if(!$run)throw new InvalidArgumentException('Job history is unavailable for this boot.');
@@ -73,7 +74,7 @@ function zfsas_operation_detail(ZfsasCoordinatorState $journal,string $id,int $o
     }else $offset=max(0,$offset);$page=[];$bytes=0;
     foreach(array_slice($events,$offset,200) as $event){$size=strlen(json_encode($event,JSON_THROW_ON_ERROR));if($bytes+$size>120000)break;$page[]=$event;$bytes+=$size;}
     $next=$offset+count($page);
-    return ['runId'=>$id,'state'=>$run['state'],'problem'=>zfsas_operation_problem($tasks),'entries'=>$page,
+    return ['checklist'=>zfsas_operation_stages($tasks,$run['state'],$stage,$stageOffset),'runId'=>$id,'state'=>$run['state'],'problem'=>zfsas_operation_problem($tasks),'entries'=>$page,
         'previousOffset'=>$offset>0?max(0,$offset-200):null,'nextOffset'=>$next<count($events)?$next:null,'total'=>count($events),'scope'=>'job','historyNotice'=>'Runtime history is lost after reboot. Older attempts may not have recorded ZFS diagnostics.'];
 }
 

@@ -5,6 +5,13 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### Unreleased
+
+- Detect older or mismatched coordinators and explain when job logs or recovery are unavailable. Failed loads now show a local error and retry option instead of remaining on Loading.
+- Refresh supported coordinators only after existing attempts and their process groups finish. Reject busy installations before replacing files, preserve RAM history and queued work, and verify installation hooks and service activation.
+- Replace the long Details message with expandable replication stages and paginated dataset results. Keep source cleanup separate and preserve expanded sections and log scroll during refresh.
+- Stop polling completed job logs and closed dialogs; preserve loaded content as stale after a refresh failure.
+
 ### 2026.09.22.08 (2026-09-22)
 
 - Show job-specific steps and retained ZFS errors in Details, with the failure and next action separated from successful steps. Label shared logs clearly.

@@ -104,7 +104,7 @@ A replication job specifies a source, destination, schedule, whether to include 
 
 Local scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification. Recursive membership is captured for the run, and every expected child must report verified success before the run completes. Snapshot Manager also supports explicit local sends and validated Retry of interrupted receives.
 
-In a job’s **Details**, the failure summary identifies the affected dataset and next action. **Show job log** shows only that run’s steps and attempts, including available ZFS error output. Shared category logs are labeled separately and can include other jobs. Older attempts may lack diagnostics because earlier versions did not preserve them.
+In a job’s **Details**, the outcome and next action appear above a replication checklist: **Check datasets → Create source snapshots → Inspect destinations → Cleanup → Check space → Transfer → Verify**. Expand a stage for dataset results and attempt counts, with pages of up to 50 datasets. Failed stages open initially. Unplanned or unexecuted work is not shown as successful; manual sends and recovery reuse captured snapshots. Linked source-retention cleanup remains a separate operation. Timestamps, IDs, and raw diagnostics are under expandable technical details. **Show job log** shows only that run’s steps and attempts, including available ZFS error output. Shared category logs are labeled separately and can include other jobs. Older attempts may lack diagnostics because earlier versions did not preserve them.
 
 For an unfinished local receive, choose **Review recovery** in Details or on its saved Replication configuration. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
 
@@ -152,6 +152,16 @@ New elapsed intervals start one interval after Save. Run Now and completion time
 Canceling an automatic or configured replication run persistently pauses its schedule until **Resume**. The cancellation decision is saved before workers are signaled. Activity distinguishes that committed decision from verified worker shutdown. A snapshot already deleted before cancellation cannot be restored by canceling the run.
 
 Configuration saves are atomic and revision checked. If another page changed the settings, reload before saving. The UI reports configuration-save success separately from scheduler-application success.
+
+## Coordinator updates
+
+Installation checks for active work before replacing package files. If a transfer, pipeline child, or unverified owner remains, the installed release stays intact and the update reports that it must be retried after work finishes. Updates do not cancel transfers to load newer code.
+
+The coordinator reports its running build, protocol, and supported actions. The root watchdog blocks new attempts when a supported service needs refresh, lets existing attempts finish, verifies complete process groups, then restarts it. Queued work retains its identity and goes through normal admission checks. History, command receipts, pauses, configuration, and permanent lock files are preserved. Automatic refresh coordination stays in RAM; only explicit installation uses the persistent maintenance barrier.
+
+Older coordinators without the handshake require an explicit installation retry when idle. Details and recovery explain unavailable capabilities immediately. Transient loading failures offer **Retry loading**, and previously loaded content is labeled stale. Status and log GET requests never start or refresh the service. Completed job logs, closed dialogs, and hidden pages stop polling.
+
+Installation separately verifies the hook and the new service handshake. An installed package with failed runtime activation is reported as a failure, with the coordinator log explaining the blocker. Direct `upgradepkg` bypasses the manifest's before-replacement check; use the plugin installer for guarded updates.
 
 ## Runtime state and recovery
 

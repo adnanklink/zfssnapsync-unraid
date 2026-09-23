@@ -7,7 +7,13 @@ if (!zfsas_validate_csrf_token($error)) { zfsas_emit_marked_json(['ok' => false,
 $action = $_POST['action'] ?? '';
 if (!in_array($action, ['cancel', 'resume', 'retry','review_recovery','retry_reviewed'], true)) { zfsas_emit_marked_json(['ok' => false, 'error' => 'Invalid action.'], 400); }
 try {
+    if (in_array($_POST['action'] ?? '', ['review_recovery','retry_reviewed'], true)) {
+        require_once __DIR__.'/coordinator-service.php';
+        $hello=zfsas_coordinator_request(['action'=>'handshake']);
+        $service=zfsas_service_compatibility($hello['ok']?($hello['result'] ?? null):null);
+        if (!$service['compatible'] || $service['refreshPending'] || !in_array($_POST['action'],$service['actions'],true)) zfsas_emit_marked_json(['ok'=>false,'code'=>in_array($_POST['action'],$service['actions'],true)?'refresh_pending':'unsupported_capability','retryable'=>false,'error'=>$service['message']],409);
+    }
     zfsas_coordinator_ensure();
     $response = zfsas_coordinator_request(['action' => $action, 'runId' => (string) ($_POST['run_id'] ?? ''),'scheduleId'=>(string)($_POST['schedule_id'] ?? 'auto'),'reviewId'=>(string)($_POST['review_id'] ?? ''),'commandId'=>(string)($_POST['command_id'] ?? '')]);
     zfsas_emit_marked_json($response['ok'] ? ['ok' => true] + $response['result'] : $response, $response['ok'] ? 200 : 409);
-} catch (Throwable $error) { zfsas_emit_marked_json(['ok' => false, 'error' => $error->getMessage()], 503); }
+} catch (Throwable $error) { zfsas_emit_marked_json(['ok' => false, 'code'=>'request_failed','retryable'=>true, 'error' => $error->getMessage()], 503); }

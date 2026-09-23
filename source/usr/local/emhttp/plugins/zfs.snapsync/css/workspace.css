@@ -814,3 +814,9 @@
 
 .zfsas-workspace #replication-recovery li,.zfsas-workspace #operation-log-panel{overflow-wrap:anywhere;white-space:normal;min-width:0;}
 .zfsas-workspace #replication-recovery li{white-space:pre-wrap;}
+
+/* Stage summaries stay in place while dataset pages refresh. */
+#operation-checklist details { margin: .65rem 0; padding: .7rem; border: 1px solid var(--ui-border, #8885); border-radius: .4rem; }
+#operation-checklist summary { cursor: pointer; overflow-wrap: anywhere; line-height: 1.6; }
+#operation-checklist [data-panel-status] { min-height: 1.5em; }
+#operation-checklist li { overflow-wrap: anywhere; white-space: pre-wrap; }

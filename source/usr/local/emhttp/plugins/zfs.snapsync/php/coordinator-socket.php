@@ -82,7 +82,7 @@ final class ZfsasCoordinatorSocket
                 $this->clients[$id]['output'] = json_encode($response, JSON_THROW_ON_ERROR) . "\n";
                 // UI reads and rejected requests must not turn idle waiting into
                 // repeated admission/recovery scans. The watchdog still wakes it.
-                if ($response['ok'] && !in_array($request['action'] ?? '', ['status','operation_detail','recovery_status'],true)) { $nextTick = 0; }
+                if ($response['ok'] && !in_array($request['action'] ?? '', ['status','handshake','operation_detail','recovery_status'],true)) { $nextTick = 0; }
             }
             foreach ($write as $stream) {
                 $id = (int) $stream;

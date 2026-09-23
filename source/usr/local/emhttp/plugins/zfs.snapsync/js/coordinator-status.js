@@ -26,6 +26,7 @@
       resume.disabled = !data.autoPaused || (current && current.state === 'canceling');
       text.textContent = current ? (current.state === 'canceling' ? 'Cancellation saved; verifying worker shutdown.' : 'Run ' + current.id + ': ' + current.state + (current.blockedReasons?.length ? ' — waiting: ' + current.blockedReasons.join(', ') : '') + (current.nextRetry ? ' — next attempt ' + new Date(current.nextRetry * 1000).toLocaleString() : ''))
         : data.autoPaused ? 'Schedule paused until Resume.' : data.available ? 'No active Auto Snapshot run.' : (data.message || 'Coordinator is unavailable.');
+      if(data.service&&(!data.service.compatible||data.service.refreshPending))text.textContent+=' '+data.service.message;
     } catch (error) { if (mine === generation && error.name !== 'AbortError') text.textContent = error.message; }
     finally { clearTimeout(timeout); if (!document.hidden && mine === generation) timer = setTimeout(refresh, current ? 2000 : 10000); }
   }

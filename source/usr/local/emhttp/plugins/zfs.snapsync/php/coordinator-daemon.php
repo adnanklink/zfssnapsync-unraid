@@ -1,6 +1,8 @@
 <?php
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/coordinator-socket.php';
+require_once __DIR__ . '/coordinator-service.php';
+$service = zfsas_service_handshake();
 require_once __DIR__ . '/coordinator-executor.php';
 require_once __DIR__ . '/coordinator-retention.php';
 require_once __DIR__ . '/operation-diagnostics.php';
@@ -23,6 +25,7 @@ if (is_file($configDir . '/maintenance')) { exit(0); }
 if (!is_dir($runtime)) { mkdir($runtime, 0770, true); }
 $owner = fopen($runtime . '/owner.lock', 'c');
 if (!$owner || !flock($owner, LOCK_EX | LOCK_NB)) { exit(0); }
+file_put_contents($runtime.'/owner.json', json_encode(ZfsasCoordinatorExecutor::identity(getmypid()), JSON_THROW_ON_ERROR));
 $journal = new ZfsasCoordinatorState($root);
 $deletion = new ZfsasCoordinatorDeletion($journal, $root);
 $config = null; $nextConfigCheck = 0; $nextPrune = 0;
@@ -51,7 +54,8 @@ $submitAuto = static function (string $commandId, bool $manual, ?int $occurrence
                 'prefixHistory' => $config['prefixHistory'], 'scheduleSpec' => $config['schedule']]]]], time());
 };
 $command = static function (array $task) use ($root, $configDir, $journal, $deletion): ?array {
-    if (is_file($configDir . '/maintenance')) { return null; }
+    clearstatcache();
+    if (is_file($configDir . '/maintenance') || is_file('/var/run/zfs-snapsync-coordinator/refresh.json')) { return null; }
     if (str_starts_with($task['parameters']['phase'] ?? '', 'recovery_')) { return zfsas_recovery_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (in_array($task['parameters']['phase'] ?? '',['replication_schedule','replication_snapshot','replication_member','replication_run_verify'],true)) { return zfsas_coordinator_schedule_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) { return zfsas_coordinator_source_command($task,$journal,$root,zfsas_config_revision($configDir)); }
@@ -105,14 +109,15 @@ foreach (array_keys($journal->state['runs']) as $runId) { zfsas_coordinator_sour
 foreach ($journal->state['runs'] as $run) {
     if (is_file(zfsas_ops_control_path('cancelled', $run['id'])) && !ZfsasCoordinatorState::terminal($run['state'])) { $executor->cancel($run['id']); }
 }
-$handler = static function (array $request) use ($journal, $executor, $submitAuto, $loadConfig, $deletion, &$config): array {
+$handler = static function (array $request) use ($journal, $executor, $submitAuto, $loadConfig, $deletion, $service, &$config): array {
     $action = $request['action'] ?? '';
+    if ($action === 'handshake') { return $service; }
     if ($action==='recovery_status') return zfsas_recovery_status($journal,(string)($request['reviewId'] ?? ''),(int)($request['offset'] ?? 0));
     if (in_array($action,['review_recovery','retry_reviewed'],true)) {
         if(!$loadConfig())throw new InvalidArgumentException('Configuration save is in progress. Retry the same request.');
         return $action==='review_recovery'?zfsas_recovery_begin($journal,$request,$config):zfsas_recovery_execute($journal,(string)($request['reviewId'] ?? ''),$config);
     }
-    if ($action === 'operation_detail') { return zfsas_operation_detail($journal,(string)($request['runId'] ?? ''),(int)($request['offset'] ?? 0)); }
+    if ($action === 'operation_detail') { return zfsas_operation_detail($journal,(string)($request['runId'] ?? ''),(int)($request['offset'] ?? 0),(string)($request['stage'] ?? ''),(int)($request['stageOffset'] ?? 0)); }
     if ($action === 'worker_report') {
         $response = $executor->workerReport($request);
         if (str_starts_with($request['type'] ?? '', 'item_')) { zfsas_coordinator_project_batch($journal, $request['taskId']); }
@@ -166,7 +171,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
             $run['kinds'] = array_values(array_unique($run['kinds']));
             $run['blockedReasons'] = array_values(array_unique($run['blockedReasons']));
         } unset($run);
-        return ['runs' => array_slice($runs, 0, 120), 'sequence' => $journal->state['sequence'],
+        return ['service'=>$service, 'runs' => array_slice($runs, 0, 120), 'sequence' => $journal->state['sequence'],
             'autoPaused' => is_file(zfsas_ops_control_path('paused', 'auto')),
             'schedule' => ZfsasSchedule::preview(ZfsasSchedule::autoConfig($config['auto']), time(), ZfsasSchedule::hostTimezone())];
     }
