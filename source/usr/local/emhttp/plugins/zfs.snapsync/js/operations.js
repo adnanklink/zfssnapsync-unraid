@@ -155,7 +155,7 @@
     const render=data=>{
       if(selected!==op.id || !$('operation-detail').open || !panel.isConnected)return false;
       const first=!output.dataset.loaded,bottom=output.scrollHeight-output.scrollTop-output.clientHeight<20,scroll=output.scrollTop,drawer=$('operation-detail'),drawerScroll=drawer.scrollTop;
-      const text=shared?data.content:(data.entries||[]).map(e=>date(e.at)+' · '+phaseLabel(e.phase)+' · '+e.state+'\n'+[e.source,e.destination].filter(Boolean).join(' → ')+'\n'+e.message+(e.exitCode!==null&&e.exitCode!==undefined?' (exit '+e.exitCode+')':'')+(e.diagnostic?'\nZFS diagnostics:\n'+e.diagnostic:'')).join('\n\n');
+      const text=shared?data.content:(data.entries||[]).map(e=>date(e.at)+' · '+phaseLabel(e.phase)+' · '+e.state+'\n'+[e.source,e.destination].filter(Boolean).join(' → ')+'\n'+e.message+(e.exitCode!==null&&e.exitCode!==undefined?' (exit '+e.exitCode+')':'')+(e.diagnostic?'\nZFS diagnostics:\n'+e.diagnostic:'')+(e.output?'\nWorker output:\n'+e.output:'')).join('\n\n');
       if(output.textContent!==text)output.textContent=text||'No log is available for this boot.';
       panel.dataset.state=text?'ready':'empty';output.dataset.loaded='1';output.scrollTop=first||bottom?output.scrollHeight:scroll;drawer.scrollTop=drawerScroll;
       panel.querySelector('.operation-log-notice').textContent=shared?'Latest shared category entries; these may not describe the selected job.':data.historyNotice;

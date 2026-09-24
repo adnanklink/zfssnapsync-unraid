@@ -1,13 +1,13 @@
 <?php
 require_once __DIR__."/operation-stages.php";
 /** Bounded, read-only projections of coordinator evidence. */
-function zfsas_diagnostic_text(string $text): string
+function zfsas_diagnostic_text(string $text, int $limit=4096): string
 {
     $text=preg_replace('/(Authorization:\s*Bearer\s+)\S+/i','$1[redacted]',$text);
     $text=preg_replace('/((?:receive_resume_token|token|password|secret|credential|passphrase)\s*[:=]\s*)(?:"[^"\n]*"|\S+)/i','$1[redacted]',$text);
     $text=preg_replace('/(zfs\s+send\s+(?:-\S+\s+)*-t\s+)\S+/i','$1[redacted]',$text);
     $text=preg_replace('/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/','',$text);
-    return json_decode(json_encode(substr($text,-4096),JSON_INVALID_UTF8_SUBSTITUTE),true);
+    return json_decode(json_encode(substr($text,-$limit),JSON_INVALID_UTF8_SUBSTITUTE),true);
 }
 function zfsas_operation_problem(array $tasks): ?array
 {
@@ -68,14 +68,20 @@ function zfsas_operation_detail(ZfsasCoordinatorState $journal,string $id,int $o
             'message'=>zfsas_diagnostic_text($task['result']['message'] ?? ($task['state']==='canceled'?'Did not run: prerequisite work failed or the run was canceled.':'Waiting for prerequisites.')),'diagnostic'=>''];
     }
     usort($events,static fn($a,$b)=>$a['at']<=>$b['at'] ?: strcmp($a['taskId'],$b['taskId']));
+    $withOutput=static function(array $event) use ($journal): array {
+        if (isset($event['attemptId'])) { $event['output']=zfsas_diagnostic_text($journal->attemptOutput($event['attemptId']),66000); }
+        return $event;
+    };
     if($offset<0){
         $offset=count($events);$tailBytes=0;$tailCount=0;
-        while($offset>0 && $tailCount<200){$size=strlen(json_encode($events[$offset-1],JSON_THROW_ON_ERROR));if($tailBytes+$size>120000)break;$offset--;$tailCount++;$tailBytes+=$size;}
+        while($offset>0 && $tailCount<200){$size=strlen(json_encode($withOutput($events[$offset-1]),JSON_THROW_ON_ERROR));if($tailBytes+$size>120000)break;$offset--;$tailCount++;$tailBytes+=$size;}
     }else $offset=max(0,$offset);$page=[];$bytes=0;
-    foreach(array_slice($events,$offset,200) as $event){$size=strlen(json_encode($event,JSON_THROW_ON_ERROR));if($bytes+$size>120000)break;$page[]=$event;$bytes+=$size;}
+    foreach(array_slice($events,$offset,200) as $event){
+        $event=$withOutput($event);
+        $size=strlen(json_encode($event,JSON_THROW_ON_ERROR));if($bytes+$size>120000)break;$page[]=$event;$bytes+=$size;}
     $next=$offset+count($page);
     return ['checklist'=>zfsas_operation_stages($tasks,$run['state'],$stage,$stageOffset),'runId'=>$id,'state'=>$run['state'],'problem'=>zfsas_operation_problem($tasks),'entries'=>$page,
-        'previousOffset'=>$offset>0?max(0,$offset-200):null,'nextOffset'=>$next<count($events)?$next:null,'total'=>count($events),'scope'=>'job','historyNotice'=>'Runtime history is lost after reboot. Older attempts may not have recorded ZFS diagnostics.'];
+        'previousOffset'=>$offset>0?max(0,$offset-200):null,'nextOffset'=>$next<count($events)?$next:null,'total'=>count($events),'scope'=>'job','historyNotice'=>'Runtime history is lost after reboot. Older attempts may not have recorded worker output or ZFS diagnostics.'];
 }
 
 function zfsas_replication_error_result(Throwable $error,string $outcome='validation_failure'): array

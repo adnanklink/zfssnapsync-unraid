@@ -32,5 +32,5 @@ function zfsas_coordinator_auto_command(ZfsasCoordinatorState $journal, array $t
             || !rename($path . '.pending', $path)) { throw new RuntimeException('Cannot publish captured configuration.'); }
     }
     return ['/usr/bin/env', 'ZFSAS_COORDINATED=1', 'CONFIG_FILE=' . $capture . '/zfs_snapsync.conf',
-        'ZFSAS_CONFIG_REVISION=' . $parameters['revision'], '/usr/local/sbin/zfs_snapsync'];
+        'ZFSAS_CONFIG_REVISION=' . $parameters['revision'], '/bin/bash', __DIR__.'/../scripts/coordinator-auto-attempt.sh'];
 }

@@ -23,6 +23,7 @@ for ((round=0; round<100; round++)); do
     ((${#command[@]} > 0)) || exit 1
     export ZFSAS_ATTEMPT_TOKEN="$token" ZFSAS_COORDINATOR_GENERATION="$generation"
     ZFSAS_TASK_ID="$(cat "$attempt_dir/task-id")"
+    export ZFSAS_ATTEMPT_LOG="$attempt_dir/output.log"
     export ZFSAS_TASK_ID
     exec "${command[@]}"
   fi

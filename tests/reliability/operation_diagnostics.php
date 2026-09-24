@@ -2,12 +2,16 @@
 require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-state.php';
 require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/operation-diagnostics.php';
 function check($ok,$why){if(!$ok)throw new RuntimeException($why);}
-$j=new ZfsasCoordinatorState('/tmp/diagnostics-'.bin2hex(random_bytes(8)));
+$root='/tmp/diagnostics-'.bin2hex(random_bytes(8));
+$j=new ZfsasCoordinatorState($root);
 $r=$j->submit('errors',['tasks'=>['success'=>['kind'=>'prepare'],'bad'=>['kind'=>'send','dataset'=>'tank/data','parameters'=>['replication'=>['sourceSnapshot'=>'tank/data@s','destination'=>'backup/data']]],'later'=>['kind'=>'finalize','dependencies'=>['bad']]]],time())['runId'];
 $id=$r.':success';$token=$j->claim($id,1,time());$j->result($id,$token,['outcome'=>'success','message'=>'Verified expected receiver snapshot.'],1,time(),true);
 $id=$r.':bad';$token=$j->claim($id,1,time());$j->result($id,$token,['outcome'=>'transient_failure','message'=>'Pipeline failed','exitCode'=>1,'diagnostic'=>'cannot receive: out of space'],1,time(),true);
 $token=$j->claim($id,62,time());$j->result($id,$token,['outcome'=>'validation_failure','failureCode'=>'interrupted_receive','message'=>'An earlier transfer is unfinished.','recoveryRequired'=>true],62,time(),true);
+mkdir($root.'/attempts/'.$token,0700,true);
+file_put_contents($root.'/attempts/'.$token.'/output.log',"auto output password=hidden-secret\n");
 $d=zfsas_operation_detail($j,$r);
+check(str_contains(json_encode($d),'auto output') && !str_contains(json_encode($d),'hidden-secret'),'Attempt output missing or unredacted');
 check($d['problem']['code']==='interrupted_receive','Failure was obscured by a successful task');
 check($d['problem']['destination']==='backup/data','Failure has no destination');
 check(count($d['entries'])===4,'Earlier attempt or blocked task was lost');
@@ -16,6 +20,13 @@ check(!str_contains($d['problem']['summary'],'Verified'),'Success leaked into th
 check(str_contains(json_encode($d),'prerequisite'),'Blocked child lacks explanation');
 $other=$j->submit('other',['tasks'=>['send'=>['kind'=>'send']]],time())['runId'];
 check(!str_contains(json_encode(zfsas_operation_detail($j,$other)),'out of space'),'Different jobs share diagnostics');
+check(!str_contains(json_encode(zfsas_operation_detail($j,$other)),'auto output'),'Another job leaked attempt output');
+file_put_contents($root.'/attempts/'.$token.'/output.log',str_repeat('x',100000).'TAIL');
+check(strlen($j->attemptOutput($token))<66000 && str_ends_with($j->attemptOutput($token),'TAIL'),'Attempt output is not bounded');
+unlink($root.'/attempts/'.$token.'/output.log');
+symlink('/etc/passwd',$root.'/attempts/'.$token.'/output.log');
+check($j->attemptOutput($token)==='','Symlink output accepted');
+unlink($root.'/attempts/'.$token.'/output.log');
 $secret=zfsas_diagnostic_text("password=hunter2 receive_resume_token=raw-secret\nRun zfs send -t raw-secret\nAuthorization: Bearer private\n");
 check(!preg_match('/hunter2|raw-secret|private/',$secret),'Diagnostic leaked secrets');
 check(strlen(zfsas_diagnostic_text(str_repeat('x',10000)))===4096,'Unbounded diagnostic');

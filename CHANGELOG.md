@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.24.02 (2026-09-24)
+
+- Capture automatic snapshot worker output and errors in the selected job’s log instead of discarding them. Keep the shared Auto summary separate.
+- Bound attempt output in RAM and show its latest portion in Details with secret redaction. Previously completed jobs cannot recover output that was not recorded.
+
 ### 2026.09.24.01 (2026-09-24)
 
 - Fix Automation pool and dataset search filters leaving nonmatching rows visible. Preserve selections when switching filters.

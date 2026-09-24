@@ -26,6 +26,18 @@ final class ZfsasCoordinatorState
         $this->rebuildIndexes();
     }
 
+    /** Read only this journal's bounded attempt output; never use caller paths. */
+    public function attemptOutput(string $token): string
+    {
+        if (!preg_match('/^[a-f0-9]{48}$/D',$token) || !isset($this->state['attempts'][$token])) { return ''; }
+        $dir=$this->root.'/attempts/'.$token;$path=$dir.'/output.log';
+        if (is_link($dir) || is_link($path) || !is_file($path)) { return ''; }
+        $file=@fopen($path,'rb');if (!$file) { return ''; }
+        $size=fstat($file)['size'];fseek($file,max(0,$size-12288));
+        $text=stream_get_contents($file,12288);fclose($file);
+        return ($size>12288 ? "[Latest 12 KiB of attempt output]\n" : '').($text===false?'':$text);
+    }
+
     private static function identifier(string $id): void
     {
         if (!preg_match('/^[A-Za-z0-9_.:-]{1,160}$/D', $id)) { throw new InvalidArgumentException('Invalid operation identifier.'); }

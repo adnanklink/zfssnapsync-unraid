@@ -21,7 +21,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
      logCalls++;
      if(mode==='unsupported')data={ok:false,code:'unsupported_capability',retryable:false,error:'Older coordinator. Refresh when idle.'};
      else if(mode==='error')data={ok:false,code:'request_failed',retryable:true,error:'Temporary disconnect.'};
-     else data={ok:true,state:mode==='complete'?'complete':'running',historyNotice:'RAM history.',entries:mode==='empty'?[]:[{at:1,phase:'replication_transfer',state:'running',message:'Retained job content'}]};
+     else data={ok:true,state:mode==='complete'?'complete':'running',historyNotice:'RAM history.',entries:mode==='empty'?[]:[{at:1,phase:'replication_transfer',state:'running',message:'Retained job content',output:'Automatic snapshot worker output <literal>'}]};
     }else{
      stagesCalls++;const offset=Number(url.searchParams.get('stage_offset')||0);
      data={ok:true,state:'running',checklist:{available:true,stages,page:{rows:Array.from({length:50},(_,i)=>({dataset:'tank/'+('long-path-'.repeat(12))+(offset+i),state:'failed',attempts:2,message:'Receiver unavailable'})),total:10000,previousOffset:offset?0:null,nextOffset:offset+50}}};
@@ -46,6 +46,8 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   await page.locator('#operation-log-panel').getByRole('button',{name:'Retry loading'}).waitFor();
   mode='ready';await page.locator('#operation-log-panel').getByRole('button',{name:'Retry loading'}).click();
   await page.waitForFunction(()=>document.querySelector('#operation-detail-log').textContent.includes('Retained'));
+  assert.match(await page.locator('#operation-detail-log').textContent(),/Automatic snapshot worker output <literal>/);
+  assert.equal(await page.locator('#operation-detail-log literal').count(),0);
   mode='error';await page.waitForFunction(()=>document.querySelector('.operation-log-notice').textContent.includes('stale'));
   assert.match(await page.locator('#operation-detail-log').textContent(),/Retained/);
   mode='complete';await page.locator('#operation-log-panel').getByRole('button',{name:'Retry loading'}).click();
