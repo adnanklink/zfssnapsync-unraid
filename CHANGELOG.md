@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.24.01 (2026-09-24)
+
+- Fix Automation pool and dataset search filters leaving nonmatching rows visible. Preserve selections when switching filters.
+- Clearly distinguish datasets shown from datasets selected, and ignore surrounding whitespace in searches.
+
 ### 2026.09.23.05 (2026-09-23)
 
 - Protect backup receive destinations as read-only, including native retries and completed-transfer verification.

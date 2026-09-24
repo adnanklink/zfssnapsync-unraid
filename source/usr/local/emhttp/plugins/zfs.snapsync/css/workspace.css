@@ -820,3 +820,6 @@
 #operation-checklist summary { cursor: pointer; overflow-wrap: anywhere; line-height: 1.6; }
 #operation-checklist [data-panel-status] { min-height: 1.5em; }
 #operation-checklist li { overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* Keep filtered table rows hidden even when host styles set table-row display. */
+.zfsas-dataset-row[hidden] { display: none !important; }

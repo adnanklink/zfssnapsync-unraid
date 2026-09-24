@@ -412,20 +412,20 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
   }
 
   function rowIsVisible(row) {
-    return !row.classList.contains('zfsas-row-hidden');
+    return !row.hidden;
   }
 
   function applyPoolFilter() {
     var poolFilter = byId('dataset_pool_filter');
     var selectedPool = poolFilter ? poolFilter.value : '__all';
     var rows = document.querySelectorAll('.zfsas-dataset-row');
+    var query = (byId('dataset_name_filter').value || '').trim().toLowerCase();
 
     rows.forEach(function (row) {
       var rowPool = row.getAttribute('data-pool') || '';
-      var query = (byId('dataset_name_filter').value || '').toLowerCase();
       var name = row.querySelector('input[type="hidden"]').value.toLowerCase();
       var shouldShow = (selectedPool === '__all' || rowPool === selectedPool) && name.indexOf(query) !== -1;
-      row.classList.toggle('zfsas-row-hidden', !shouldShow);
+      row.hidden = !shouldShow;
     });
   }
 
@@ -460,7 +460,7 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
       }
     });
 
-    countLabel.textContent = selected + ' selected of ' + boxes.length + ' datasets (' + visibleSelected + ' of ' + visible + ' shown).';
+    countLabel.textContent = 'Showing ' + visible + ' of ' + boxes.length + ' datasets. ' + selected + ' selected overall; ' + visibleSelected + ' selected among shown datasets.';
   }
 
   function setAllDatasetChecks(checked, visibleOnly) {

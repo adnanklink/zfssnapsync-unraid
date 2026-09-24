@@ -15,7 +15,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     if(url.pathname.endsWith('.css')) return route.fulfill({contentType:'text/css',body:fs.readFileSync(plugin+'/css/'+path.basename(url.pathname),'utf8')});
     if(url.pathname.endsWith('.js')) return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(plugin+'/js/'+path.basename(url.pathname),'utf8')});
     if(url.pathname==='/') return route.fulfill({contentType:'text/html',body:html});
-    let data={ok:true,probe:true,spec:{kind:'interval',seconds:21600},sources:{},operations:[],schedules:[],jobs:[],pausedSchedules:[],pendingDeleteCount:0,content:'',datasets:[{dataset:'tank/data',pool:'tank',sendDestination:false},{dataset:'tank/dest',pool:'tank',sendDestination:true}]};
+    let data={ok:true,probe:true,spec:{kind:'interval',seconds:21600},sources:{},operations:[],schedules:[],jobs:[],pausedSchedules:[],pendingDeleteCount:0,content:'',datasets:[{dataset:'tank/data',pool:'tank',sendDestination:false},{dataset:'tank/dest',pool:'tank',sendDestination:true},{dataset:'backup/archive',pool:'backup',sendDestination:false}]};
     return route.fulfill({contentType:'text/plain',body:'ZFSAS_JSON_BEGIN'+JSON.stringify(data)+'ZFSAS_JSON_END'});
    });
    await page.goto('http://config.test/');
@@ -30,12 +30,33 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
    await page.locator(kind==='auto'?'#manual_run':'#run_send_now').click();
    assert.match(await page.locator('#workspace-notice').textContent(),/Save or discard/);
    if(kind==='auto') {
-    await page.waitForFunction(()=>document.querySelectorAll('.zfsas-dataset-row').length===2);
+    await page.waitForFunction(()=>document.querySelectorAll('.zfsas-dataset-row').length===3);
+    await page.selectOption('#dataset_pool_filter','backup');
+    assert.equal(await page.locator('.zfsas-dataset-row:visible').count(),1);
+    assert.match(await page.locator('.zfsas-dataset-row:visible').textContent(),/backup\/archive/);
+    assert.match(await page.locator('#dataset_count').textContent(),/Showing 1 of 3 datasets. 0 selected overall/);
+    await page.locator('#dataset_select_visible').click();
+    assert.equal(await page.locator('.zfsas-dataset-checkbox:checked').count(),1);
+    await page.selectOption('#dataset_pool_filter','tank');
+    assert.equal(await page.locator('.zfsas-dataset-row:visible').count(),2);
+    assert.match(await page.locator('#dataset_count').textContent(),/1 selected overall; 0 selected among shown/);
+    await page.locator('#dataset_name_filter').fill(' DATA ');
+    assert.equal(await page.locator('.zfsas-dataset-row:visible').count(),1);
+    await page.locator('#dataset_select_visible').click();
+    assert.equal(await page.locator('.zfsas-dataset-checkbox:checked').count(),2);
+    await page.locator('#dataset_name_filter').fill('no-match');
+    assert.equal(await page.locator('.zfsas-dataset-row:visible').count(),0);
+    await page.locator('#dataset_clear_visible').click();
+    assert.equal(await page.locator('.zfsas-dataset-checkbox:checked').count(),2);
+    await page.locator('#dataset_name_filter').fill('');
+    await page.selectOption('#dataset_pool_filter','__all');
+    assert.equal(await page.locator('.zfsas-dataset-row:visible').count(),3);
+    await page.locator('#dataset_clear_all').click();
     await page.locator('.zfsas-dataset-checkbox').first().check();
     await page.locator('[name="dry_run"]').check();
     await page.selectOption('[name="schedule_mode"]','daily');
    } else {
-    await page.waitForFunction(()=>document.querySelector('#new_job_source').options.length===3);
+    await page.waitForFunction(()=>document.querySelector('#new_job_source').options.length===4);
     await page.locator('[name="send_max_parallel"]').fill('4');
     await page.locator('[name="send_rate_limit"]').fill('20M');
     await page.locator('#open-new-job').click();
@@ -81,6 +102,6 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
    assert.deepEqual(errors,[]);
    await page.close();
   }
-  console.log('PASS: actual settings pages in Chromium, async discovery, reset preserves choices/prefix/Dry Run, shared tuning defaults, dirty state and inline prefix conflicts');
+  console.log('PASS: actual settings pages in Chromium, async discovery, pool/search visibility and selection preservation, reset preserves choices/prefix/Dry Run, shared tuning defaults, dirty state and inline prefix conflicts');
  } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});
