@@ -49,6 +49,7 @@
   }
   function selectedStatus() {
     $('selected-count').textContent = selection.items.size + ' selected';
+    $('snapshot-selection-bar').hidden = selection.items.size === 0;
     const descriptions = [];
     ['delete', 'hold', 'release'].forEach(action => {
       let eligible = 0; const exclusions = new Map();
@@ -63,6 +64,8 @@
     });
     $('eligibility').textContent = descriptions.join(' · ') + (selection.items.size ? '. Eligibility is checked again during review.' : '');
     const header = selection.header(rows);
+    $('select-matching').hidden = !header.checked;
+    $('select-matching').textContent = 'Select all matching snapshots across all pages';
     $('page-checkbox').checked = header.checked; $('page-checkbox').indeterminate = header.indeterminate;
     $('snapshots').querySelectorAll('[data-select]').forEach(input => { input.checked = selection.items.has(input.dataset.select); });
   }
@@ -81,7 +84,7 @@
       if ((row.clones || []).length) badges.push('Clone dependencies');
       return '<tr><td><input type="checkbox" data-index="' + index + '" data-select="' + escape(row.identity) + '" aria-label="Select ' + escape(row.snapshotName) + '" ' + (selection.items.has(row.identity) ? 'checked ' : '') + (!selection.selectable(row) ? 'disabled' : '') + '></td>' +
         '<td><code>' + escape(row.snapshotName) + '</code></td><td>' + escape(row.createdText) + '</td><td>' + escape(row.usedText) + '</td><td>' + escape(row.writtenText) + '</td><td>' + badges.map(badge => '<span class="badge">' + escape(badge) + '</span>').join(' ') + '</td><td>' +
-        ['send', 'restore', 'rollback'].map(action => '<button data-single="' + action + '" data-index="' + index + '" title="' + escape(row.eligibility[action === 'restore' ? 'send' : action] || '') + '" ' + (row.eligibility[action === 'restore' ? 'send' : action] ? 'disabled' : '') + '>' + (action === 'send' ? 'Send' : action === 'restore' ? 'Restore' : 'Rollback') + '</button>').join(' ') + '</td></tr>';
+        '<details class="ui-action-menu"><summary>Actions</summary>' + ['send', 'restore', 'rollback'].map(action => '<button data-single="' + action + '" data-index="' + index + '" title="' + escape(row.eligibility[action === 'restore' ? 'send' : action] || '') + '" ' + (row.eligibility[action === 'restore' ? 'send' : action] ? 'disabled' : '') + '>' + (action === 'send' ? 'Send' : action === 'restore' ? 'Restore' : 'Rollback') + '</button>').join(' ') + '</details></td></tr>';
     }).join('') || '<tr><td colspan="7">No matching snapshots.</td></tr>';
     const body = $('snapshots');
     if (body._html !== html) {
@@ -105,6 +108,7 @@
     try {
       const payload = await request('inventory', 'snapshot-manager-dataset.php', Object.assign({dataset: selection.dataset}, filters()), 'GET', replace);
       if (!payload || !selection.accepts(stamp) || payload.dataset !== stamp.dataset) return;
+      if(!replace && ($('snapshot-transfer').open || $('snapshots').querySelector('details[open]') || $('snapshots').contains(document.activeElement)))return;
       rows = payload.snapshots; page = payload.page; pages = payload.pages;
       selection.refresh(rows); renderRows();
       $('counts').textContent = payload.matching + ' matching / ' + payload.total + ' total snapshots';
@@ -151,6 +155,10 @@
     } catch (_) {}
   }
   function changedFilters() {
+    const active=$('active-snapshot-filters');active.replaceChildren();
+    for(const [key,value] of new FormData($('filters')))if(value!==''){
+      const clear=document.createElement('button');clear.type='button';clear.className='btn-quiet';clear.textContent=key.replaceAll('_',' ')+': '+value+' ×';clear.setAttribute('aria-label','Clear '+key.replaceAll('_',' ')+' filter');clear.addEventListener('click',()=>{$('filters').elements[key].value='';changedFilters();});active.append(clear);
+    }
     changeContext(selection.dataset, 'Filters changed. Selection cleared so actions stay within the displayed filter.');
   }
   function renderBatch(payload) {
@@ -161,6 +169,8 @@
     $('review-title').textContent = (payload.state === 'review' ? 'Review: ' : 'Batch: ') + labels[payload.action];
     $('review-summary').textContent = 'Dataset: ' + payload.dataset + ' · ' + payload.selected + ' snapshots in review · ' + payload.eligible + ' eligible · approval expires ' + new Date(payload.expires * 1000).toLocaleTimeString() + '.';
     $('batch-counts').textContent = Object.entries(payload.counts).map(([name, count]) => name + ': ' + count).join(' · ');
+    $('approve').classList.toggle('btn-danger',['delete','rollback'].includes(payload.action));
+    $('review-summary').textContent += ['delete','rollback'].includes(payload.action) ? ' Approval permanently removes the reviewed eligible snapshots or rolls back dataset changes. Excluded snapshots are not authorized.' : ' Only the reviewed eligible snapshot identities will be changed.';
     $('approve').hidden = payload.state !== 'review'; $('approve').disabled = !payload.eligible || busy || Date.now() > payload.expires * 1000;
     $('retry-failed').hidden = !payload.counts.failed; $('retry-failed').disabled = busy;
     $('review-items').innerHTML = payload.items.map(item => '<tr><td><code>' + escape(item.snapshot) + '</code></td><td>' + escape(item.guid) + '</td><td>' + escape(payload.state === 'review' ? (item.candidate ? 'Eligible' : 'Excluded') : item.state) + '</td><td>' + escape(item.error || item.reason) + '</td></tr>').join('');
@@ -207,6 +217,21 @@
     // The reset handler applies these values once, after reset completes.
   }));
   const pendingSendCommands = new Map();
+  let transferContext=null,transferBusy=false;
+  $('snapshot-transfer').addEventListener('cancel',event=>{if(transferBusy)event.preventDefault();});
+  $('snapshot-transfer-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(transferBusy||!transferContext)return;
+    const {row,action,stamp}=transferContext,destination=$('snapshot-transfer-destination').value.trim();
+    if(!selection.accepts(stamp)){$('snapshot-transfer-error').textContent='Dataset or filters changed. Close this dialog and choose the snapshot again.';return;}
+    const key=action+'|'+row.snapshot+'#'+row.guid+'|'+destination;
+    if(!pendingSendCommands.has(key))pendingSendCommands.set(key,'manual-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join(''));
+    transferBusy=true;$('snapshot-transfer-submit').disabled=true;$('snapshot-transfer').querySelector('[data-close-dialog]').disabled=true;
+    try {
+      const payload=await request('action','snapshot-manager-action.php',{dataset:stamp.dataset,action,snapshots:[row.snapshot],guid:row.guid,destination,command_id:pendingSendCommands.get(key)},'POST');
+      pendingSendCommands.delete(key);$('snapshot-transfer').close();notice(payload.message);loadSnapshots(true);
+    }catch(error){$('snapshot-transfer-error').textContent=error.message;}
+    finally{transferBusy=false;$('snapshot-transfer-submit').disabled=false;$('snapshot-transfer').querySelector('[data-close-dialog]').disabled=false;}
+  });
   $('snapshots').addEventListener('click', event => {
     const input = event.target.closest('[data-select]');
     if (input && !input.disabled) { selection.toggle(rows, Number(input.dataset.index), input.checked, event.shiftKey); selectedStatus(); }
@@ -215,11 +240,13 @@
       const row = rows[Number(button.dataset.index)], action = button.dataset.single;
       const data = {dataset: stamp.dataset, action, snapshots: [row.snapshot], guid: row.guid};
       if (action === 'send' || action === 'restore') {
-        const destination = window.prompt((action === 'restore' ? 'Restore to a NEW writable dataset (parent must exist). The restored dataset will remain unmounted. Snapshot: ' : 'Backup destination (will be made read-only). Snapshot: ') + row.snapshot + '\nDestination dataset:');
-        if (!destination) return; data.destination = destination;
-        const key = action + '|' + row.snapshot + '#' + row.guid + '|' + destination;
-        if (!pendingSendCommands.has(key)) pendingSendCommands.set(key, 'manual-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join(''));
-        data.command_id = pendingSendCommands.get(key);
+        transferContext={row,action,stamp};
+        $('snapshot-transfer-title').textContent=action==='restore'?'Restore snapshot':'Send snapshot';
+        $('snapshot-transfer-submit').textContent=action==='restore'?'Restore snapshot':'Send snapshot';
+        $('snapshot-transfer-source').textContent=row.snapshot;
+        $('snapshot-transfer-help').textContent=action==='restore'?'Restore creates a NEW writable dataset below an existing parent. The restored dataset remains unmounted. Existing targets cannot be overwritten.':'Send creates a read-only backup below an existing parent. Received filesystems remain unmounted. An existing backup target must pass incremental replication checks.';
+        $('snapshot-transfer-error').textContent='';$('snapshot-transfer-destination').value='';
+        const menu=button.closest('details');menu.open=false;ZfsasUI.open($('snapshot-transfer'),menu.querySelector('summary'));return;
       }
       const payload = await request('action', 'snapshot-manager-action.php', data, 'POST');
       if (action === 'send' || action === 'restore') pendingSendCommands.delete(action + '|' + row.snapshot + '#' + row.guid + '|' + data.destination);
@@ -227,7 +254,6 @@
       if (payload.token) renderBatch(payload); else { notice(payload.message); loadSnapshots(true); }
     });
   });
-  $('select-page').addEventListener('click', () => { selection.page(rows, true); selectedStatus(); });
   $('page-checkbox').addEventListener('change', event => { selection.page(rows, event.target.checked); selectedStatus(); });
   $('clear-selection').addEventListener('click', () => { selection.clear(); selectedStatus(); notice('Selection cleared.'); });
   $('select-matching').addEventListener('click', () => perform(async stamp => {

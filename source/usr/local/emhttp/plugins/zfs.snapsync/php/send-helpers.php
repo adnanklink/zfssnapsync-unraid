@@ -826,6 +826,62 @@ function zfsas_send_write_config_atomically($configFile, $content)
     return $written;
 }
 
+/** Merge one explicit save boundary with a revision-bound configuration snapshot.
+ * The exclusive transaction rechecks this revision before writing, so a concurrent
+ * save cannot turn this merge into a lost update. Legacy full forms are unchanged.
+ */
+function zfsas_send_scoped_post(array $post, array $config): array
+{
+    $scope = $post['scope'] ?? 'full';
+    if ($scope === 'full') { return $post; }
+    if (!in_array($scope, ['job_create', 'job_update', 'job_remove', 'shared'], true)) {
+        throw new InvalidArgumentException('Unknown replication save scope.');
+    }
+    $merged = array_intersect_key($post, array_flip(['config_revision', 'return_to', 'csrf_token', 'ajax', 'scope']));
+    if ($scope === 'shared') {
+        foreach (zfsas_send_defaults() as $key => $_) {
+            if (in_array($key, ['SEND_JOBS', 'SEND_SOURCE_RETENTION', 'SEND_CLEANUP_POLICIES', 'SEND_SCHEDULE_SPECS'], true)) { continue; }
+            $field = strtolower($key);
+            if (array_key_exists($field, $post)) { $merged[$field] = $post[$field]; }
+        }
+    }
+    $jobs = zfsas_send_parse_jobs($config['SEND_JOBS']);
+    $id = (string) ($post['job_id'][0] ?? '');
+    $found = false; $targetIndex = count($jobs);
+    foreach ($jobs as $savedIndex => $job) {
+        if ($scope !== 'shared' && $job['id'] === $id) {
+            if ($scope === 'job_create') { throw new InvalidArgumentException('This job already exists. Reload before creating another job.'); }
+            $found = true; $targetIndex = $savedIndex;
+            continue;
+        }
+        $index = $savedIndex;
+        foreach (['id', 'source', 'destination', 'frequency', 'threshold', 'children', 'transport'] as $field) {
+            $merged['job_' . $field][$index] = $job[$field];
+        }
+    }
+    if (in_array($scope, ['job_update', 'job_remove'], true) && !$found) {
+        throw new InvalidArgumentException('This job no longer exists. Your draft has not been saved.');
+    }
+    if (in_array($scope, ['job_create', 'job_update'], true)) {
+        if (count($post['job_source'] ?? []) !== 1 || !isset($post['job_source'][0])) {
+            throw new InvalidArgumentException('Submit exactly one job for this save.');
+        }
+        if ($scope === 'job_create') {
+            $candidate = zfsas_send_job_id(zfsas_send_normalize_dataset_path($post['job_source'][0]), zfsas_send_normalize_dataset_path($post['job_destination'][0] ?? ''));
+            foreach ($jobs as $job) { if ($job['id'] === $candidate) { throw new InvalidArgumentException('This replication job already exists.'); } }
+        }
+        $index = $targetIndex;
+        foreach (['id','source','destination','frequency','threshold','children','transport','cleanup_policy','source_keep','source_review','time','day','convert'] as $field) {
+            if (isset($post['job_' . $field][0])) { $merged['job_' . $field][$index] = $post['job_' . $field][0]; }
+        }
+        // Creation uses the existing deterministic identity, including on retries.
+        if ($scope === 'job_create') { $merged['job_id'][$index] = ''; }
+    }
+    foreach ($merged as $key => &$values) { if (str_starts_with($key, 'job_') && is_array($values)) { ksort($values); } }
+    unset($values);
+    return $merged;
+}
+
 function zfsas_send_handle_save_request($post, $configDir, $configFile, $syncScript, $config, $defaultReturnUrl, $autoSnapshotPrefix = '')
 {
     $errors = [];
@@ -833,7 +889,16 @@ function zfsas_send_handle_save_request($post, $configDir, $configFile, $syncScr
     $saved = false;
     $returnTarget = zfsas_normalize_return_url($post['return_to'] ?? '', $defaultReturnUrl);
 
-    $config = zfsas_send_parse_config_file($configFile, zfsas_send_defaults());
+    $pair = zfsas_config_read_pair($configDir);
+    $config = $pair['send'];
+    try {
+        if (($post['scope'] ?? 'full') !== 'full' && (!is_string($post['config_revision'] ?? null) || !hash_equals($pair['revision'], $post['config_revision']))) {
+            throw new InvalidArgumentException('Settings changed. Your draft is preserved; reload the saved configuration before trying again.');
+        }
+        $post = zfsas_send_scoped_post($post, $config);
+    } catch (InvalidArgumentException $error) {
+        return ['config'=>$config, 'formJobs'=>[], 'errors'=>[$error->getMessage()], 'notices'=>[], 'saved'=>false, 'schedulerApplied'=>false, 'revision'=>$pair['revision'], 'returnTarget'=>$returnTarget];
+    }
     $autoSnapshotPrefix = zfsas_read_auto_snapshot_prefix($configDir);
     $saveResult = ['saved' => false, 'schedulerApplied' => false, 'revision' => zfsas_config_revision($configDir)];
     $submitted = $config;
@@ -984,6 +1049,7 @@ function zfsas_send_handle_save_request($post, $configDir, $configFile, $syncScr
         $errors = array_merge($errors, $saveResult['errors']);
         $notices = array_merge($notices, $saveResult['notices']);
         $saved = $saveResult['saved'];
+        if ($saved) { $config = $saveResult['config']; $submittedJobs = zfsas_send_parse_jobs($config['SEND_JOBS']); }
     }
 
     return [

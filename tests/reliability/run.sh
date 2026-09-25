@@ -21,6 +21,7 @@ php tests/reliability/pause_schedule.php
 php tests/reliability/interface_settings.php
 php tests/reliability/attention.php
 php tests/reliability/settings_endpoints.php
+php tests/reliability/scoped_replication_save.php
 php tests/reliability/snapshots.php
 php tests/reliability/inventory_cache.php
 php tests/reliability/batch_item_recovery.php

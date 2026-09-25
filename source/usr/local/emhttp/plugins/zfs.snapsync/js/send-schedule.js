@@ -38,7 +38,7 @@
       const mine = ++generation;
       controller?.abort(); const current = new AbortController(); controller = current;
       const timeout = setTimeout(() => current.abort(), 5000);
-      const params = new URLSearchParams({kind:'send', job_id:id, frequency:frequency.value, time:ui.time.value, day:ui.day.value,
+      const params = new URLSearchParams({kind:'send', job_id:row.querySelector('[name^="job_id["]')?.value || '', frequency:frequency.value, time:ui.time.value, day:ui.day.value,
         convert:row.querySelector('[name^="job_convert["]')?.checked ? '1' : '0'});
       try {
         const response = await fetch('/plugins/zfs.snapsync/php/schedule-preview.php?' + params, {cache:'no-store', signal:current.signal});
@@ -51,16 +51,19 @@
       } catch (error) { if (mine === generation && error.name !== 'AbortError') ui.output.textContent = error.message; }
       finally { clearTimeout(timeout); }
     }
-    function changed() { clearTimeout(timer); timer = setTimeout(preview, 250); }
+    function changed() { timeVisibility(); clearTimeout(timer); timer = setTimeout(preview, 250); }
     row.addEventListener('input', changed); row.addEventListener('change', changed);
     pending.set(row, {refresh:preview, stop:() => { ++generation; controller?.abort(); clearTimeout(timer); }});
-    preview();
+    function timeVisibility() { ui.time.parentElement.hidden=!['1d','1w'].includes(frequency.value); ui.day.parentElement.hidden=frequency.value!=='1w'; }
+    timeVisibility(); preview();
   }
+  document.getElementById('zfsas_send_form').addEventListener('zfsas:saved',event=>{if(event.detail.saved&&event.detail.settings?.SEND_SCHEDULE_SPECS)Object.assign(specs,JSON.parse(event.detail.settings.SEND_SCHEDULE_SPECS));});
+  window.ZfsasSendSchedule={attach};
   const newFrequency = document.getElementById('new_job_frequency');
   if (newFrequency) controls(newFrequency.parentElement, 'new', '');
-  body.querySelectorAll('tr').forEach(attach);
+  body.querySelectorAll('[data-job]').forEach(attach);
   new MutationObserver(() => {
-    body.querySelectorAll('tr').forEach(attach);
+    body.querySelectorAll('[data-job]').forEach(attach);
     for (const [row, request] of pending) if (!row.isConnected) { request.stop(); pending.delete(row); }
   }).observe(body, {childList:true});
   document.addEventListener('visibilitychange', () => {

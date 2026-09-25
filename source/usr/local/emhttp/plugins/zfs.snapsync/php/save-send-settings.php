@@ -139,6 +139,8 @@ if ($expectsJson) {
         'revision' => $saveResult['revision'],
         'jobCount' => count($saveResult['formJobs']),
         'jobs' => $saveResult['saved'] ? $saveResult['formJobs'] : [],
+        'settings' => $saveResult['saved'] ? $saveResult['config'] : null,
+        'scope' => $_POST['scope'] ?? 'full',
     ], empty($saveResult['errors']) ? 200 : 400);
 }
 

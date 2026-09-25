@@ -823,3 +823,37 @@
 
 /* Keep filtered table rows hidden even when host styles set table-row display. */
 .zfsas-dataset-row[hidden] { display: none !important; }
+
+/* Workflow forms use spacing and headings; emphasis belongs to the active save. */
+.zfsas-workspace #zfsas_settings_form > .zfsas-card,
+.zfsas-workspace #zfsas_send_form .zfsas-send-card {border:0;box-shadow:none;background:transparent;padding:1rem 0;}
+.zfsas-workspace .btn-quiet {background:transparent;border-color:transparent;color:var(--ui-accent);box-shadow:none;}
+.zfsas-workspace .btn-primary {background:var(--ui-accent);color:var(--ui-bg);border-color:var(--ui-accent);}
+.zfsas-workspace .btn-danger {background:#b42318;color:#fff;border-color:#b42318;}
+.zfsas-workspace .ui-action-menu {display:inline-block;position:relative;vertical-align:middle;}
+.zfsas-workspace .ui-action-menu summary {cursor:pointer;padding:.5rem;min-height:38px;box-sizing:border-box;color:var(--ui-accent);}
+.zfsas-workspace .ui-action-menu[open] {z-index:5;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:.4rem;}
+.zfsas-workspace .ui-action-menu button {display:block;text-align:left;white-space:normal;width:100%;}
+.zfsas-workspace .ui-form-footer,.zfsas-workspace #zfsas_settings_form > .zfsas-actions {display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:1rem 0;border-top:1px solid var(--ui-border);}
+.zfsas-workspace #zfsas_settings_form > .zfsas-actions {position:sticky;bottom:0;background:var(--ui-surface);z-index:4;}
+.zfsas-workspace .ui-editor-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;}
+.zfsas-workspace #job-editor-body section {margin:1rem 0;border:0;padding:0;}
+.zfsas-workspace #job-editor-body label {display:block;margin-bottom:.35rem;}
+.zfsas-workspace #job-editor-body input:not([type=checkbox]),.zfsas-workspace #job-editor-body select {width:100%;max-width:100%;box-sizing:border-box;}
+.zfsas-workspace #job-editor-body .source-retention-control {grid-column:1/-1;}
+.zfsas-workspace #job-editor-body .source-retention-control select {width:auto;}
+.zfsas-workspace #replication-job-list code {white-space:normal;overflow-wrap:anywhere;}
+.zfsas-workspace #replication-job-list table {table-layout:fixed;}
+.zfsas-workspace #replication-job-list th:first-child {width:40%;}
+.zfsas-workspace #job-editor-error,.zfsas-workspace #snapshot-transfer-error {color:var(--ui-danger);}
+.zfsas-workspace #snapshot-transfer-source {overflow-wrap:anywhere;}
+.zfsas-workspace summary:focus-visible {outline:2px solid var(--ui-accent);outline-offset:2px;}
+.zfsas-workspace [hidden] {display:none !important;}
+@media(max-width:700px){.zfsas-workspace .ui-editor-grid{grid-template-columns:1fr;}.zfsas-workspace #replication-job-list table{min-width:580px;}}
+
+.zfsas-workspace #approve.btn-danger {background:#b42318;border-color:#b42318;color:#fff;}
+.zfsas-workspace .zfsas-send-actions {border:0;box-shadow:none;background:transparent;padding:1rem 0;}
+.zfsas-workspace #dataset-discovery-status:not(.error) {background:transparent;border:0;padding:0;color:var(--ui-muted);}
+
+.zfsas-workspace #job-editor-body .source-retention-control input[type=number]{width:7em;margin-left:.5rem;}
+.zfsas-workspace #edit-job-dialog > .ui-form-footer,.zfsas-workspace #snapshot-transfer .ui-form-footer{position:sticky;bottom:0;background:var(--ui-surface);z-index:6;}

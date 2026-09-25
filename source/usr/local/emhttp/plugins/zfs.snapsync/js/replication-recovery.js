@@ -5,7 +5,7 @@
   function ensure(){
     if(dialog)return;
     dialog=document.createElement('dialog');dialog.id='replication-recovery';dialog.setAttribute('aria-labelledby','replication-recovery-title');
-    dialog.innerHTML='<div class="ui-dialog-header"><h2 id="replication-recovery-title">Review interrupted replication</h2><button type="button" data-close-dialog>Close</button></div><p class="ui-notice">Recovery finishes reviewed original snapshots. It does not create fresh snapshots, authorize additional cleanup, or resume a paused schedule. Earlier history may be unavailable after reboot.</p><p class="recovery-status" role="status"></p><ul class="recovery-members source-review-list"></ul><div class="recovery-pages toolbar"></div><button type="button" class="recovery-approve" disabled>Retry reviewed work</button>';
+    dialog.innerHTML='<div class="ui-dialog-header"><h2 id="replication-recovery-title">Review interrupted replication</h2><button type="button" data-close-dialog>Close</button></div><p class="ui-notice">Recovery finishes reviewed original snapshots. It does not create fresh snapshots, authorize additional cleanup, or resume a paused schedule. Earlier history may be unavailable after reboot.</p><p class="recovery-status" role="status"></p><ul class="recovery-members source-review-list"></ul><div class="recovery-pages toolbar"></div><button type="button" class="recovery-approve btn-primary" disabled>Retry reviewed work</button>';
     document.querySelector('.zfsas-workspace').append(dialog);
     dialog.addEventListener('close',()=>{++generation;poller?.stop();poller=null;});
   }

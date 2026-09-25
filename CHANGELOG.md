@@ -5,6 +5,13 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.25.01 (2026-09-25)
+
+- Save replication jobs directly from one editor, with source-retention choices available during creation. Shared settings save separately without applying unrelated drafts.
+- Simplify Automation into datasets, schedule and retention, with a runtime summary, shown-dataset checkbox and persistent save controls.
+- Show snapshot selection actions only when needed. Group protection and per-snapshot actions in menus, and use consistent Send and Restore dialogs.
+- Preserve revision checks, cleanup reviews, protected snapshots and existing schedule timing. Report saved configuration separately from scheduler-application failures.
+
 ### 2026.09.24.02 (2026-09-24)
 
 - Capture automatic snapshot worker output and errors in the selected job’s log instead of discarding them. Keep the shared Auto summary separate.

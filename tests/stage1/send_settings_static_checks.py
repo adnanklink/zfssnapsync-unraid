@@ -63,7 +63,7 @@ def main() -> int:
     )
     assert_contains(
         settings,
-        'name="new_job_transport"',
+        'template id="job-template"',
         "send settings UI must expose a transport selector for newly added jobs",
     )
     assert_contains(

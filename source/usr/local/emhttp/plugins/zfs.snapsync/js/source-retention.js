@@ -6,7 +6,7 @@
   function attach(row) {
     if(row.querySelector('[name^="job_source_keep["]'))return;
     const index=row.querySelector('[name^="job_id["]')?.name.match(/\[(\d+)\]/)?.[1];if(index===undefined)return;
-    const td=document.createElement('td');td.className='source-retention-control';
+    const td=document.createElement('div');td.className='source-retention-control';
     td.innerHTML='<select aria-label="Source snapshots"><option value="all">Keep all</option><option value="count">Keep latest</option></select> <input type="number" min="1" max="1000" aria-label="Source checkpoint count" value="3">'+
       '<input type="hidden" name="job_source_keep['+index+']"><input type="hidden" name="job_source_review['+index+']" value="">'+
       '<p class="zfsas-send-help">Local jobs only. Cleanup follows fully verified replication. Required bases, recovery references, holds and clones remain protected beyond this count. Older failed checkpoints may be removed once superseded.</p>'+
@@ -21,6 +21,7 @@
     function sync() { const local=value('transport')==='local';mode.disabled=!local;count.hidden=mode.value!=='count'||!local;count.disabled=count.hidden;keep.value=local&&mode.value==='count'?count.value:'0';button.disabled=keep.value==='0'; }
     function invalidate() { ++generation;poller?.stop();poller=null;token.value='';results.replaceChildren();status.textContent='';sync(); }
     mode.addEventListener('change',invalidate);count.addEventListener('input',invalidate);
+    row.addEventListener('input',event=>{if(/job_(source|destination|children|transport)\[/.test(event.target.name||''))invalidate();});
     row.addEventListener('change',event=>{if(event.target!==mode&&event.target!==count&&/job_(source|destination|children|transport)\[/.test(event.target.name||''))invalidate();});
     button.addEventListener('click',async()=>{
       if(!count.reportValidity())return;invalidate();const mine=generation,sig=signature();button.disabled=true;status.textContent='Inspecting source snapshots and receiver protections…';
@@ -45,7 +46,7 @@
           }results.append(pager);
           const accept=document.createElement('button');accept.type='button';accept.textContent='Use this retention policy';accept.addEventListener('click',()=>{
             if(mine!==generation||signature()!==sig||Date.now()>=data.expires*1000){invalidate();status.textContent='Review expired or settings changed. Review again.';return;}
-            token.value=started.token;status.textContent='Reviewed. Save replication within five minutes to apply this policy.';results.replaceChildren();form.dispatchEvent(new Event('change',{bubbles:true}));
+            token.value=started.token;status.textContent='Reviewed. Save this job within five minutes to apply this policy.';results.replaceChildren();form.dispatchEvent(new Event('change',{bubbles:true}));
           });results.append(accept);return false;
         }
         poller=ZfsasRequests.poll('source-review-'+index,async()=>{
@@ -59,7 +60,8 @@
     form.addEventListener('zfsas:saved',event=>{if(event.detail.saved){token.value='';++generation;poller?.stop();status.textContent='';results.replaceChildren();}});
     sync();
   }
+  window.ZfsasSourceRetention={attach};
   const body=document.getElementById('zfsas_send_jobs_body');
-  [...body.rows].forEach(attach);
-  new MutationObserver(()=>[...body.rows].forEach(attach)).observe(body,{childList:true});
+  [...body.querySelectorAll('[data-job]')].forEach(attach);
+  new MutationObserver(()=>[...body.querySelectorAll('[data-job]')].forEach(attach)).observe(body,{childList:true});
 })();

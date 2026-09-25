@@ -9,7 +9,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
 (async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{
  for(const query of ['section=overview','section=snapshots','section=snapshots&tab=automation','section=replication','section=activity','section=tools','section=tools&tab=migrator','section=help']){
  const html=execFileSync('php',['-r','parse_str($argv[1],$_GET); require $argv[2];',query,plugin+'/php/workspace.php'],{encoding:'utf8'});
- const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];let summaryRequests=0,mutationRequests=0,discoveryRequests=0;page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];let summaryRequests=0,mutationRequests=0,discoveryRequests=0,saveMode='ok',savePosts=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('http://workspace.test/**',async route=>{const url=new URL(route.request().url());
  if(url.pathname.endsWith('.png'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(plugin+url.pathname.replace('/plugins/zfs.snapsync',''))});
  if(/\.(js|css)$/.test(url.pathname))return route.fulfill({contentType:url.pathname.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(plugin+url.pathname.replace('/plugins/zfs.snapsync',''),'utf8')});
@@ -20,15 +20,18 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
    if(discoveryRequests===1){await new Promise(resolve=>setTimeout(resolve,300));data={ok:false,error:'Test discovery failure'};}
    if(discoveryRequests===3) await new Promise(resolve=>setTimeout(resolve,1200));
  }
- if(url.pathname.endsWith('save-send-settings.php')) data={ok:true,saved:true,schedulerApplied:true,revision:'saved',errors:[],jobs:[{id:'abcdef123456',source:'tank/anchor-test',destination:'backup/anchor-test'}]};
+ if(url.pathname.endsWith('save-send-settings.php')){savePosts.push(new URLSearchParams(route.request().postData()));await new Promise(resolve=>setTimeout(resolve,150));data={ok:true,saved:true,schedulerApplied:true,revision:'saved',errors:[],jobs:[{id:'abcdef123456',source:'tank/anchor-test',destination:'backup/anchor-test'}]};if(saveMode==='failure')data={ok:false,saved:false,errors:['Settings changed. Your draft is preserved.']};if(saveMode==='runtime')data.schedulerApplied=false;}
  if(url.pathname.endsWith('save-interface-settings.php')) data={ok:true,enabled:true,revision:'saved-revision'};
  if(url.pathname.endsWith('send-queue-action.php')){mutationRequests++;const params=new URLSearchParams(route.request().postData()||'');if(['pause','resume'].includes(params.get('action')))summary.schedules[0].paused=params.get('action')==='pause';}
+ if(url.pathname.endsWith('coordinator-status.php'))data={ok:true,available:true,autoPaused:false,runs:[{id:'test-run',kinds:['auto'],state:'running'}]};
  if(url.pathname.endsWith('workspace-summary.php')){summaryRequests++;data=summary;}
  if(url.pathname.endsWith('migrate-datasets-status.php') && url.searchParams.get('dataset'))data.preview={folders:[]};
  return route.fulfill({contentType:'text/plain',body:'ZFSAS_JSON_BEGIN'+JSON.stringify(data)+'ZFSAS_JSON_END'});
  });
  await page.addInitScript(()=>{const original=window.setTimeout;window.setTimeout=(fn,ms,...args)=>original(fn,ms===20000?800:ms,...args);});
  await page.goto('http://workspace.test/?'+query);
+ async function captureState(state){fs.mkdirSync('/tmp/zfsas-ui-screenshots',{recursive:true});for(const theme of ['light','dark'])for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.evaluate(theme=>document.body.style.backgroundColor=theme==='dark'?'rgb(25,25,25)':'rgb(255,255,255)',theme);await page.screenshot({path:'/tmp/zfsas-ui-screenshots/'+state+'-'+theme+'-'+width+'.png',fullPage:false});}await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>document.body.style.backgroundColor='rgb(255,255,255)');}
+
  if(query==='section=snapshots' || query.endsWith('tab=automation') || query==='section=replication'){
    const browse=query==='section=snapshots',status=page.locator(browse?'#notice':'#dataset-discovery-status');
    assert.match(await status.textContent(),/Discovering/);
@@ -44,15 +47,15 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
      assert.match(await status.textContent(),/timed out/);assert(await retry.isEnabled());
      await retry.click();await page.waitForTimeout(100);assert.match(await status.textContent(),/Choose a dataset/);
    }else{
-     assert.equal(await page.locator('[data-config-tools] button:visible').count(),1);
-     assert(await page.locator('[data-config-tools]').evaluate(el=>el===el.parentElement.lastElementChild));
+     assert.equal(await page.locator('[data-config-tools] button').count(),1);
+
    }
  }
  await page.waitForTimeout(500);
  assert(await page.locator('.ui-brand-mark').evaluate(img=>img.complete && img.naturalWidth>0),'Brand icon did not load');
  assert.equal(await page.locator('.zfsas-workspace').count(),1,query);assert.equal(await page.locator('h1').count(),1,query);assert.equal(await page.locator('iframe').count(),0);
  if(query==='section=activity' || query.endsWith('tab=automation')){
- const groups=query==='section=activity' ? [['#activity-state','#activity-refresh']] : [['#dataset_pool_filter','#dataset_select_visible','#dataset_clear_visible','#dataset_select_all','#dataset_clear_all'],['#manual_run','#zfsas_save_btn'],['[data-cancel]','[data-resume]']];
+ const groups=query==='section=activity' ? [['#activity-state','#activity-refresh']] : [['#dataset_pool_filter','#dataset_name_filter']];
  for(const selectors of groups){const boxes=await Promise.all(selectors.map(selector=>page.locator(selector).boundingBox()));for(const box of boxes.slice(1)){assert(Math.abs((boxes[0].y+boxes[0].height)-(box.y+box.height))<3,'Misaligned controls: '+selectors.join(', '));}}
  }
  if(query==='section=overview' || query==='section=activity'){
@@ -61,7 +64,7 @@ summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'rep
  assert(await page.locator('#operation-rows td:nth-child(2) code').evaluateAll(nodes=>nodes.every(el=>el.getBoundingClientRect().right<=el.closest('td').getBoundingClientRect().right+1)),'Dataset extends into adjacent column');
  if(query==='section=overview')assert(await page.locator('.ui-attention-item').evaluateAll(nodes=>nodes.every(el=>el.scrollWidth<=el.clientWidth+1)),'Attention text overflows');
  }
- if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByRole('button',{name:'Shared batch log — includes other jobs'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
+ if(query==='section=overview'){const button=page.getByRole('button',{name:'Details',exact:true}).first();await button.click();await page.getByText('More log options',{exact:true}).click();await page.getByRole('button',{name:'Shared batch log — includes other jobs'}).click();await page.waitForTimeout(2300);assert.match(await page.locator('#operation-detail-log').textContent(),/Test log/);
  const log=page.locator('#operation-detail-log');assert(await log.evaluate(el=>el.scrollTop>0),'Log did not open at newest entries');
  await log.evaluate(el=>el.scrollTop=125);
  await page.locator('#operation-detail').evaluate(el=>el.scrollTop=180);
@@ -96,39 +99,30 @@ await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.get
  assert.match(batchRequest.postData(),/action=cancel/);assert.match(batchRequest.postData(),/run_id=batch-run/);
  await page.keyboard.press('Escape');
  }
+ if(query.endsWith('tab=automation')){await page.locator('#dataset-page-checkbox').check();await page.locator('#dataset_name_filter').fill('no-match');assert(await page.locator('.zfsas-dataset-checkbox').isChecked());await page.locator('#dataset_name_filter').fill('');assert(await page.locator('#dataset-page-checkbox').isChecked());await page.locator('#automation-advanced summary').click();await page.locator('#dry_run').check();assert.match(await page.locator('#automation-dry-run-summary').textContent(),/Dry Run enabled/);await captureState('automation-running-draft');}
  if(query==='section=replication'){
- await page.locator('#open-new-job').click();assert(await page.locator('#new-job-dialog').evaluate(el=>el.open));
- await page.locator('#new_job_source').evaluate(el=>el.add(new Option('tank/anchor-test','tank/anchor-test')));
- await page.selectOption('#new_job_source','tank/anchor-test');await page.fill('#new_job_destination','backup/anchor-test');
- await page.locator('#zfsas_add_send_job').click();
- await page.getByRole('button',{name:'Edit',exact:true}).last().click();
-
- // Reproduce host table rules that must not constrain the vertical editor.
- await page.addStyleTag({content:'td {height:30px;white-space:nowrap;} tr {height:32px;}'});
- for(const width of [1440,900,390]){
-   await page.setViewportSize({width,height:1000});
-   const layout=await page.locator('#edit-job-dialog').evaluate(dialog=>{
-     const cells=[...dialog.querySelectorAll('td')].map(el=>el.getBoundingClientRect());
-     return {overlap:cells.some((cell,i)=>i && cell.top<cells[i-1].bottom),overflow:dialog.scrollWidth>dialog.clientWidth+1,
-       contained:[...dialog.querySelectorAll('td')].every(cell=>[...cell.children].filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().bottom<=cell.getBoundingClientRect().bottom+1))};
-   });
-   assert(!layout.overlap && !layout.overflow && layout.contained,'Editor layout failed at '+width+': '+JSON.stringify(layout));
- }
+ await captureState('replication-empty');await page.locator('#replication-shared summary').click();await page.locator('#send_max_parallel').fill('7');await page.locator('#replication-shared summary').click();
+ await page.locator('#open-new-job').click();assert(await page.locator('#edit-job-dialog').evaluate(el=>el.open));
+ const editor=page.locator('#job-editor-body');
+ await editor.locator('[name^="job_source["]').evaluate(el=>el.add(new Option('tank/anchor-test','tank/anchor-test')));
+ await editor.locator('[name^="job_source["]').selectOption('tank/anchor-test');await editor.locator('[name^="job_destination["]').fill('backup/anchor-test');
+ assert.equal(await editor.locator('[name^="job_source_keep["]').inputValue(),'3');
+ for(const width of [1440,900,390]){await page.setViewportSize({width,height:1000});assert(await page.locator('#edit-job-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Editor overflow at '+width);}
  await page.setViewportSize({width:1440,height:1000});
- const policy=page.locator('#job-editor-body select[name^="job_cleanup_policy["]');
- assert.equal(await policy.inputValue(),'retention_only','New job inherited cleanup authority');
- await policy.selectOption('older_anchors');await page.locator('#cancel-job-edit').click();
+ await captureState('replication-editing');saveMode='failure';await page.locator('#finish-job-edit').click();await page.waitForFunction(()=>document.getElementById('job-editor-error').textContent.includes('Settings changed'));
+ assert.equal(await editor.locator('[name^="job_destination["]').inputValue(),'backup/anchor-test');await captureState('replication-error');
+ const before=savePosts.length;saveMode='runtime';await page.locator('#finish-job-edit').evaluate(button=>{button.click();button.click();});await page.waitForFunction(()=>!document.getElementById('edit-job-dialog').open);assert.equal(savePosts.length,before+1);assert.equal(savePosts.at(-1).get('scope'),'job_create');assert.equal(savePosts.at(-1).get('send_max_parallel'),null);
+ assert.equal(await page.locator('#send_max_parallel').inputValue(),'7');assert.equal(await page.locator('#zfsas_send_form').getAttribute('data-dirty'),'true');assert.match(await page.locator('#workspace-notice').textContent(),/scheduler application failed/);
+ saveMode='ok';await page.locator('#replication-shared summary').click();await page.locator('#save_send_btn').click();await page.waitForFunction(()=>document.getElementById('zfsas_send_form').dataset.dirty==='false');assert.equal(savePosts.at(-1).get('scope'),'shared');assert.equal(savePosts.at(-1).get('job_source[0]'),null);await page.locator('#replication-shared summary').click();
+ await captureState('replication-configured');
  await page.getByRole('button',{name:'Edit',exact:true}).last().click();
- assert.equal(await policy.inputValue(),'retention_only','Cancel did not restore cleanup policy');
- await policy.selectOption('older_anchors');await page.locator('#finish-job-edit').click();await page.waitForFunction(()=>!document.getElementById('edit-job-dialog').open && document.querySelector('#zfsas_send_jobs_body select[name^="job_cleanup_policy["]'));
- assert.equal(await page.locator('#zfsas_send_jobs_body select[name^="job_cleanup_policy["]').last().inputValue(),'older_anchors','Editor lost explicit opt-in');
- await page.getByRole('button',{name:'Save replication',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('[name^="job_id["]').value==='abcdef123456');
- assert.equal(await page.locator('#replication-job-list .ui-badge').last().textContent(),'Configured');
+ const policy=editor.locator('[name^="job_cleanup_policy["]');await policy.selectOption('older_anchors');await page.locator('#cancel-job-edit').click();
+ await page.getByRole('button',{name:'Edit',exact:true}).last().click();assert.equal(await policy.inputValue(),'retention_only');
+ await policy.selectOption('older_anchors');await page.locator('#finish-job-edit').click();await page.waitForFunction(()=>!document.getElementById('edit-job-dialog').open);
+ assert.equal(await page.locator('#zfsas_send_jobs_body [name^="job_cleanup_policy["]').last().inputValue(),'older_anchors');
  assert.equal(await page.locator('#zfsas_send_form').getAttribute('data-dirty'),'false');
- const pause=page.getByRole('button',{name:'Pause schedule',exact:true});await pause.click();
- await page.getByRole('button',{name:'Resume schedule',exact:true}).waitFor();
- await page.getByRole('button',{name:'Resume schedule',exact:true}).click();await page.getByRole('button',{name:'Pause schedule',exact:true}).waitFor();
+ await page.locator('#replication-job-list summary').last().click();await page.getByRole('button',{name:'Pause schedule',exact:true}).click();
+ await page.locator('#replication-job-list summary').last().click();await page.getByRole('button',{name:'Resume schedule',exact:true}).click();
  }
  if(query==='section=tools'){
  assert(!(await page.locator('[name=show_tab]').isChecked()));

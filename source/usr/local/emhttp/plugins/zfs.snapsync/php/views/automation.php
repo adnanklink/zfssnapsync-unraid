@@ -8,6 +8,12 @@
     </div>
   <?php endif; ?>
 
+        <div id="auto-coordinator-status">
+          <p data-status role="status">Checking coordinator status…</p>
+          <div class="toolbar"><button type="button" class="btn" id="manual_run">Run now</button><button type="button" class="btn" data-resume disabled hidden>Resume schedule</button><details class="ui-action-menu"><summary>Runtime actions</summary><button type="button" class="btn-quiet" data-cancel disabled>Cancel run and pause</button></details></div>
+          <p id="schedule-next-preview" role="status">Loading next run…</p><p id="automation-dry-run-summary" role="status"></p><div id="manual_run_status" class="snapsync-manual-status"></div>
+        </div>
+
   <form method="post" action="<?php echo h($saveApiUrl); ?>" data-ajax-action="<?php echo h($saveApiUrl); ?>" id="zfsas_settings_form">
     <input type="hidden" name="return_to" value="<?php echo h($defaultSettingsReturnUrl); ?>">
     <?php if ($csrfToken !== '') : ?>
@@ -32,18 +38,15 @@
                   </option>
                 <?php endforeach; ?>
               </select></label>
-            <button type="button" class="btn" id="dataset_select_visible">Select shown</button>
-            <button type="button" class="btn" id="dataset_clear_visible">Clear shown</button>
-            <button type="button" class="btn" id="dataset_select_all">Select all</button>
-            <button type="button" class="btn" id="dataset_clear_all">Clear all</button>
+            <details class="ui-action-menu"><summary>Selection</summary><button type="button" class="btn-quiet" id="dataset_select_all">Select all eligible datasets</button><button type="button" class="btn-quiet" id="dataset_clear_all">Clear all datasets</button></details>
             <div class="zfsas-help zfsas-dataset-count" id="dataset_count"></div>
           </div>
 
-          <div class="zfsas-table-wrap">
+          <p class="muted">Free-space targets accept sizes such as 500M, 100G or 2T.</p><div class="zfsas-table-wrap">
             <table class="zfsas-table">
               <thead>
                 <tr>
-                  <th class="zfsas-center">Use</th>
+                  <th class="zfsas-center"><input id="dataset-page-checkbox" type="checkbox" aria-label="Select shown eligible datasets"></th>
                   <th>Dataset</th>
                   <th class="zfsas-threshold-col">Pool free-space target</th>
                 </tr>
@@ -53,7 +56,7 @@
                   <tr class="zfsas-dataset-row<?php echo !empty($row['locked']) ? ' zfsas-row-locked' : ''; ?>" data-pool="<?php echo h($row['pool']); ?>">
                     <td class="zfsas-center">
                       <input type="hidden" name="dataset_name[<?php echo (int) $index; ?>]" value="<?php echo h($row['dataset']); ?>">
-                      <input class="zfsas-dataset-checkbox" type="checkbox" name="dataset_selected[<?php echo (int) $index; ?>]" value="1" <?php echo $row['selected'] ? 'checked' : ''; ?> <?php echo !empty($row['locked']) ? 'disabled' : ''; ?>>
+                      <input class="zfsas-dataset-checkbox" aria-label="Select <?php echo h($row['dataset']); ?>" type="checkbox" name="dataset_selected[<?php echo (int) $index; ?>]" value="1" <?php echo $row['selected'] ? 'checked' : ''; ?> <?php echo !empty($row['locked']) ? 'disabled' : ''; ?>>
                     </td>
                     <td>
                       <div class="zfsas-dataset-cell">
@@ -71,7 +74,7 @@
                     </td>
                     <td class="zfsas-threshold-col">
                       <input class="zfsas-input zfsas-threshold-input" name="dataset_threshold[<?php echo (int) $index; ?>]" value="<?php echo h($row['threshold']); ?>" <?php echo !empty($row['locked']) ? 'disabled' : ''; ?>>
-                      <div class="zfsas-help">Examples: <code>500M</code>, <code>100G</code>, <code>2T</code>.</div>
+
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -82,45 +85,8 @@
       </div>
 
       <div class="zfsas-card">
-        <h3>Retention Policy (Days)</h3>
-        <div class="zfsas-grid">
-          <div class="zfsas-field">
-            <label for="keep_all_for_days">Keep every snapshot for this many days</label>
-            <input id="keep_all_for_days" name="keep_all_for_days" class="zfsas-input" type="number" min="1" max="36500" value="<?php echo h($config['KEEP_ALL_FOR_DAYS']); ?>">
-            <div class="zfsas-help">
-              All snapshots newer than this age are kept.
-            </div>
-          </div>
-
-          <div class="zfsas-field">
-            <label for="keep_daily_until_days">Then keep 1 snapshot per day until this many days</label>
-            <input id="keep_daily_until_days" name="keep_daily_until_days" class="zfsas-input" type="number" min="2" max="36500" value="<?php echo h($config['KEEP_DAILY_UNTIL_DAYS']); ?>">
-            <div class="zfsas-help">
-              For snapshots older than the first window, keep the newest snapshot from each day.
-            </div>
-          </div>
-
-          <div class="zfsas-field">
-            <label for="keep_weekly_until_days">Then keep 1 snapshot per week until this many days</label>
-            <input id="keep_weekly_until_days" name="keep_weekly_until_days" class="zfsas-input" type="number" min="3" max="36500" value="<?php echo h($config['KEEP_WEEKLY_UNTIL_DAYS']); ?>">
-            <div class="zfsas-help">
-              Snapshots older than this are removed.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="zfsas-card">
-        <h3>Run Schedule</h3>
-        <div id="auto-coordinator-status">
-          <p data-status role="status">Checking coordinator status…</p>
-          <div class="toolbar"><button type="button" class="btn" data-cancel disabled>Cancel run and pause</button>
-          <button type="button" class="btn" data-resume disabled>Resume schedule</button></div>
-          <p>Runtime history is kept in RAM and is lost on reboot. A saved pause remains until Resume.</p>
-        </div>
-        <p>Existing interval schedules retain their cron alignment until converted. New intervals first run one interval after Save; Run Now does not change that time.</p>
-        <label><input type="checkbox" name="convert_schedule" value="1" id="convert_schedule"> Convert this schedule to the new timing rules on Save</label>
-        <p id="schedule-next-preview" role="status">Next run preview loads when scheduling fields change.</p>
+        <h3>Schedule</h3>
+        <details id="automation-schedule-options"><summary>Schedule options</summary><div id="automation-legacy-timing" hidden><p>Existing intervals retain cron alignment until converted. Conversion starts the next interval after Save.</p><label><input type="checkbox" name="convert_schedule" value="1" id="convert_schedule"> Convert legacy timing on Save</label></div><p>Run now does not change the scheduled time.</p></details>
         <div class="zfsas-field">
           <label for="schedule_mode">How often should automatic runs happen?</label>
           <select id="schedule_mode" name="schedule_mode" class="zfsas-select">
@@ -193,6 +159,29 @@
         </div>
       </div>
 
+      <div class="zfsas-card">
+        <h3>Retention</h3><p id="automation-retention-summary" class="muted"></p>
+        <div class="zfsas-grid">
+          <div class="zfsas-field">
+            <label for="keep_all_for_days">All snapshots through (days)</label>
+            <input id="keep_all_for_days" name="keep_all_for_days" class="zfsas-input" type="number" min="1" max="36500" value="<?php echo h($config['KEEP_ALL_FOR_DAYS']); ?>">
+
+          </div>
+
+          <div class="zfsas-field">
+            <label for="keep_daily_until_days">Daily through (days)</label>
+            <input id="keep_daily_until_days" name="keep_daily_until_days" class="zfsas-input" type="number" min="2" max="36500" value="<?php echo h($config['KEEP_DAILY_UNTIL_DAYS']); ?>">
+
+          </div>
+
+          <div class="zfsas-field">
+            <label for="keep_weekly_until_days">Weekly through (days)</label>
+            <input id="keep_weekly_until_days" name="keep_weekly_until_days" class="zfsas-input" type="number" min="3" max="36500" value="<?php echo h($config['KEEP_WEEKLY_UNTIL_DAYS']); ?>">
+
+          </div>
+        </div>
+      </div>
+
       <details id="automation-advanced" class="zfsas-card"><summary>Advanced: naming and Dry Run</summary>
         <div class="zfsas-field" style="margin-top: 14px;">
           <label for="prefix">Snapshot name prefix</label>
@@ -212,10 +201,11 @@
             Leave this unchecked for normal operation. In Dry Run mode, open Activity → Logs → Auto Snapshot debug to see each action that would be taken.
           </div>
         </div>
+    <?php echo zfsas_config_tools_markup('auto', $configDir, $pageConfig); ?>
       </details>
 
       <div class="zfsas-actions">
-        <div id="manual_run_status" class="snapsync-manual-status">Manual run is ready.</div>
+
         <div id="save_feedback" class="zfsas-save-feedback-inline">
           <?php if (!empty($errors)) : ?>
             <div class="zfsas-alert zfsas-alert-error">
@@ -225,7 +215,7 @@
             </div>
           <?php endif; ?>
         </div>
-        <button type="button" class="btn" id="manual_run">Run Now</button>
+
         <button
           type="button"
           class="btn btn-primary"
@@ -235,7 +225,7 @@
         <noscript><button type="submit" class="btn btn-primary">Save automation</button></noscript>
       </div>
 
-    <?php echo zfsas_config_tools_markup('auto', $configDir, $pageConfig); ?>
+
   </form>
 <script src="/plugins/zfs.snapsync/js/config-tools.js"></script>
 </div>

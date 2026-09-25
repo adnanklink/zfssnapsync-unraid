@@ -6,7 +6,7 @@ plugin = root / 'source/usr/local/emhttp/plugins/zfs.snapsync'
 page = (plugin / 'php/views/snapshots.php').read_text()
 js = (plugin / 'js/snapshot-manager.js').read_text()
 selection = (plugin / 'js/snapshot-selection.js').read_text()
-for control in ['dataset-search', 'select-page', 'select-matching', 'clear-selection', 'review', 'approve', 'retry-failed', 'cleanup-mode', 'page-size']:
+for control in ['dataset-search', 'page-checkbox', 'select-matching', 'clear-selection', 'review', 'approve', 'retry-failed', 'cleanup-mode', 'page-size']:
     assert f'id="{control}"' in page, control
 for contract in ['selection.accepts(stamp)', 'payload.dataset !== stamp.dataset', 'document.hidden', 'resources.has(resource)', 'AbortController', 'i += 500', 'indeterminate', 'requestedPage']:
     assert contract in js, contract

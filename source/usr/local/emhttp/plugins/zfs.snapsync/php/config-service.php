@@ -98,6 +98,7 @@ function zfsas_config_save($kind, $dir, array $submitted, $revision, $render, $s
         if (zfsas_send_write_config_atomically($file, $content) === false) {
             $result['errors'][] = 'Unable to write configuration atomically.'; return $result;
         }
+        $result['config'] = array_filter($submitted, static fn($key) => !str_starts_with($key, '__'), ARRAY_FILTER_USE_KEY);
         $result['saved'] = true;
         $result['revision'] = zfsas_config_revision($dir);
         $output = []; $exit = 0;

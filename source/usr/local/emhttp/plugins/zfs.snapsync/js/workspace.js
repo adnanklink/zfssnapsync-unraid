@@ -45,7 +45,7 @@
   root.addEventListener('close', event => { if(event.target.tagName==='DIALOG' && event.target._trigger?.isConnected) event.target._trigger.focus(); },true);
   root.addEventListener('click', event => {
     if(!event.target.closest('#manual_run,#run_send_now')) return;
-    const form=event.target.closest('form');
+    const form=event.target.closest('form') || document.getElementById('zfsas_settings_form');
     if(form?.dataset.dirty==='true') { event.preventDefault(); event.stopImmediatePropagation(); ZfsasUI.notice('Save or discard your changes before Run Now. It uses saved settings.',true); }
   },true);
   root.addEventListener('invalid', event => {

@@ -3,6 +3,7 @@
   const root = document.getElementById('auto-coordinator-status');
   if (!root) return;
   const text = root.querySelector('[data-status]'), cancel = root.querySelector('[data-cancel]'), resume = root.querySelector('[data-resume]');
+  const actionError=document.createElement('p');actionError.setAttribute('role','alert');root.append(actionError);
   let current = null, generation = 0, timer = null, controller = null, busy = false;
   async function json(url, options) {
     const response = await fetch(url, options), body = await response.text();
@@ -23,6 +24,7 @@
       if (mine !== generation) return;
       current = (data.runs || []).find(run => (run.kinds || []).includes('auto') && !['complete', 'failed', 'canceled'].includes(run.state)) || null;
       cancel.disabled = !current || current.state === 'canceling';
+      resume.hidden = !data.autoPaused;
       resume.disabled = !data.autoPaused || (current && current.state === 'canceling');
       text.textContent = current ? (current.state === 'canceling' ? 'Cancellation saved; verifying worker shutdown.' : 'Run ' + current.id + ': ' + current.state + (current.blockedReasons?.length ? ' — waiting: ' + current.blockedReasons.join(', ') : '') + (current.nextRetry ? ' — next attempt ' + new Date(current.nextRetry * 1000).toLocaleString() : ''))
         : data.autoPaused ? 'Schedule paused until Resume.' : data.available ? 'No active Auto Snapshot run.' : (data.message || 'Coordinator is unavailable.');
@@ -32,7 +34,7 @@
   }
   async function action(name) {
     if (busy) return;
-    busy = true; ++generation; if (controller) controller.abort(); clearTimeout(timer);
+    actionError.textContent='';busy = true; ++generation; if (controller) controller.abort(); clearTimeout(timer);
     cancel.disabled = true; resume.disabled = true;
     const csrf = document.querySelector('input[name="csrf_token"]')?.value || window.csrf_token || '';
     const requestController = new AbortController(), timeout = setTimeout(() => requestController.abort(), 10000);
@@ -40,7 +42,7 @@
       await json('/plugins/zfs.snapsync/php/coordinator-action.php', {method: 'POST', signal: requestController.signal,
         headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrf},
         body: new URLSearchParams({action: name, run_id: current?.id || '', csrf_token: csrf})});
-    } catch (error) { text.textContent = error.message; }
+    } catch (error) { actionError.textContent = error.message; }
     finally { clearTimeout(timeout); busy = false; timer = setTimeout(refresh, 500); }
   }
   cancel.addEventListener('click', () => action('cancel'));

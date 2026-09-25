@@ -9,6 +9,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
   const browser = await chromium.launch({executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'], headless: true});
   try {
     const page = await browser.newPage({viewport: {width: 1400, height: 900}});
+    async function capture(state){fs.mkdirSync('/tmp/zfsas-ui-screenshots',{recursive:true});for(const theme of ['light','dark'])for(const width of [1440,390]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.body.style.backgroundColor=theme==='dark'?'rgb(25,25,25)':'rgb(255,255,255)',theme);await page.screenshot({path:'/tmp/zfsas-ui-screenshots/'+state+'-'+theme+'-'+width+'.png'});}await page.setViewportSize({width:1400,height:900});}
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     let addNew = false, captures = [], datasetRequests = 0, singleActions = [];
     const row = (i, dataset = 'tank/data') => ({dataset, snapshot: dataset + '@auto-' + String(i).padStart(5, '0'), snapshotName: 'auto-' + String(i).padStart(5, '0'), guid: String(i + 1), identity: dataset + '@auto-' + String(i).padStart(5, '0') + '#' + (i + 1), createdEpoch: i, createdText: String(i), usedBytes: i % 2, writtenBytes: i % 3, usedText: i % 2 + ' B', writtenText: i % 3 + ' B', metadataComplete: true, pendingAction: i === 2 ? 'delete' : '', eligibility: {delete: '', hold: '', release: 'No plugin hold', send: '', rollback: ''}});
@@ -56,20 +57,23 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     assert(await page.locator('#page-checkbox').evaluate(el => el.indeterminate));
     await page.locator('[data-select]').nth(0).click({modifiers: ['Shift']});
     assert.equal(await page.locator('#selected-count').textContent(), '0 selected');
-    await page.locator('#select-page').click();
+    await page.locator('#page-checkbox').check();
     assert.equal(await page.locator('#selected-count').textContent(), '99 selected');
+    await capture('snapshots-selected');
     await page.locator('#next').click();
     await page.waitForFunction(() => document.querySelector('#page-text').textContent === 'Page 2 of 100');
     await page.locator('[data-select]').nth(0).check();
     assert.equal(await page.locator('#selected-count').textContent(), '100 selected');
     await page.locator('[data-sort="used"]').click();
     assert.equal(await page.locator('#selected-count').textContent(), '100 selected');
+    await page.locator('#page-checkbox').check();
     await page.locator('#select-matching').click();
     await page.waitForFunction(() => document.querySelector('#selected-count').textContent === '9999 selected');
     addNew = true;
     await page.locator('[data-sort="creation"]').click();
     await page.waitForFunction(() => document.querySelector('#counts').textContent.startsWith('10001 matching'));
     assert.equal(await page.locator('#selected-count').textContent(), '9999 selected');
+    await page.locator('#snapshot-selection-bar summary').click();
     await page.locator('[data-bulk="hold"]').click();
     await page.waitForFunction(() => !document.querySelector('#review').hidden);
     assert.equal(captures.length, 9999);
@@ -83,11 +87,12 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     assert.equal(await page.locator('#dataset-title').textContent(), 'tank/data');
     assert((await page.locator('[data-select]').first().getAttribute('data-select')).startsWith('tank/data@'));
     for (const action of ['restore','send']) {
-      page.once('dialog', async dialog => {
-        assert(dialog.message().includes(action === 'restore' ? 'NEW writable' : 'read-only'));
-        await dialog.accept('backup/new-target');
-      });
+      await page.locator('#snapshots summary').first().click();
       await page.locator('[data-single="' + action + '"]').first().click();
+      assert.match(await page.locator('#snapshot-transfer-help').textContent(),action==='restore'?/NEW writable/:/read-only/);
+      await capture('snapshot-'+action);
+      await page.locator('#snapshot-transfer-destination').fill('backup/new-target');await page.locator('#snapshot-transfer-submit').click();
+      await page.waitForFunction(()=>!document.getElementById('snapshot-transfer').open);
       await page.waitForFunction(() => document.querySelector('#snapshots'));
       await page.waitForTimeout(150);
     }

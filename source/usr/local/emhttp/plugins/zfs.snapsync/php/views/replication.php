@@ -13,7 +13,7 @@
     </div>
   <?php endif; ?>
 
-  <form method="post" action="<?php echo zfsas_send_h($saveApiUrl); ?>" data-ajax-action="<?php echo zfsas_send_h($saveApiUrl); ?>" id="zfsas_send_form">
+  <form method="post" action="<?php echo zfsas_send_h($saveApiUrl); ?>" data-ajax-action="<?php echo zfsas_send_h($saveApiUrl); ?>" id="zfsas_send_form" novalidate>
     <input type="hidden" name="return_to" value="<?php echo zfsas_send_h($defaultReturnUrl); ?>">
     <?php if ($csrfToken !== '') : ?>
     <input type="hidden" name="csrf_token" value="<?php echo zfsas_send_h($csrfToken); ?>">
@@ -21,53 +21,35 @@
 
 <section class="ui-card"><div class="ui-card-heading"><div><h2>Replication jobs</h2><p class="muted">Each job keeps its own checkpoint chain for safe incremental transfers.</p></div><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
 <p id="dataset-discovery-status" role="status" aria-live="polite">Discovering ZFS datasets…</p>
-<p class="muted">Pause schedule prevents future runs and survives reboot. Already accepted runs may finish; use Activity to cancel a run.</p>
-<div id="replication-job-list"></div>
-<div id="replication-job-storage" hidden><?php if (count($formJobs) === 0) : ?>
-        <div class="zfsas-send-empty">No ZFS send jobs are configured yet. Add one below, then save.</div>
-      <?php endif; ?>
 
-      <div class="zfsas-send-table-wrap">
-        <table class="zfsas-send-table" id="zfsas_send_jobs_table">
-          <thead>
-            <tr>
-              <th>Source dataset</th>
-              <th>Destination dataset</th>
-              <th>Frequency</th>
-              <th>Children</th>
-              <th>Transport</th>
-              <th>Destination free-space target</th>
-              <th>Low-space retention</th>
-              <th>Source snapshots</th>
-              <th style="width:90px;">Remove</th>
-            </tr>
-          </thead>
-          <tbody id="zfsas_send_jobs_body">
-            <?php foreach ($formJobs as $index => $job) : ?>
-              <tr data-source-keep="<?php echo (int)zfsas_source_policy($config,$job)['keep']; ?>">
-                <td>
+<div id="replication-job-list"></div>
+<div id="replication-job-storage" hidden><div id="zfsas_send_jobs_body">            <?php foreach (array_merge($formJobs, [['id'=>'', 'source'=>'', 'destination'=>'', 'frequency'=>'6h', 'children'=>'0', 'transport'=>'local', 'threshold'=>'100G']]) as $index => $job) : ?>
+              <<?php echo $job['id'] === '' ? 'template id="job-template"' : 'div'; ?>>
+              <div data-job data-source-keep="<?php echo $job['id'] === '' ? 3 : (int)zfsas_source_policy($config,$job)['keep']; ?>">
+                <div class="zfsas-send-field">
                   <input type="hidden" name="job_id[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['id']); ?>">
-                  <select name="job_source[<?php echo (int) $index; ?>]" class="zfsas-send-select">
+                  <select name="job_source[<?php echo (int) $index; ?>]" class="zfsas-send-select" required>
+                    <option value="">Select source dataset</option>
                     <?php foreach ($availableDatasets as $dataset) : ?>
                       <option value="<?php echo zfsas_send_h($dataset); ?>" <?php echo ($dataset === $job['source']) ? 'selected' : ''; ?>><?php echo zfsas_send_h($dataset); ?></option>
                     <?php endforeach; ?>
                   </select>
-                </td>
-                <td><input class="zfsas-send-input" name="job_destination[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['destination']); ?>"></td>
-                <td>
+                </div>
+                <div class="zfsas-send-field"><input class="zfsas-send-input" required name="job_destination[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['destination']); ?>"></div>
+                <div class="zfsas-send-field">
                   <select name="job_frequency[<?php echo (int) $index; ?>]" class="zfsas-send-select">
                     <?php foreach (zfsas_send_frequency_options() as $value => $label) : ?>
                       <option value="<?php echo zfsas_send_h($value); ?>" <?php echo ($value === $job['frequency']) ? 'selected' : ''; ?>><?php echo zfsas_send_h($label); ?></option>
                     <?php endforeach; ?>
                   </select>
-                </td>
-                <td>
+                </div>
+                <div class="zfsas-send-field">
                   <select name="job_children[<?php echo (int) $index; ?>]" class="zfsas-send-select">
                     <option value="0" <?php echo (($job['children'] ?? '0') === '0') ? 'selected' : ''; ?>>No</option>
                     <option value="1" <?php echo (($job['children'] ?? '0') === '1') ? 'selected' : ''; ?>>Yes</option>
                   </select>
-                </td>
-                <td>
+                </div>
+                <div class="zfsas-send-field">
                   <?php $jobTransport = (string) ($job['transport'] ?? 'local'); ?>
                   <?php if (array_key_exists($jobTransport, zfsas_send_gui_transport_options())) : ?>
                     <select name="job_transport[<?php echo (int) $index; ?>]" class="zfsas-send-select">
@@ -79,28 +61,24 @@
                     <input type="hidden" name="job_transport[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($jobTransport); ?>">
                     <span class="zfsas-send-help">Unavailable transport saved in config</span>
                   <?php endif; ?>
-                </td>
-                <td><input class="zfsas-send-input" name="job_threshold[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['threshold']); ?>"></td>
-                <td>
+                </div>
+                <div class="zfsas-send-field"><input class="zfsas-send-input" name="job_threshold[<?php echo (int) $index; ?>]" value="<?php echo zfsas_send_h($job['threshold']); ?>"></div>
+                <div class="zfsas-send-field">
                   <?php $cleanupMode=zfsas_send_cleanup_mode($config,$job); ?>
                   <select class="zfsas-send-select" name="job_cleanup_policy[<?php echo (int)$index; ?>]">
                     <option value="retention_only" <?php echo $cleanupMode==='retention_only'?'selected':''; ?>>Preserve retained snapshots</option>
                     <option value="older_anchors" <?php echo $cleanupMode==='older_anchors'?'selected':''; ?>>Delete older retained snapshots when space is needed (local only)</option>
                   </select>
                   <div class="zfsas-send-help">Enabling this permanently removes older daily/weekly restore points, oldest first, until the space target is met. The keep-all window, newest checkpoint and required replication references remain protected. Only this job's snapshots on the receiving dataset are eligible.</div>
-                </td>
-                <td>
+                </div>
+                <div class="zfsas-send-field">
                   <input type="hidden" name="job_remove[<?php echo (int) $index; ?>]" value="0" class="zfsas-send-remove-flag">
                   <button type="button" class="btn zfsas-send-remove-row">Remove</button>
-                </td>
-              </tr>
+                </div>
+              </div></<?php echo $job['id'] === '' ? 'template' : 'div'; ?>>
             <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-
-</div></section>
-<details class="ui-card" id="replication-shared"><summary>Shared connection &amp; tuning</summary>      <div class="zfsas-send-inline-grid">
+</div></div></section>
+<details class="ui-card" id="replication-shared"><summary>Shared destination retention, connection &amp; performance</summary>      <div class="zfsas-send-inline-grid">
         <div class="zfsas-send-field">
           <label for="send_snapshot_prefix">Send snapshot prefix base</label>
           <input id="send_snapshot_prefix" name="send_snapshot_prefix" class="zfsas-send-input" value="<?php echo zfsas_send_h($config['SEND_SNAPSHOT_PREFIX']); ?>">
@@ -118,10 +96,10 @@
         </div>
       </div>
 
-      <div class="zfsas-send-card" style="margin-top: 14px;">
+      <label for="shared-transport">Connection transport</label><select id="shared-transport"><option value="local">Local datasets</option><option value="ssh">SSH receiver</option></select><div id="shared-ssh-settings" style="margin-top: 14px;">
         <h4 style="margin-top:0;">SSH receiver settings</h4>
         <div class="zfsas-send-help">
-          SSH transport uses keys or other preconfigured non-interactive authentication. This page stores connection metadata and an optional local private-key path only; it does not store raw passwords or private-key contents.
+          SSH sends run zfs send through an audited ssh receive command. SSH transport uses keys or other preconfigured non-interactive authentication. This page stores connection metadata and an optional local private-key path only; it does not store raw passwords or private-key contents.
         </div>
         <div class="zfsas-send-retention-grid" style="margin-top: 12px;">
           <div class="zfsas-send-field">
@@ -175,57 +153,10 @@
           <div class="zfsas-send-help">After the daily window, the destination keeps one snapshot per week until this age.</div>
         </div>
       </div>
+    <?php echo zfsas_config_tools_markup('send', $configDir, $pageConfig); ?>
+<div class="ui-form-footer"><button type="button" class="btn btn-primary" id="save_send_btn">Save shared settings</button><span id="shared-save-status" role="status"></span></div>
     </details>
-<dialog id="new-job-dialog" aria-labelledby="new-job-title"><div class="ui-dialog-header"><h2 id="new-job-title">Add replication job</h2><button type="button" data-close-dialog>Cancel</button></div><p class="muted">New local jobs default to keeping three source checkpoints. Choose Keep all in Edit to disable source cleanup. Existing checkpoints require review before enabling cleanup. Save replication to activate the job.</p>      <div class="zfsas-send-add-row">
-        <div class="zfsas-send-field">
-          <label for="new_job_source">Source dataset</label>
-          <select id="new_job_source" name="new_job_source" class="zfsas-send-select">
-            <option value="">Select source dataset</option>
-            <?php foreach ($availableDatasets as $dataset) : ?>
-              <option value="<?php echo zfsas_send_h($dataset); ?>"><?php echo zfsas_send_h($dataset); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="zfsas-send-field">
-          <label for="new_job_destination">Destination dataset</label>
-          <input id="new_job_destination" name="new_job_destination" class="zfsas-send-input" placeholder="backup/replicas/example">
-        </div>
-        <div class="zfsas-send-field">
-          <label for="new_job_frequency">Frequency</label>
-          <select id="new_job_frequency" name="new_job_frequency" class="zfsas-send-select">
-            <?php foreach (zfsas_send_frequency_options() as $value => $label) : ?>
-              <option value="<?php echo zfsas_send_h($value); ?>"><?php echo zfsas_send_h($label); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="zfsas-send-field">
-          <label for="new_job_children">Send all children as well</label>
-          <select id="new_job_children" name="new_job_children" class="zfsas-send-select">
-            <option value="0">No</option>
-            <option value="1">Yes</option>
-          </select>
-        </div>
-        <div class="zfsas-send-field">
-          <label for="new_job_transport">Transport</label>
-          <select id="new_job_transport" name="new_job_transport" class="zfsas-send-select">
-            <?php foreach (zfsas_send_gui_transport_options() as $value => $label) : ?>
-              <option value="<?php echo zfsas_send_h($value); ?>"><?php echo zfsas_send_h($label); ?></option>
-            <?php endforeach; ?>
-          </select>
-          <div class="zfsas-send-help">SSH sends run zfs send through an audited ssh receive command on the configured receiver.</div>
-        </div>
-        <div class="zfsas-send-field">
-          <label for="new_job_threshold">Destination free-space target</label>
-          <input id="new_job_threshold" name="new_job_threshold" class="zfsas-send-input" placeholder="100G" value="100G">
-        </div>
-        <div class="zfsas-send-field">
-          <label>&nbsp;</label>
-          <button type="button" class="btn" id="zfsas_add_send_job">Add Job</button>
-        </div>
-      </div>
-
-</dialog>
-<dialog id="edit-job-dialog" aria-labelledby="edit-job-title"><div class="ui-dialog-header"><h2 id="edit-job-title">Edit replication job</h2><button type="button" id="cancel-job-edit">Cancel</button></div><p class="muted">Changes apply when you Save replication.</p><table class="ui-job-editor"><tbody id="job-editor-body"></tbody></table><div class="toolbar"><button type="button" class="btn btn-primary" id="finish-job-edit">Done</button></div></dialog>
+<dialog id="edit-job-dialog" aria-labelledby="edit-job-title"><div class="ui-dialog-header"><h2 id="edit-job-title">Replication job</h2><button type="button" id="cancel-job-edit" class="btn-quiet">Cancel</button></div><div id="job-editor-body"></div><p id="job-editor-error" role="alert"></p><div class="ui-form-footer"><button type="button" class="btn btn-primary" id="finish-job-edit">Save job</button></div></dialog>
     <div class="zfsas-send-actions">
       <div id="send_run_status" class="zfsas-send-run-status">Manual ZFS send is ready.</div>
       <div id="send_feedback" class="zfsas-send-feedback">
@@ -237,11 +168,10 @@
           </div>
         <?php endif; ?>
       </div>
-      <button type="button" class="btn" id="run_send_now">Run Now</button>
-      <button type="button" class="btn btn-primary" id="save_send_btn" <?php if (($_GET['saved'] ?? '') === '1' && !$isPostRequest) : ?>data-show-saved="1"<?php endif; ?>>Save replication</button>
+      <button type="button" class="btn" id="run_send_now">Run all jobs now</button>
       <noscript><button type="submit" class="btn btn-primary">Save replication</button></noscript>
     </div>
-    <?php echo zfsas_config_tools_markup('send', $configDir, $pageConfig); ?>
+
   </form>
 <script src="/plugins/zfs.snapsync/js/config-tools.js"></script>
 

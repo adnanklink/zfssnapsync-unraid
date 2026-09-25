@@ -821,17 +821,24 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
     }
   });
 
+  const shownBoxes=()=>[...document.querySelectorAll('.zfsas-dataset-row:not([hidden]) .zfsas-dataset-checkbox:not(:disabled)')];
+  function headerSelection(){const boxes=shownBoxes(),checked=boxes.filter(box=>box.checked).length;byId('dataset-page-checkbox').checked=boxes.length>0&&checked===boxes.length;byId('dataset-page-checkbox').indeterminate=checked>0&&checked<boxes.length;byId('dataset-page-checkbox').disabled=!boxes.length;}
+  byId('dataset-page-checkbox').addEventListener('change',event=>{setAllDatasetChecks(event.target.checked,true);saveForm.dispatchEvent(new Event('change',{bubbles:true}));});
+  saveForm.addEventListener('change',headerSelection);saveForm.addEventListener('input',event=>{if(event.target.id!=='dataset-page-checkbox')headerSelection();});document.addEventListener('zfsas:datasets-ready',headerSelection);
+  new MutationObserver(headerSelection).observe(byId('async-dataset-rows'),{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+  function summaries(){byId('automation-dry-run-summary').textContent=byId('dry_run').checked?'Dry Run enabled — preview only; snapshots will not be created or deleted.':'';byId('automation-retention-summary').textContent='Keep every snapshot through '+byId('keep_all_for_days').value+' days, one per day through '+byId('keep_daily_until_days').value+' days, then one per week through '+byId('keep_weekly_until_days').value+' days. Older eligible snapshots are removed.';}
+  saveForm.addEventListener('input',summaries);summaries();headerSelection();
   var selectAllBtn = byId('dataset_select_all');
   if (selectAllBtn) {
     selectAllBtn.addEventListener('click', function () {
-      setAllDatasetChecks(true, false);
+      setAllDatasetChecks(true, false);saveForm.dispatchEvent(new Event('change',{bubbles:true}));
     });
   }
 
   var clearAllBtn = byId('dataset_clear_all');
   if (clearAllBtn) {
     clearAllBtn.addEventListener('click', function () {
-      setAllDatasetChecks(false, false);
+      setAllDatasetChecks(false, false);saveForm.dispatchEvent(new Event('change',{bubbles:true}));
     });
   }
 

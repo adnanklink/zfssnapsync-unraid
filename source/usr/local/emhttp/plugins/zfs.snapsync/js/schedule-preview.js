@@ -21,6 +21,7 @@
       const match = text.match(/ZFSAS_JSON_BEGIN\s*([\s\S]*?)\s*ZFSAS_JSON_END/);
       const data = JSON.parse(match ? match[1] : text);
       if (mine !== generation) return;
+      document.getElementById('automation-legacy-timing').hidden = !data.spec?.legacy && !document.getElementById('convert_schedule').checked;
       output.textContent = data.ok ? (data.nextScheduledText ? 'Next scheduled run: ' + data.nextScheduledText + (data.spec.kind === 'interval' ? ' (preview assumes Save now).' : data.spec.legacy ? ' Legacy cron alignment: ' + data.spec.expression + '.' : '') : 'Automatic runs disabled.') : data.error;
     } catch (error) {
       if (mine === generation && error.name !== 'AbortError') output.textContent = 'Schedule preview is unavailable.';
