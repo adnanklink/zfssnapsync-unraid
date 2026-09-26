@@ -5,6 +5,11 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.26.02 (2026-09-26)
+
+- Show Automatic snapshots section fields directly when editing, without redundant History or Advanced dropdowns.
+- Align Take snapshot and Preview cleanup, remove empty spacing above the snapshot list, and center the pagination controls and page counter.
+
 ### 2026.09.26.01 (2026-09-26)
 
 - Give Automatic snapshots, Snapshots, and Backup copies their own navigation entries. Move interface preferences, migration, and diagnostics into Settings; existing links still work.

@@ -902,10 +902,24 @@
 .zfsas-workspace #automation-summary~#zfsas_settings_form [data-auto-section=history] details{margin-top:8px}
 .zfsas-workspace #filters{align-items:start;gap:16px;margin:0}.zfsas-workspace #filters>.ui-dataset-discovery{flex:none}.zfsas-workspace #filters>details[open]{flex-basis:100%}.zfsas-workspace #filters>details>summary{margin:0}
 .zfsas-workspace #notice:not(.error){background:none;border:0;padding:0;margin:4px 0;font-size:12px;color:var(--ui-muted)}
-.zfsas-workspace #dataset-actions{align-items:start}.zfsas-workspace #dataset-actions #cleanup{max-width:100%}.zfsas-workspace #dataset-actions #cleanup>details>summary{padding:.5rem;min-height:38px}.zfsas-workspace #dataset-actions:has(details[open]){display:block}
+
 .zfsas-workspace #snapshot-selection-bar{padding:8px 12px;gap:8px}.zfsas-workspace #eligibility{font-size:11px}
 .zfsas-workspace .ui-snapshot-table{max-height:max(260px,calc(100dvh - 360px))}.zfsas-workspace #manager:has(#snapshot-selection-bar:not([hidden])) .ui-snapshot-table{max-height:max(220px,calc(100dvh - 430px))}
 .zfsas-workspace .ui-snapshot-table td{height:auto!important;padding:7px 8px}.zfsas-workspace .ui-snapshot-table .ui-action-menu summary{min-height:28px;padding:3px}
 .zfsas-workspace .zfsas-inline{display:flex;gap:10px}.zfsas-workspace .zfsas-inline input{width:80px}.zfsas-workspace .zfsas-inline select{flex:1}
 .zfsas-workspace [data-auto-section=schedule] .zfsas-schedule-row .zfsas-help{display:none}.zfsas-workspace #schedule_preview{margin-top:8px}
 .zfsas-workspace.workflow-editing #dataset-discovery-status:not(.error){font-size:11px;margin:0 0 8px}
+
+/* Section editing already supplies the context; no second disclosure is needed. */
+.zfsas-workspace #zfsas_settings_form.ui-section-edit details>summary{display:none}
+.zfsas-workspace #zfsas_settings_form.ui-section-edit #automation-advanced{padding-top:0!important}
+.zfsas-workspace #manager #dataset-actions{align-items:center;gap:8px;margin:0 0 8px}
+.zfsas-workspace #manager #cleanup{margin:0;padding:0;border:0;background:none}
+.zfsas-workspace .ui-dataset-action-panel{padding:14px;margin:0 0 12px;border:1px solid var(--ui-border);border-radius:7px;background:var(--ui-surface)}
+.zfsas-workspace #take-snapshot-panel{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.zfsas-workspace #take-snapshot-panel label{display:flex;flex-direction:column;gap:6px}
+.zfsas-workspace #active-snapshot-filters:empty{display:none}
+.zfsas-workspace #manager>.ui-snapshot-table{margin:0 0 10px}
+.zfsas-workspace #manager>.ui-pager{align-items:center;gap:10px;margin:0}
+.zfsas-workspace #manager>.ui-pager label{flex-direction:row;align-items:center;gap:8px}
+.zfsas-workspace #page-text{white-space:nowrap}

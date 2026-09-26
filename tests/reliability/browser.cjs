@@ -49,6 +49,10 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     await page.waitForFunction(() => document.querySelector('#counts').textContent.startsWith('10000 matching'));
     assert.equal(await page.locator('#snapshots tr').count(), 100);
     const fifth=await page.locator('#snapshots tr').nth(4).boundingBox();assert(fifth.y+fifth.height<=768,'Five snapshot rows must fit on a laptop');
+    const actionBoxes=await page.locator('#dataset-actions button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {y:r.y,height:r.height};}));assert.equal(actionBoxes.length,2);assert(Math.abs(actionBoxes[0].y-actionBoxes[1].y)<1,'Dataset action buttons are misaligned');
+    const paginationCenters=await page.locator('#previous,#page-text,#next,#page-size').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return r.y+r.height/2;}));assert(Math.max(...paginationCenters)-Math.min(...paginationCenters)<2,'Pagination controls are misaligned');
+    await page.locator('[aria-controls="take-snapshot-panel"]').click();assert(await page.locator('#snapshot-name').isVisible());await page.keyboard.press('Escape');assert(await page.locator('[aria-controls="take-snapshot-panel"]').evaluate(el=>el===document.activeElement));
+    await page.locator('[aria-controls="cleanup-options"]').click();assert(await page.locator('#cleanup-mode').isVisible());await page.keyboard.press('Escape');
     await page.locator('[data-sort="name"]').click(); // first desc
     await page.locator('[data-sort="name"]').click(); // asc
     await page.waitForFunction(() => document.querySelector('#snapshots code').textContent === 'auto-00000');
