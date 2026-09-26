@@ -4,7 +4,7 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current testing release: `2026.09.23.04` · Requires Unraid 6.12.0 or newer**
+**Current testing release: `2026.09.26.02` · Requires Unraid 6.12.0 or newer**
 
 SnapSync is a standalone plugin under active development. Local replication uses the new coordinator; network replication and some recovery integration remain unfinished. Start testing with disposable datasets. See [Testing and known limitations](#testing-and-known-limitations) before enabling unattended work.
 
@@ -22,12 +22,14 @@ Stop snapshot, replication, and migration work before installing or updating. If
 
 ## Get started
 
-1. Open **Automatic snapshots** and select a test dataset.
-2. Review its snapshot prefix, retention windows, and free-space target.
-3. Use Auto Snapshot's **Dry Run** to inspect planned actions before enabling its schedule.
-4. Save settings, then use **Run Now** or wait for the first scheduled occurrence.
-5. Follow the run in **Activity** and inspect its snapshots under **Snapshots**.
-6. To test replication, add a local job under **Replication**, save it, and run it against a disposable destination.
+1. Open **Automatic snapshots → Set up automatic snapshots**.
+2. In **Choose data**, select a test dataset and review its pool free-space target.
+3. In **Schedule & history**, choose when to run and how much history to retain. Expand **Advanced: naming and Dry Run** if you want to inspect planned actions before making changes.
+4. Review the settings and choose **Save automation**. Use **Run now** or wait for the first scheduled occurrence.
+5. Follow the run in **Activity**, then browse its snapshots under **Snapshots**.
+6. To test backup copies, open **Backup copies → Add job**. Choose a source and disposable destination, review the schedule and history settings, and choose **Create job**. **Run all jobs now** starts the saved jobs.
+
+After setup, Automatic snapshots shows four summaries: **Data**, **Schedule**, **History to keep**, and **Advanced**. Choose **Edit** beside a section to see its fields directly, then **Save automation** or **Cancel**. There is no extra dropdown inside these section editors.
 
 New installations start with no Auto Snapshot datasets selected and its schedule disabled. Save or discard pending settings before Run Now. Dry Run applies to Auto Snapshot; it is not a global simulation mode for replication or migration.
 
@@ -35,11 +37,12 @@ New installations start with no Auto Snapshot datasets selected and its schedule
 
 | Section | What you can do |
 | --- | --- |
-| **Overview** | See current operations, schedule state, and unavailable services. |
-| **Snapshots** | Browse and filter snapshots, review bulk actions, preview cleanup, and configure Auto Snapshot. |
-| **Backup copies** | Add or edit send jobs, configure retention and connections, and start runs. |
+| **Overview** | See snapshot and backup configuration, upcoming schedules, current work, and reported failures. |
+| **Automatic snapshots** | Set up scheduled snapshots, then edit data selection, timing, history, or advanced settings. |
+| **Snapshots** | Browse and filter snapshots, take a snapshot, restore an earlier version, or review protection and cleanup actions. |
+| **Backup copies** | Create and edit jobs, manage shared backup settings, pause/resume schedules, and run saved jobs. |
 | **Activity** | Follow running work, dependency waits, failures, cancellation, and available recovery actions. |
-| **Settings** | Preview dataset migrations and download diagnostics. |
+| **Settings** | Change the optional Unraid navigation tab, preview dataset migrations, and download diagnostics. |
 | **Help** | Find guidance and support links. |
 
 Activity shows native replication phases and, for new transfers, estimated stream progress, bytes sent, and sampled send speed. Percentages are estimates for the reported transfer, not an overall recursive-job completion guarantee; receiver verification still determines success. Older workers and network paths may provide fewer metrics.
@@ -48,25 +51,48 @@ The interface adapts to light and dark Unraid themes and smaller screens. Runtim
 
 ## Screenshots
 
-Captured from the current interface using demo datasets and operation records, without the surrounding Unraid navigation. These illustrate the UI, not a live server’s status.
+Captured from the **2026.09.26.02 production interface** using demo datasets and operation records, without the surrounding Unraid navigation. These illustrate the UI, not a live server’s status. [Capture details and refresh instructions](docs/screenshots/README.md).
 
-**Overview** — current work, schedules, and operations that need attention.
+**Overview** — snapshot and backup tasks, schedules, and recent work.
 
-![SnapSync Overview showing running operations and recovery notices](docs/screenshots/overview.png)
+![SnapSync Overview with automatic snapshot and backup copy summaries](docs/screenshots/overview.png)
 
 <details>
-<summary>Snapshot automation: dataset selection and retention settings</summary>
+<summary>Automatic snapshots: saved settings and direct section editing</summary>
 
-![Snapshot Automation showing dataset selection, retention windows, and run controls](docs/screenshots/automation.png)
+The configured view groups settings into four sections. Select **Edit** to work on one section at a time.
+
+![Automatic snapshots with Data, Schedule, History to keep, and Advanced summaries](docs/screenshots/automation.png)
+
+**History to keep** displays its age-window fields immediately.
+
+![History to keep editor with all three retention fields visible](docs/screenshots/automation-history.png)
+
+**Advanced** displays the snapshot prefix and Dry Run setting immediately.
+
+![Advanced editor with snapshot prefix and Dry Run controls visible](docs/screenshots/automation-advanced.png)
 
 </details>
 
 <details>
-<summary>Replication in the dark theme</summary>
+<summary>Snapshot browsing and selection</summary>
 
-An example local replication job being configured before Save.
+Dataset selection, snapshot search, and origin sit together. **Take snapshot** and **Preview cleanup** open their options below the action buttons. The list and pagination remain together.
 
-![Dark-theme Replication view with an example source and destination job](docs/screenshots/replication-dark.png)
+![Snapshot viewer with aligned dataset actions and pagination](docs/screenshots/snapshots.png)
+
+Selecting snapshots reveals the contextual action bar. **Select all matching** captures the current matching set across pages.
+
+![Snapshot viewer with selected snapshots and contextual protection and deletion controls](docs/screenshots/snapshots-selected.png)
+
+</details>
+
+<details>
+<summary>Backup copies: guided setup in the dark theme</summary>
+
+Create a job through **Source & destination → Schedule & history → Review**. Choose **Create job** to save it directly.
+
+![Dark-theme backup job setup with source and destination fields](docs/screenshots/replication-dark.png)
 
 </details>
 
@@ -92,21 +118,25 @@ Auto Snapshot's free-space cleanup is separate from age-based retention. It can 
 Snapshot Manager works on one dataset at a time, with search, filters, and pagination. It supports large inventories and selections across pages. **Select all matching** captures a fixed set of snapshot identities; snapshots created afterward do not join that selection.
 
 - Bulk Delete, Add plugin hold, and Release plugin hold require review of the selected snapshots. External holds cannot be released by SnapSync.
-- Send and Rollback act on a single selected snapshot. Rollback refuses to remove newer, unselected snapshots.
+- The per-row **Actions** menu contains **Send**, **Restore**, and **Rollback**. Send makes a read-only backup; Restore creates a new writable dataset. Rollback refuses to remove newer, unselected snapshots.
 - Cleanup previews make no changes, expire after five minutes, and bind approval to exact names and GUIDs. Changed configuration or identities require review or cause items to be skipped.
 - Explicit requests contain at most 500 identities, and batches execute in chunks of at most 50. Failed-only retry opens a fresh review.
 
 **Used** and **Written** are different ZFS measurements. Zero does not mean a snapshot is empty, and Written totals do not predict how much space deletion will reclaim.
 
-## Replication
+## Backup copies and replication
 
-A replication job specifies a source, destination, schedule, whether to include child datasets, and a destination free-space target. Add or edit a job, choose **Done**, then **Save replication**. Monitor execution in **Activity**.
+A backup job specifies a source, destination, schedule, whether to include child datasets, and a destination free-space target. In **Backup copies**, choose **Add job**, complete the three setup steps, and choose **Create job**. For an existing job, choose **Edit**, select a section, then **Save job**. There is no second page-level save. **Cancel** preserves the saved job and asks before discarding changes.
+
+**Shared backup settings** has **History**, **Connection**, and **Performance** tabs with its own **Save shared settings** action. These settings apply to all jobs. SSH connection setup opened from a job returns to the preserved job draft after saving; it does not create or save that job. A job save does not apply unrelated shared-setting drafts.
+
+**Run all jobs now** runs saved jobs. Each row’s **Actions** menu contains schedule pause/resume, applicable recovery review, and removal. Monitor execution in **Activity**.
 
 Local scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification. Recursive membership is captured for the run, and every expected child must report verified success before the run completes. Snapshot Manager also supports explicit local sends and validated Retry of interrupted receives.
 
 In a job’s **Details**, the outcome and next action appear above a replication checklist: **Check datasets → Create source snapshots → Inspect destinations → Cleanup → Check space → Transfer → Verify**. Expand a stage for dataset results and attempt counts, with pages of up to 50 datasets. Failed stages open initially. Unplanned or unexecuted work is not shown as successful; manual sends and recovery reuse captured snapshots. Linked source-retention cleanup remains a separate operation. Timestamps, IDs, and raw diagnostics are under expandable technical details. **Show job log** shows only that run’s steps and attempts, including available ZFS error output. Shared category logs are labeled separately and can include other jobs. Older attempts may lack diagnostics because earlier versions did not preserve them.
 
-For an unfinished local receive, choose **Review recovery** in Details or on its saved Replication configuration. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
+For an unfinished local receive, choose **Review recovery** in Details or in its saved Backup copies row’s Actions menu. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
 
 Reviews are stored in RAM. After reboot, a fresh explicit review can inspect current interrupted receives, but missing history does not authorize retrying other snapshots. Configuration or identity changes require another review. SnapSync never automatically discards an interrupted receive or forces receiver rollback.
 
@@ -118,7 +148,7 @@ SSH jobs currently use the existing network execution path; native coordinator S
 
 ### Source snapshot retention
 
-New local jobs default to **Keep latest 3** source checkpoints per job and dataset. Choose **Keep all** or a count from 1–1,000 in **Edit → Source snapshots**. Existing jobs remain on Keep all until explicitly enabled. A new job with no existing owned checkpoints can be saved directly; an existing checkpoint backlog requires **Review source snapshots → Use this retention policy → Save replication** within five minutes. Reducing the count or expanding an existing authorization also requires review.
+New local jobs default to **Keep latest 3** source checkpoints per job and dataset. Choose **Keep all** or a count from 1–1,000 in **Edit → History → Edit**, under **Source snapshots**. Existing jobs remain on Keep all until explicitly enabled. A new job with no existing owned checkpoints can be saved directly; an existing checkpoint backlog requires **Review source snapshots → Use this retention policy**, followed by **Create job** or **Save job** within five minutes. Reducing the count or expanding an existing authorization also requires review.
 
 Source cleanup runs only after the entire replication run succeeds, including every recursive member. Activity shows a separate **Source cleanup** operation linked to the completed replication, with deleted/skipped counts and protection reasons. Cleanup failure does not repeat or undo a successful transfer. Saving a policy does not immediately delete snapshots.
 
@@ -181,7 +211,7 @@ Exactly-once scheduling across reboot is not guaranteed. Discovered snapshots or
 
 **Settings → Dataset Migrator** turns top-level folders into child datasets. For example, separate application folders in an `appdata` dataset can become datasets with independent snapshot histories.
 
-Choose a parent dataset, generate a preview, review the proposed folders, and acknowledge the plan before starting. The migrator checks names and existing datasets, records container restoration information, stops affected containers, copies data, verifies it with manifests and checksums, then restores container settings and restarts them.
+Follow **Select data → Review → Run**: choose a parent dataset, generate a preview, review the proposed folders and container handling, and acknowledge the plan before starting. The migrator checks names and existing datasets, records container restoration information, stops affected containers, copies data, verifies it with manifests and checksums, then restores container settings and restarts them.
 
 Verification can take time. Stop external watchdogs that could restart containers during migration. If space becomes insufficient, the migration can wait for space before continuing. Recovery checkpoints survive reboot; recurring progress does not.
 

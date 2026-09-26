@@ -9,10 +9,10 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
   const browser = await chromium.launch({executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'], headless: true});
   try {
     const page = await browser.newPage({viewport: {width: 1366, height: 768}});
-    async function capture(state){fs.mkdirSync('/tmp/zfsas-ui-screenshots',{recursive:true});for(const theme of ['light','dark'])for(const width of [1440,390]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.body.style.backgroundColor=theme==='dark'?'rgb(25,25,25)':'rgb(255,255,255)',theme);await page.screenshot({path:'/tmp/zfsas-ui-screenshots/'+state+'-'+theme+'-'+width+'.png'});}await page.setViewportSize({width:1400,height:900});}
+    async function capture(state){fs.mkdirSync('/tmp/zfsas-ui-screenshots',{recursive:true});for(const theme of ['light','dark'])for(const width of [1440,390]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.body.style.backgroundColor=theme==='dark'?'rgb(25,25,25)':'rgb(255,255,255)',theme);await page.screenshot({path:'/tmp/zfsas-ui-screenshots/'+state+'-'+theme+'-'+width+'.png',fullPage:true});}await page.setViewportSize({width:1400,height:900});}
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     let addNew = false, captures = [], datasetRequests = 0, singleActions = [];
-    const row = (i, dataset = 'tank/data') => ({dataset, snapshot: dataset + '@auto-' + String(i).padStart(5, '0'), snapshotName: 'auto-' + String(i).padStart(5, '0'), guid: String(i + 1), identity: dataset + '@auto-' + String(i).padStart(5, '0') + '#' + (i + 1), createdEpoch: i, createdText: String(i), usedBytes: i % 2, writtenBytes: i % 3, usedText: i % 2 + ' B', writtenText: i % 3 + ' B', metadataComplete: true, pendingAction: i === 2 ? 'delete' : '', eligibility: {delete: '', hold: '', release: 'No plugin hold', send: '', rollback: ''}});
+    const row = (i, dataset = 'tank/data') => ({dataset, snapshot: dataset + '@auto-' + String(i).padStart(5, '0'), snapshotName: 'auto-' + String(i).padStart(5, '0'), guid: String(i + 1), identity: dataset + '@auto-' + String(i).padStart(5, '0') + '#' + (i + 1), createdEpoch: i, createdText: process.env.ZFSAS_DOC_CAPTURE?new Date(Date.UTC(2026,8,26,12)- (10000-i)*3600000).toISOString().slice(0,16).replace('T',' '):String(i), usedBytes: i % 2, writtenBytes: i % 3, usedText: i % 2 + ' B', writtenText: i % 3 + ' B', metadataComplete: true, pendingAction: i === 2 ? 'delete' : '', eligibility: {delete: '', hold: '', release: 'No plugin hold', send: '', rollback: ''}});
     const all = () => Array.from({length: 10000 + Number(addNew)}, (_, i) => row(i));
     await page.route('http://zfsas.test/**', async route => {
       const url = new URL(route.request().url());
@@ -53,6 +53,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     const paginationCenters=await page.locator('#previous,#page-text,#next,#page-size').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return r.y+r.height/2;}));assert(Math.max(...paginationCenters)-Math.min(...paginationCenters)<2,'Pagination controls are misaligned');
     await page.locator('[aria-controls="take-snapshot-panel"]').click();assert(await page.locator('#snapshot-name').isVisible());await page.keyboard.press('Escape');assert(await page.locator('[aria-controls="take-snapshot-panel"]').evaluate(el=>el===document.activeElement));
     await page.locator('[aria-controls="cleanup-options"]').click();assert(await page.locator('#cleanup-mode').isVisible());await page.keyboard.press('Escape');
+    await capture('snapshots-browse');
     await page.locator('[data-sort="name"]').click(); // first desc
     await page.locator('[data-sort="name"]').click(); // asc
     await page.waitForFunction(() => document.querySelector('#snapshots code').textContent === 'auto-00000');

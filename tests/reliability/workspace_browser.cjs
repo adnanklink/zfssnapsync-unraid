@@ -3,7 +3,8 @@ const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.snapsync');
 const summary={ok:true,generatedAt:1700000000,timezone:'UTC',sources:{configuration:{available:true},coordinator:{available:true}},operations:[{id:'coordinator:batch',nativeId:'batch-run',type:'batch',title:'Snapshot batch',state:'running',createdAt:1699999999,actions:['cancel'],url:'?section=snapshots',logType:'batch'},{id:'coordinator:example',nativeId:'example',type:'auto',title:'Automatic snapshots',state:'running',createdAt:1700000000,actions:['cancel'],url:'?section=snapshots&tab=automation',logType:'auto'},{id:'replication:recovery',nativeId:'recovery',type:'replication',title:'Interrupted snapshot creation',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['clear_failed'],url:'?section=replication',logType:'replication'}],schedules:[{id:'abcdef123456',type:'replication',paused:false,preview:{nextScheduledText:'Tomorrow'}}],pausedSchedules:[]};
-summary.operations[2].source='tank/'+ 'long-dataset-name-'.repeat(30);
+summary.operations[2].source=process.env.ZFSAS_DOC_CAPTURE?'tank/photos':'tank/'+ 'long-dataset-name-'.repeat(30);
+summary.schedules[0].label='Photos backup';
 summary.operations.push({id:'coordinator:transfer',nativeId:'transfer',type:'replication',title:'Active transfer',state:'running',phase:'transfer',progress:42,message:'42 MiB sent · 8.0 MiB/s',actions:[],url:'?section=activity'});
 summary.operations.push({id:'coordinator:native',nativeId:'native-run',type:'replication',coordinator:true,manual:true,title:'Native replication',state:'failed',createdAt:1700000000,recoveryRequired:true,actions:['retry'],url:'?section=activity'});
 (async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{
