@@ -1,5 +1,7 @@
 # Workflow refinement — 2026.09.25.01
 
+> Release-specific record for 2026.09.25.01. The save contracts remain relevant, but the layout was superseded by [guided workflows](workflow-redesign.md) and the 2026.09.26.02 section/spacing fixes. Use the [README](../README.md) for current controls.
+
 Replication uses one Source and destination → Schedule → Retention and space editor. Create and update save directly; Cancel restores the saved job. Removal has its own confirmation. Shared destination retention, connection and performance settings have an independent save boundary. The existing page-wide execution action is labeled “Run all jobs now.”
 
 The save endpoint accepts `scope=job_create`, `job_update`, `job_remove`, or `shared`; an omitted scope preserves full-form compatibility. Job requests use index zero. Scoped requests merge with a configuration pair read under the configuration lock. The exclusive write transaction rechecks the submitted revision, preventing a concurrent change from turning the merge into a lost update. Responses include canonical jobs/settings, revision, and separate `saved` and `schedulerApplied` results. Source cleanup authorization and schedule conversion still run through their existing validators.

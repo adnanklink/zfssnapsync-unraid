@@ -1,46 +1,23 @@
-# Standalone development direction
+# Standalone development status
 
-The plugin will become a separately named standalone project. Compatibility with
-the original plugin's runtime queues and an automatic upgrade bridge are no longer
-delivery requirements. Existing ZFS data-safety checks remain requirements. A
-configuration importer, if useful later, must be an explicit reviewed operation.
-The chosen name is **ZFS SnapSync**, plugin ID `zfs.snapsync`.
+Current status: **2026.09.26.02**, audited **2026-09-26**. See the [claim-by-claim documentation audit](status-audit.md) for code and fixture evidence.
 
-Source packaging now assigns independent configuration, runtime, service, cron,
-UI and update identities. Default snapshot prefixes and manual hold tags are also
-independent. Existing release artifacts still belong to the original plugin; the
-standalone package has not been published. Both plugins operating on the same
-datasets still require one scheduler disabled; namespace isolation does not
-provide shared ZFS resource coordination.
+## Implemented and published
 
-The implementation order is:
+ZFS SnapSync is published as the standalone `zfs.snapsync` plugin through the `main` manifest. It has independent configuration, runtime, service, cron, interface and update identities. It does not automatically import the original ZFS Auto Snapshot plugin's configuration or execution authority. The two plugins must not independently manage the same work; naming isolation is not shared resource coordination.
 
-1. Complete native coordinator replication phases: bounded destination inspection,
-   exact reference registration, cleanup dependencies, measured space approval,
-   transfer and explicit finalization of all expected children. Keep destructive
-   validation, forced receive rollback and automatic destination removal disabled.
-2. Add independently validated shared cleanup owners. Cancel detaches one owner;
-   work can continue only while another valid authorization remains. Finish native
-   schedule admission, manual Retry and configuration revision revalidation.
-3. Route Auto Snapshot mutations through coordinator tasks and finish shared
-   exclusion with Dataset Migrator. Retain safety-critical migration recovery
-   checkpoints; all recurring runtime data stays in RAM.
-4. Apply the chosen standalone identity, package/update URLs and documentation.
-   Provide a clean installation and update path for standalone clients. Do not
-   silently claim or replay the original plugin's pending work.
-5. Finish all-path flash-write tracing, scale/idle behavior, failure/reboot tests,
-   browser regressions and real-ZFS pipeline acceptance before publishing a release.
+Native local replication supports manual sends, automatic schedules and Run all jobs now. Its phases capture membership, inspect destinations, register references, perform authorized cleanup, check measured space, transfer and verify every required child. Local reviewed recovery reuses original snapshots and validates receive/resume state. Per-job older-anchor cleanup is opt-in; source checkpoint retention follows verified local runs and requires review where applicable.
 
-Native manual local replication now supports new receivers, GUID-validated
-incremental transfer, explicit Retry of interrupted receives and verification of
-all expected children. Snapshot Manager Send uses this coordinator path.
+Deletion batches use coordinator-owned item execution. Non-delete batches use bounded workers with coordinator item authorization/results. Installation checks ownership before package replacement, blocks busy updates, and verifies explicit activation. The production workspace includes task navigation, guided setup, direct scoped job saves and reviewed snapshot actions.
 
-The native scheduled-run graph also captures recursive membership, creates
-snapshots with intent metadata and verifies every member. Local automatic timers and configured-job Run Now now use this graph. Per-job
-opt-in anchor cleanup preserves the keep-all window and exact replication references
-and admits one measured deletion at a time. SSH, shared cleanup ownership,
-remaining automatic snapshot mutation ownership and full release acceptance are
-still unfinished.
+## Remaining work
 
-See [the implementation record](job-coordination-progress.md) and
-[verification audit](reliability-audit.md) for evidence and limitations.
+1. Integrate SSH/network work into native coordinator phases. Existing SSH execution remains available; spiped is hidden from the WebGUI.
+2. Implement independently validated shared cleanup owners. Current shared reference protection does not grant multiple cleanup authorizations.
+3. Extend safe replanning beyond queued, never-attempted automatic work. Do not infer that partially executed mutations are safe to replay after a revision change.
+4. Represent remaining internal Auto Snapshot mutations as individual coordinator tasks. Existing run ownership and dataset/migration gates remain in force.
+5. Complete broad release acceptance: all-path flash-write tracing, reboot/fault, scale/idle and actual Unraid-host checks. Later implementation records already contain scoped real-ZFS and tracing evidence; those results are not a claim of full coverage.
+
+Runtime histories and reviews remain in RAM. After reboot, manual work requires explicit recovery/review; exactly-once execution and reconstructed manual authority are not promised. Persistent pauses and migration recovery checkpoints remain separate.
+
+Use the [README](../README.md) for installation and operation, the [implementation record](job-coordination-progress.md) for historical milestones, and the [reliability audit](reliability-audit.md) for recorded verification.

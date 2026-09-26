@@ -1,5 +1,7 @@
 # Proposed upgrade and removal shutdown changes
 
+> Historical proposal, superseded for current plugin-managed updates. Do not use its original-plugin paths or shutdown sequence as current installation instructions. Busy updates now stop before file replacement; see [the current lifecycle design](coordinator-compatibility.md), [README](../README.md#install-and-update), and [status audit](status-audit.md).
+
 Status: source implementation resumed after the user instructed continuation of this documented proposal. Verification is recorded in the reliability audit. No installation or deployment has been performed.
 
 The plugin is not installed on this development host. Implementation would edit repository source only; deployment and execution remain outside this task.

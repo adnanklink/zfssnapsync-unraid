@@ -1,5 +1,7 @@
 # Coordinator compatibility and Details
 
+> Implementation and verification record. Publication statements below describe the original milestone; this lifecycle is included in the current release. See [current status](status-audit.md).
+
 The service handshake captures a content fingerprint at startup, protocol revision 1, and supported action names. PHP readers compare it with the installed source. Missing handshake fields are treated as an older service. Status includes compatibility and the RAM refresh blocker; job-history and recovery endpoints return structured capability errors instead of forwarding unknown commands.
 
 `php/coordinator-lifecycle.php` serializes installation and root watchdog changes on a permanent RAM lock. For supported services, a RAM admission barrier stops new attempts while granted workers finish. A status round trip fences admission already in progress. Replacement requires committed attempt completion and empty recorded process groups, using PID start times to reject reused identities. Legacy send records and worker entry points are checked too. Only the idle daemon receives TERM; no transfer receives a lifecycle signal. Queued tasks, journal history, receipts, configuration, pauses, and permanent lock inodes are preserved.

@@ -6,7 +6,7 @@ Manage snapshots, replicate datasets, and follow storage operations from one Unr
 
 **Current testing release: `2026.09.26.02` · Requires Unraid 6.12.0 or newer**
 
-SnapSync is a standalone plugin under active development. Local replication uses the new coordinator; network replication and some recovery integration remain unfinished. Start testing with disposable datasets. See [Testing and known limitations](#testing-and-known-limitations) before enabling unattended work.
+SnapSync is a standalone plugin under active development. Local replication, schedules, and reviewed local recovery use the coordinator. SSH still uses the older execution path; shared cleanup authorization and broader partial-execution replanning remain incomplete. Start testing with disposable datasets. See [Testing and known limitations](#testing-and-known-limitations) before enabling unattended work.
 
 ## Install and update
 
@@ -221,7 +221,7 @@ This testing build has passed reliability and stage-one suites, actual PHP endpo
 
 The traced native anchor-cleanup fixture ran with `/boot` read-only and recorded no file-write opens or path-metadata mutation attempts on boot flash. This is scoped evidence, not verification of every plugin path.
 
-Remaining work includes native network replication, independently shared cleanup ownership, broader automatic replanning and recovery, complete per-mutation Auto Snapshot ownership, and all-path release acceptance. These limits are tracked in the [standalone roadmap](docs/standalone-development.md), [implementation record](docs/job-coordination-progress.md), and [reliability audit](docs/reliability-audit.md).
+Remaining work includes native SSH coordination, independently shared cleanup authorization, safe replanning after partially executed mutations, complete per-mutation Auto Snapshot ownership, and comprehensive release acceptance. Reviewed local recovery already works; automatic reconstruction of lost manual authority and exactly-once execution across reboot are not promised. The [current-status audit](docs/status-audit.md) separates superseded claims from remaining gaps. These limits are tracked in the [standalone roadmap](docs/standalone-development.md), [implementation record](docs/job-coordination-progress.md), and [reliability audit](docs/reliability-audit.md).
 
 For initial host testing, use disposable source and destination datasets. Exercise a snapshot run, a local transfer, Cancel/Resume, and recovery behavior before enabling recurring work. Keep low-space anchor cleanup off until you have reviewed its retention tradeoff.
 

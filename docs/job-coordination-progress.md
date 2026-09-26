@@ -1,5 +1,7 @@
 # Job coordination implementation record
 
+> Historical implementation log. Statements about unfinished work, publication, branch names and original-plugin paths describe the milestone where they appear; later entries can supersede them. For the audited current status, use [the status audit](status-audit.md) and [current roadmap](standalone-development.md).
+
 Branch: `fix/job-coordination`, based on `fix/send-cancellation`.
 
 ## RAM runtime storage

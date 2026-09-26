@@ -1,5 +1,7 @@
 # Replication and Snapshot Manager reliability audit
 
+> Historical verification log. Branch names and original-plugin paths belong to earlier milestones; test results have the scope stated in each entry. This is not a current feature checklist. See [the status audit](status-audit.md) for superseded claims and remaining gaps.
+
 Branch: `fix/send-cancellation`. This document covers source changes, not deployment.
 
 ## Findings and disposition
