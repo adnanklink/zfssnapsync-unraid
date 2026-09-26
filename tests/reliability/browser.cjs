@@ -8,7 +8,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
 (async () => {
   const browser = await chromium.launch({executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'], headless: true});
   try {
-    const page = await browser.newPage({viewport: {width: 1400, height: 900}});
+    const page = await browser.newPage({viewport: {width: 1366, height: 768}});
     async function capture(state){fs.mkdirSync('/tmp/zfsas-ui-screenshots',{recursive:true});for(const theme of ['light','dark'])for(const width of [1440,390]){await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.body.style.backgroundColor=theme==='dark'?'rgb(25,25,25)':'rgb(255,255,255)',theme);await page.screenshot({path:'/tmp/zfsas-ui-screenshots/'+state+'-'+theme+'-'+width+'.png'});}await page.setViewportSize({width:1400,height:900});}
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     let addNew = false, captures = [], datasetRequests = 0, singleActions = [];
@@ -48,6 +48,7 @@ const plugin = path.resolve(__dirname, '../../source/usr/local/emhttp/plugins/zf
     await page.selectOption('#dataset', 'tank/data');
     await page.waitForFunction(() => document.querySelector('#counts').textContent.startsWith('10000 matching'));
     assert.equal(await page.locator('#snapshots tr').count(), 100);
+    const fifth=await page.locator('#snapshots tr').nth(4).boundingBox();assert(fifth.y+fifth.height<=768,'Five snapshot rows must fit on a laptop');
     await page.locator('[data-sort="name"]').click(); // first desc
     await page.locator('[data-sort="name"]').click(); // asc
     await page.waitForFunction(() => document.querySelector('#snapshots code').textContent === 'auto-00000');

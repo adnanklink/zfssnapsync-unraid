@@ -596,6 +596,7 @@ const pageOptions = JSON.parse(document.getElementById('migration-options').text
         renderContainerRows(lastDocker, status);
         renderLog(payload.logTail || []);
         updateMigrationControls(status, hasSelectedDataset);
+        document.dispatchEvent(new CustomEvent('zfsas:migration-state',{detail:{active:!!status.isActive,reviewed:inspect&&!!reviewedDataset}}));
 
         if (payload.datasetError) {
           renderFeedback(payload.datasetError, 'error');

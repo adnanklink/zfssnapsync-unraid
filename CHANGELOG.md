@@ -5,6 +5,14 @@ It answers one question: "What changed for me?"
 
 ## Development releases
 
+### 2026.09.26.01 (2026-09-26)
+
+- Give Automatic snapshots, Snapshots, and Backup copies their own navigation entries. Move interface preferences, migration, and diagnostics into Settings; existing links still work.
+- Guide first-time setup through focused steps, then show compact summaries with section editing. Keep shared backup settings separate and return from connection setup to your job draft.
+- Bring dataset selection and snapshot search together, shorten browsing controls, and center action dialogs. Keep exact snapshot selection, cleanup reviews, and recovery protections intact.
+- Add task-based Overview summaries and a Select → Review → Run migration flow. Preserve schedule timing and show saved configuration separately from scheduler errors.
+- Improve laptop and narrow layouts, keyboard focus, draft cancellation, and optional tuning disclosures.
+
 ### 2026.09.25.01 (2026-09-25)
 
 - Save replication jobs directly from one editor, with source-retention choices available during creation. Shared settings save separately without applying unrelated drafts.

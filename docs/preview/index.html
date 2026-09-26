@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>SnapSync · Workflow preview</title>
+  <link rel="stylesheet" href="preview.css">
+  <script src="preview.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="preview-bar">
+    <span><span class="preview-dot" aria-hidden="true"></span><strong>Preview · simulated</strong><span class="preview-description"> · No real data or settings are changed</span></span>
+    <div class="preview-controls"><label for="scenario">Scenario</label><select id="scenario"><option value="configured">Configured</option><option value="empty">First visit</option><option value="running">Running</option><option value="error">Needs attention</option><option value="unavailable">Status unavailable</option><option value="save-error">Save fails once</option><option value="scheduler-error">Saved, scheduler fails</option></select><button id="theme-toggle" class="quiet" type="button" aria-label="Switch to dark theme">Dark theme</button></div>
+  </header>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview"><img src="../../source/usr/local/emhttp/plugins/zfs.snapsync/images/zfs-snapsync.png" width="32" height="32" alt=""><span>SnapSync<small>Snapshots &amp; backup copies</small></span></a>
+      <button id="nav-toggle" class="secondary mobile-only" aria-expanded="false" aria-controls="navigation">Menu</button>
+      <nav id="navigation" aria-label="Main navigation">
+        <div class="nav-group"><a href="#overview" data-page="overview"><span aria-hidden="true">◫</span>Overview</a><a href="#automation" data-page="automation"><span aria-hidden="true">◷</span>Automatic snapshots</a><a href="#snapshots" data-page="snapshots"><span aria-hidden="true">▤</span>Snapshots</a><a href="#backups" data-page="backups"><span aria-hidden="true">⇄</span>Backup copies</a><a href="#activity" data-page="activity"><span aria-hidden="true">≡</span>Activity</a></div>
+        <div class="nav-group utility"><a href="#settings" data-page="settings"><span aria-hidden="true">⚙</span>Settings</a><a href="#help" data-page="help"><span aria-hidden="true">?</span>Help</a></div>
+      </nav>
+      <p class="sidebar-note">Your data stays on your server.<br>This preview changes nothing.</p>
+    </aside>
+    <main id="content" tabindex="-1"><div id="page"></div></main>
+  </div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="task-dialog" aria-labelledby="dialog-title"></dialog>
+</body>
+</html>

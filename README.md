@@ -22,7 +22,7 @@ Stop snapshot, replication, and migration work before installing or updating. If
 
 ## Get started
 
-1. Open **Snapshots → Automation** and select a test dataset.
+1. Open **Automatic snapshots** and select a test dataset.
 2. Review its snapshot prefix, retention windows, and free-space target.
 3. Use Auto Snapshot's **Dry Run** to inspect planned actions before enabling its schedule.
 4. Save settings, then use **Run Now** or wait for the first scheduled occurrence.
@@ -37,9 +37,9 @@ New installations start with no Auto Snapshot datasets selected and its schedule
 | --- | --- |
 | **Overview** | See current operations, schedule state, and unavailable services. |
 | **Snapshots** | Browse and filter snapshots, review bulk actions, preview cleanup, and configure Auto Snapshot. |
-| **Replication** | Add or edit send jobs, configure retention and connections, and start runs. |
+| **Backup copies** | Add or edit send jobs, configure retention and connections, and start runs. |
 | **Activity** | Follow running work, dependency waits, failures, cancellation, and available recovery actions. |
-| **Tools** | Preview dataset migrations and download diagnostics. |
+| **Settings** | Preview dataset migrations and download diagnostics. |
 | **Help** | Find guidance and support links. |
 
 Activity shows native replication phases and, for new transfers, estimated stream progress, bytes sent, and sampled send speed. Percentages are estimates for the reported transfer, not an overall recursive-job completion guarantee; receiver verification still determines success. Older workers and network paths may provide fewer metrics.
@@ -179,7 +179,7 @@ Exactly-once scheduling across reboot is not guaranteed. Discovered snapshots or
 
 ## Dataset Migrator
 
-**Tools → Dataset Migrator** turns top-level folders into child datasets. For example, separate application folders in an `appdata` dataset can become datasets with independent snapshot histories.
+**Settings → Dataset Migrator** turns top-level folders into child datasets. For example, separate application folders in an `appdata` dataset can become datasets with independent snapshot histories.
 
 Choose a parent dataset, generate a preview, review the proposed folders, and acknowledge the plan before starting. The migrator checks names and existing datasets, records container restoration information, stops affected containers, copies data, verifies it with manifests and checksums, then restores container settings and restarts them.
 
@@ -199,11 +199,11 @@ Saved replication jobs have **Pause schedule / Resume schedule** controls. Pausi
 
 ## Unraid navigation
 
-Enable **Tools → Interface → Show SnapSync in the Unraid navigation**, save, then select **Reload navigation**. The optional top-level tab is off by default. Its preference survives updates and reboots; the Settings entry remains available.
+Enable **Settings → Interface → Show SnapSync in the Unraid navigation**, save, then select **Reload navigation**. The optional top-level tab is off by default. Its preference survives updates and reboots; the Settings entry remains available.
 
 ## Diagnostics and support
 
-Download diagnostics from **Tools → Diagnostics** and report SnapSync problems in [this repository's issue tracker](https://github.com/adnanklink/zfssnapsync-unraid/issues).
+Download diagnostics from **Settings → Diagnostics** and report SnapSync problems in [this repository's issue tracker](https://github.com/adnanklink/zfssnapsync-unraid/issues).
 
 Include the SnapSync version, Unraid version, operation involved, expected and actual behavior, reproduction steps, and the diagnostics archive. The archive includes redacted configuration, logs, runtime state, and read-only ZFS/system summaries. Review it before sharing.
 

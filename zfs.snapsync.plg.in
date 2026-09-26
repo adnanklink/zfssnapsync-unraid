@@ -2,6 +2,10 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Separate Automatic snapshots, Snapshots and Backup copies, with utilities in Settings and compatible legacy links.
+- Guide setup through focused steps and edit saved configuration by section; return from shared connection settings to the preserved job draft.
+- Compact snapshot browsing, centered dialogs and task-based Overview summaries retain cleanup and recovery safeguards.
+- Improve laptop/mobile layouts and preserve saved configuration when scheduler application fails.
 - Save replication jobs directly; save shared settings independently without applying unrelated drafts.
 - Compact Automation setup with a runtime summary, shown-dataset selection and persistent save controls.
 - Contextual snapshot actions and consistent Send/Restore dialogs preserve existing cleanup reviews and safety checks.

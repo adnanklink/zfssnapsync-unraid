@@ -1,8 +1,22 @@
 <?php $isOverview = $uiSection === 'overview'; ?>
 <?php if ($isOverview): ?>
+<?php
+require_once __DIR__ . '/../send-helpers.php';
+try { $overviewConfig = zfsas_config_read_pair('/boot/config/plugins/zfs.snapsync', true); } catch (Throwable $error) { $overviewConfig = null; }
+$overviewData = array_filter(explode(',', $overviewConfig['auto']['DATASETS'] ?? ''));
+$overviewErrors = []; $overviewWarnings = [];
+$overviewJobs = zfsas_send_parse_jobs($overviewConfig['send']['SEND_JOBS'] ?? '', $overviewErrors, $overviewWarnings);
+?>
+<div class="ui-two-column ui-task-cards">
+<section class="ui-card"><h2>Automatic snapshots</h2><p>Keep earlier versions on this server so you can recover changed or deleted files.</p><strong><?= $overviewConfig === null ? 'Configuration unavailable' : (count($overviewData) ? count($overviewData) . ' datasets configured' : 'Not set up yet') ?></strong>
+<?php if (($overviewConfig['auto']['DRY_RUN'] ?? '0') === '1'): ?><p class="ui-notice">Dry Run enabled — no snapshots are created or deleted.</p><?php endif; ?>
+<p class="ui-footnote">Snapshots share the original pool. A separate backup copy helps if that pool fails.</p><a class="btn <?= count($overviewData) ? '' : 'btn-primary' ?>" href="<?= zfsas_ui_url('automation') ?>"><?= count($overviewData) ? 'Manage automatic snapshots' : 'Set up automatic snapshots' ?></a></section>
+<section class="ui-card"><h2>Backup copies</h2><p>Keep a read-only copy on another pool or server. Restore a writable copy when you need it.</p><strong><?= $overviewConfig === null ? 'Configuration unavailable' : (count($overviewJobs) ? count($overviewJobs) . ' backup jobs configured' : 'No backup jobs yet') ?></strong><p class="ui-footnote">Configuration does not confirm a successful backup. Check recent results below.</p><a class="btn" href="<?= zfsas_ui_url('replication') ?>"><?= count($overviewJobs) ? 'Manage backup copies' : 'Create a backup job' ?></a></section>
+</div>
+
 <div class="ui-metrics" aria-label="Runtime summary"><div class="ui-metric"><span>Active work in recent records</span><strong id="summary-active">—</strong><small>Queued, running, or waiting</small></div><div class="ui-metric"><span>Needs attention</span><strong id="summary-attention">—</strong><small>Reported failures and recovery</small></div><div class="ui-metric"><span>Paused schedules</span><strong id="summary-paused">—</strong><small>Resume explicitly when ready</small></div></div>
 <div id="summary-availability" aria-live="polite"></div>
-<div class="ui-two-column"><section class="ui-card"><div class="ui-card-heading"><h2>Upcoming schedules</h2><a href="<?= zfsas_ui_url('snapshots','automation') ?>">Manage →</a></div><div id="upcoming-schedules"><p class="muted">Loading schedule information…</p></div><p class="ui-footnote">Host timezone: <span data-host-zone>—</span>. Work starts when its dependencies and resources are ready.</p></section><section class="ui-card"><div class="ui-card-heading"><h2>Needs attention</h2><a href="<?= zfsas_ui_url('activity') ?>">View activity →</a></div><p class="ui-footnote">Open an alert to dismiss it. Dismissed alerts remain in Activity with recovery protections intact. Dismissals last for this boot.</p><div id="attention-list"><p class="muted">Checking recent records…</p></div></section></div>
+<div class="ui-two-column ui-overview-status"><section class="ui-card"><div class="ui-card-heading"><h2>Upcoming schedules</h2><a href="<?= zfsas_ui_url('snapshots','automation') ?>">Manage →</a></div><div id="upcoming-schedules"><p class="muted">Loading schedule information…</p></div><p class="ui-footnote">Host timezone: <span data-host-zone>—</span>. Work starts when its dependencies and resources are ready.</p></section><section class="ui-card"><div class="ui-card-heading"><h2>Needs attention</h2><a href="<?= zfsas_ui_url('activity') ?>">View activity →</a></div><p class="ui-footnote">Open an alert to dismiss it. Dismissed alerts remain in Activity with recovery protections intact. Dismissals last for this boot.</p><div id="attention-list"><p class="muted">Checking recent records…</p></div></section></div>
 <?php else: ?>
 <div class="ui-notice">Recent history is kept in RAM for this boot and may be incomplete. After reboot, manual transfers require explicit Retry and snapshot batches require fresh review.</div>
 <div id="summary-availability" aria-live="polite"></div>

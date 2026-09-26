@@ -1,4 +1,4 @@
-<a href="?section=tools">← All tools</a>
+<a href="?section=settings">← Settings</a>
 <div class="ui-notice">Select a dataset, review its folders and container handling, then start. Disable outside container watchdogs before starting.</div>
 <div class="zfsas-dm-page">
   <div class="zfsas-dm-grid">
@@ -126,4 +126,4 @@
 </div>
 
 <script type="application/json" id="migration-options"><?php echo json_encode([$statusUrl, $actionUrl], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
-<script src="/plugins/zfs.snapsync/js/migration.js"></script>
+<script src="/plugins/zfs.snapsync/js/migration.js?v=<?= (int) filemtime(__DIR__ . '/../../js/migration.js') ?>"></script>

@@ -19,10 +19,10 @@
     <?php if ($csrfToken !== '') : ?>
     <input type="hidden" name="csrf_token" value="<?php echo h($csrfToken); ?>">
     <?php endif; ?>
-      <div class="zfsas-card">
+      <section class="zfsas-card" data-auto-section="data">
         <h3>Datasets</h3>
         <div class="zfsas-help">
-          Check the datasets you want this plugin to manage. Only checked datasets are included in automated snapshot cleanup and creation.
+          Choose the datasets to snapshot and clean up automatically. A dataset is a ZFS storage area, often used for a share.
         </div>
 
         <p id="dataset-discovery-status" role="status" aria-live="polite">Saved selections are shown while datasets load.</p>
@@ -82,9 +82,9 @@
             </table>
           </div>
 
-      </div>
+      </section>
 
-      <div class="zfsas-card">
+      <section class="zfsas-card" data-auto-section="schedule">
         <h3>Schedule</h3>
         <details id="automation-schedule-options"><summary>Schedule options</summary><div id="automation-legacy-timing" hidden><p>Existing intervals retain cron alignment until converted. Conversion starts the next interval after Save.</p><label><input type="checkbox" name="convert_schedule" value="1" id="convert_schedule"> Convert legacy timing on Save</label></div><p>Run now does not change the scheduled time.</p></details>
         <div class="zfsas-field">
@@ -121,8 +121,8 @@
         <div class="zfsas-field zfsas-schedule-row" data-mode="daily" style="margin-top: 12px;">
           <label>Daily run time (24-hour clock)</label>
           <div class="zfsas-inline">
-            <input id="schedule_daily_hour" name="schedule_daily_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_DAILY_HOUR']); ?>">
-            <input id="schedule_daily_minute" name="schedule_daily_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_DAILY_MINUTE']); ?>">
+            <input aria-label="Daily hour" id="schedule_daily_hour" name="schedule_daily_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_DAILY_HOUR']); ?>">
+            <input aria-label="Daily minute" id="schedule_daily_minute" name="schedule_daily_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_DAILY_MINUTE']); ?>">
           </div>
           <div class="zfsas-help">
             Example: 03 and 30 means 3:30 AM every day.
@@ -137,8 +137,8 @@
                 <option value="<?php echo h($dayValue); ?>" <?php echo ((string) $config['SCHEDULE_WEEKLY_DAY'] === (string) $dayValue) ? 'selected' : ''; ?>><?php echo h($dayLabel); ?></option>
               <?php endforeach; ?>
             </select>
-            <input id="schedule_weekly_hour" name="schedule_weekly_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_WEEKLY_HOUR']); ?>">
-            <input id="schedule_weekly_minute" name="schedule_weekly_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_WEEKLY_MINUTE']); ?>">
+            <input aria-label="Weekly hour" id="schedule_weekly_hour" name="schedule_weekly_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_WEEKLY_HOUR']); ?>">
+            <input aria-label="Weekly minute" id="schedule_weekly_minute" name="schedule_weekly_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_WEEKLY_MINUTE']); ?>">
           </div>
           <div class="zfsas-help">
             Example: Sunday, 04 and 00 means every Sunday at 4:00 AM.
@@ -157,10 +157,10 @@
         <div class="zfsas-help" style="margin-top: 10px;">
           Current cron expression: <code id="resolved_cron_value"><?php echo h($resolvedCron); ?></code>
         </div>
-      </div>
+      </section>
 
-      <div class="zfsas-card">
-        <h3>Retention</h3><p id="automation-retention-summary" class="muted"></p>
+      <section class="zfsas-card" data-auto-section="history">
+        <h3>History to keep</h3><p id="automation-retention-summary" class="muted"></p>
         <div class="zfsas-grid">
           <div class="zfsas-field">
             <label for="keep_all_for_days">All snapshots through (days)</label>
@@ -180,9 +180,9 @@
 
           </div>
         </div>
-      </div>
+      </section>
 
-      <details id="automation-advanced" class="zfsas-card"><summary>Advanced: naming and Dry Run</summary>
+      <details data-auto-section="advanced" id="automation-advanced" class="zfsas-card"><summary>Advanced: naming and Dry Run</summary>
         <div class="zfsas-field" style="margin-top: 14px;">
           <label for="prefix">Snapshot name prefix</label>
           <input id="prefix" name="prefix" class="zfsas-input" value="<?php echo h($config['PREFIX']); ?>">

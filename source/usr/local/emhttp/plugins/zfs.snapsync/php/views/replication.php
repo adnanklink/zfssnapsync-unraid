@@ -19,7 +19,7 @@
     <input type="hidden" name="csrf_token" value="<?php echo zfsas_send_h($csrfToken); ?>">
     <?php endif; ?>
 
-<section class="ui-card"><div class="ui-card-heading"><div><h2>Replication jobs</h2><p class="muted">Each job keeps its own checkpoint chain for safe incremental transfers.</p></div><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
+<section class="ui-card" id="backup-list-panel"><div class="ui-card-heading"><div><h2>Your backup jobs</h2><p class="muted">Choose what to copy and where to keep it. Backups are read-only; restore a writable copy when needed.</p></div><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
 <p id="dataset-discovery-status" role="status" aria-live="polite">Discovering ZFS datasets…</p>
 
 <div id="replication-job-list"></div>
@@ -78,7 +78,7 @@
               </div></<?php echo $job['id'] === '' ? 'template' : 'div'; ?>>
             <?php endforeach; ?>
 </div></div></section>
-<details class="ui-card" id="replication-shared"><summary>Shared destination retention, connection &amp; performance</summary>      <div class="zfsas-send-inline-grid">
+<details class="ui-card" id="replication-shared"><summary>Shared backup settings</summary>      <div class="zfsas-send-inline-grid">
         <div class="zfsas-send-field">
           <label for="send_snapshot_prefix">Send snapshot prefix base</label>
           <input id="send_snapshot_prefix" name="send_snapshot_prefix" class="zfsas-send-input" value="<?php echo zfsas_send_h($config['SEND_SNAPSHOT_PREFIX']); ?>">
@@ -156,7 +156,7 @@
     <?php echo zfsas_config_tools_markup('send', $configDir, $pageConfig); ?>
 <div class="ui-form-footer"><button type="button" class="btn btn-primary" id="save_send_btn">Save shared settings</button><span id="shared-save-status" role="status"></span></div>
     </details>
-<dialog id="edit-job-dialog" aria-labelledby="edit-job-title"><div class="ui-dialog-header"><h2 id="edit-job-title">Replication job</h2><button type="button" id="cancel-job-edit" class="btn-quiet">Cancel</button></div><div id="job-editor-body"></div><p id="job-editor-error" role="alert"></p><div class="ui-form-footer"><button type="button" class="btn btn-primary" id="finish-job-edit">Save job</button></div></dialog>
+<section hidden class="ui-flow" id="edit-job-dialog" aria-labelledby="edit-job-title"><div class="ui-dialog-header"><h2 id="edit-job-title">Replication job</h2><button type="button" id="cancel-job-edit" class="btn-quiet">Cancel</button></div><div id="job-editor-body"></div><p id="job-editor-error" role="alert"></p><div class="ui-form-footer"><button type="button" class="btn btn-primary" id="finish-job-edit">Save job</button></div></section>
     <div class="zfsas-send-actions">
       <div id="send_run_status" class="zfsas-send-run-status">Manual ZFS send is ready.</div>
       <div id="send_feedback" class="zfsas-send-feedback">

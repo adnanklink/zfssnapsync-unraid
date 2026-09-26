@@ -315,6 +315,7 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
 
   function setSaveButtonState(isBusy) {
     saveBusy = !!isBusy;
+    if(saveForm){saveForm.inert=saveBusy;saveForm.setAttribute('aria-busy',String(saveBusy));}
     if (!saveButton) {
       return;
     }
@@ -1047,6 +1048,7 @@ const pageOptions = JSON.parse(document.getElementById('automation-options').tex
           }
         },
         function (error, payload) {
+          if(payload?.saved)saveForm.dispatchEvent(new CustomEvent('zfsas:saved',{detail:payload}));
           if (payload && Array.isArray(payload.errors)) {
             renderSaveFeedback(payload.errors, payload.notices || []);
           } else {

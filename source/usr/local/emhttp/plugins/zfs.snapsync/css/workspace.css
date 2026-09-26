@@ -857,3 +857,55 @@
 
 .zfsas-workspace #job-editor-body .source-retention-control input[type=number]{width:7em;margin-left:.5rem;}
 .zfsas-workspace #edit-job-dialog > .ui-form-footer,.zfsas-workspace #snapshot-transfer .ui-form-footer{position:sticky;bottom:0;background:var(--ui-surface);z-index:6;}
+
+/* Task-focused workflows, matching the approved design preview. */
+.zfsas-workspace{grid-template-columns:206px minmax(0,1fr)}
+.zfsas-workspace .ui-content{padding:26px 32px 20px}
+.zfsas-workspace .ui-page-header{margin-bottom:22px}
+.zfsas-workspace .ui-sidebar{padding:26px 12px 18px}
+.zfsas-workspace .ui-brand{font-size:19px}.zfsas-workspace .ui-brand-mark{width:32px;height:32px;background:transparent;padding:0}
+.zfsas-workspace #workspace-navigation a:last-child{margin:0;border:0;padding:10px 12px;border-radius:6px}
+.zfsas-workspace #workspace-navigation a[href*="section=settings"]{margin-top:24px;border-top:1px solid var(--ui-border);padding-top:20px}
+.zfsas-workspace .ui-card{padding:20px}.zfsas-workspace .ui-task-cards .ui-card{display:flex;flex-direction:column;align-items:start;gap:8px}.zfsas-workspace .ui-task-cards .btn{margin-top:auto}
+.zfsas-workspace .ui-task-cards p{margin-bottom:6px}.zfsas-workspace .ui-metrics{gap:0;border-block:1px solid var(--ui-border);margin-bottom:20px}.zfsas-workspace .ui-metric{background:none;border:0;border-radius:0;padding:12px}.zfsas-workspace .ui-metric strong{display:inline;font-size:20px;margin:0 8px 0 0}.zfsas-workspace .ui-metric small{display:inline}
+.zfsas-workspace .ui-flow,.zfsas-workspace #zfsas_settings_form{max-width:800px;margin:0 auto;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:9px;padding:22px}
+.zfsas-workspace .ui-flow .ui-dialog-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.zfsas-workspace #zfsas_settings_form>.zfsas-card{border:0;padding:0;margin:0 0 18px;background:none}
+.zfsas-workspace .ui-stepper{border:0;border-radius:0;border-bottom:1px solid var(--ui-border);margin-bottom:20px}
+.zfsas-workspace .ui-stepper li{padding:10px 8px;text-align:left}.zfsas-workspace .ui-stepper li[aria-current]{background:none;border-bottom:2px solid var(--ui-accent);font-weight:600}
+.zfsas-workspace .ui-summary{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:9px;padding:0 22px;max-width:900px}
+.zfsas-workspace .ui-summary-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 0;border-bottom:1px solid var(--ui-border)}
+.zfsas-workspace .ui-summary-row:last-child{border-bottom:0}.zfsas-workspace .ui-summary-row>div{min-width:0}.zfsas-workspace .ui-summary-row h3{font-size:14px;margin:0 0 6px}.zfsas-workspace .ui-summary-row p{color:var(--ui-muted);margin:0;overflow-wrap:anywhere}.zfsas-workspace .ui-summary-row>button{flex-shrink:0}
+.zfsas-workspace #auto-coordinator-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-bottom:18px}.zfsas-workspace #auto-coordinator-status p,.zfsas-workspace #auto-coordinator-status .toolbar{margin:0}.zfsas-workspace #auto-coordinator-status [data-status]{flex:1 1 45%}.zfsas-workspace #auto-coordinator-status #schedule-next-preview{flex:1 1 65%}
+.zfsas-workspace.workflow-editing #auto-coordinator-status{display:none}
+.zfsas-workspace .zfsas-dataset-toolbar{gap:8px}.zfsas-workspace .zfsas-dataset-toolbar label:first-child{flex:1}
+.zfsas-workspace [data-auto-section=data] .zfsas-table-wrap{max-height:260px;overflow:auto}.zfsas-workspace [data-auto-section=data] th{position:sticky;top:0;z-index:1}
+.zfsas-workspace [data-auto-section] h3{margin-bottom:10px}.zfsas-workspace [data-auto-section=schedule] .zfsas-help{margin:0}.zfsas-workspace #automation-schedule-options{margin:8px 0}.zfsas-workspace #automation-advanced{padding-top:8px!important}
+.zfsas-workspace #zfsas_settings_form>.zfsas-actions{border:0;border-top:1px solid var(--ui-border);border-radius:0;box-shadow:none;padding:14px 0 0;margin-top:16px;position:static}
+.zfsas-workspace #zfsas_settings_form>.zfsas-actions #save_feedback:empty{display:none}
+.zfsas-workspace #job-editor-body .zfsas-send-help{margin:0}.zfsas-workspace #job-editor-body .ui-editor-grid{gap:12px}.zfsas-workspace #job-editor-body section{margin:0}
+.zfsas-workspace #job-editor-body [data-editor-cell="2"],.zfsas-workspace #job-editor-body [data-editor-cell="6"]{grid-column:1/-1}
+.zfsas-workspace #job-editor-body [data-editor-cell="6"] .zfsas-send-help{font-size:11px}.zfsas-workspace .source-review-results{max-height:260px;overflow:auto}
+.zfsas-workspace #replication-shared{max-width:900px}.zfsas-workspace #replication-shared .ui-tabs{margin:16px 0}.zfsas-workspace .ui-tabs [role=tab]{border:0;border-radius:0;background:none}.zfsas-workspace .ui-tabs [aria-selected=true]{border-bottom:2px solid var(--ui-accent);color:var(--ui-accent)}
+.zfsas-workspace dialog{inset:0;margin:auto;width:min(720px,calc(100vw - 32px));height:fit-content;max-height:calc(100dvh - 48px);border:1px solid var(--ui-border);border-radius:10px;padding:24px;box-shadow:0 20px 80px #0004}
+.zfsas-workspace dialog .ui-dialog-header{margin-bottom:18px}.zfsas-workspace dialog dl{gap:8px}
+.zfsas-workspace section[aria-label="Choose dataset"],.zfsas-workspace #manager{padding:0;border:0;background:none;margin-bottom:12px}
+.zfsas-workspace #manager #dataset-title{display:none}.zfsas-workspace #manager #dataset-actions{justify-content:flex-end;margin-bottom:8px}
+.zfsas-workspace .ui-browse-search{display:flex;flex:1;gap:10px}.zfsas-workspace .ui-browse-search label:first-child{flex:1}.zfsas-workspace .ui-browse-search input{width:100%}
+.zfsas-workspace .ui-dataset-discovery{margin-bottom:8px}.zfsas-workspace #filters{margin-bottom:8px}.zfsas-workspace #filters>details{flex:1}
+.zfsas-workspace #cleanup{border:0;padding:0;background:none;margin:0}.zfsas-workspace #cleanup details{border:0;padding:0;margin-bottom:8px}
+.zfsas-workspace .ui-snapshot-table{max-height:max(280px,calc(100dvh - 440px));border:1px solid var(--ui-border);border-radius:7px;background:var(--ui-surface);overscroll-behavior:contain}
+.zfsas-workspace .ui-snapshot-table th{position:sticky;top:0;z-index:2}.zfsas-workspace .ui-snapshot-table td{padding:9px 8px}.zfsas-workspace .ui-pager{justify-content:flex-end}.zfsas-workspace .ui-pager #counts{margin-right:auto}
+.zfsas-workspace .ui-action-menu summary{white-space:nowrap}.zfsas-workspace .ui-size-help{font-size:12px;margin-top:8px;border:0;padding:0}
+@media(max-width:760px){.zfsas-workspace{display:block}.zfsas-workspace .ui-content{padding:20px 16px}.zfsas-workspace .ui-flow,.zfsas-workspace #zfsas_settings_form{padding:16px}.zfsas-workspace .ui-browse-search{flex-basis:100%;flex-wrap:wrap}.zfsas-workspace .ui-browse-search label{flex:1;min-width:120px}.zfsas-workspace .ui-pager{gap:8px}.zfsas-workspace .ui-pager #counts{flex-basis:100%}.zfsas-workspace #replication-job-list table{min-width:0}.zfsas-workspace #replication-job-list table,.zfsas-workspace #replication-job-list tbody,.zfsas-workspace #replication-job-list tr,.zfsas-workspace #replication-job-list td{display:block;width:100%;max-width:none}.zfsas-workspace #replication-job-list thead{display:none}.zfsas-workspace #replication-job-list tr{border-bottom:1px solid var(--ui-border);padding:10px 0}.zfsas-workspace #replication-job-list td{border:0;padding:4px 0}.zfsas-workspace .ui-metrics{grid-template-columns:1fr}.zfsas-workspace #workspace-navigation a[href*="section=settings"]{margin:0;border:0;padding:10px 12px}}
+.zfsas-workspace .ui-flow>.ui-form-footer{justify-content:flex-end}.zfsas-workspace .ui-job-space{margin-top:14px}.zfsas-workspace #job-editor-body .ui-job-space .ui-editor-grid{grid-template-columns:1fr}.zfsas-workspace .ui-summary .ui-empty{padding:24px 0}
+.zfsas-workspace #automation-summary~#zfsas_settings_form [data-auto-section=history] details{margin-top:8px}
+.zfsas-workspace #filters{align-items:start;gap:16px;margin:0}.zfsas-workspace #filters>.ui-dataset-discovery{flex:none}.zfsas-workspace #filters>details[open]{flex-basis:100%}.zfsas-workspace #filters>details>summary{margin:0}
+.zfsas-workspace #notice:not(.error){background:none;border:0;padding:0;margin:4px 0;font-size:12px;color:var(--ui-muted)}
+.zfsas-workspace #dataset-actions{align-items:start}.zfsas-workspace #dataset-actions #cleanup{max-width:100%}.zfsas-workspace #dataset-actions #cleanup>details>summary{padding:.5rem;min-height:38px}.zfsas-workspace #dataset-actions:has(details[open]){display:block}
+.zfsas-workspace #snapshot-selection-bar{padding:8px 12px;gap:8px}.zfsas-workspace #eligibility{font-size:11px}
+.zfsas-workspace .ui-snapshot-table{max-height:max(260px,calc(100dvh - 360px))}.zfsas-workspace #manager:has(#snapshot-selection-bar:not([hidden])) .ui-snapshot-table{max-height:max(220px,calc(100dvh - 430px))}
+.zfsas-workspace .ui-snapshot-table td{height:auto!important;padding:7px 8px}.zfsas-workspace .ui-snapshot-table .ui-action-menu summary{min-height:28px;padding:3px}
+.zfsas-workspace .zfsas-inline{display:flex;gap:10px}.zfsas-workspace .zfsas-inline input{width:80px}.zfsas-workspace .zfsas-inline select{flex:1}
+.zfsas-workspace [data-auto-section=schedule] .zfsas-schedule-row .zfsas-help{display:none}.zfsas-workspace #schedule_preview{margin-top:8px}
+.zfsas-workspace.workflow-editing #dataset-discovery-status:not(.error){font-size:11px;margin:0 0 8px}

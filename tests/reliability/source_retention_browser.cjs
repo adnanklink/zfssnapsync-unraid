@@ -21,7 +21,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   });
   await page.goto('http://source.test/');await page.waitForFunction(()=>document.querySelector('[data-config-tools]')?.dataset.ready==='1');
   assert.equal(await page.locator('[name="job_source_keep[0]"]').inputValue(),'0','Existing job defaulted to destructive cleanup');
-  await page.getByRole('button',{name:'Edit',exact:true}).click();
+  await page.locator('#replication-job-list').getByRole('button',{name:'Edit',exact:true}).click();await page.locator('.ui-job-review').getByRole('button',{name:'Edit',exact:true}).last().click();
   await page.locator('#job-editor-body').getByLabel('Source snapshots',{exact:true}).selectOption('count');
   await page.getByRole('button',{name:'Review source snapshots',exact:true}).click();
   await page.getByRole('button',{name:'Use this retention policy',exact:true}).waitFor();
@@ -32,18 +32,18 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   await page.getByRole('button',{name:'Use this retention policy',exact:true}).click();
   assert.equal(await page.locator('#job-editor-body [name="job_source_review[0]"]').inputValue(),'a'.repeat(48));
   await page.locator('#finish-job-edit').click();
-  await page.waitForFunction(()=>!document.getElementById('edit-job-dialog').open);
+  await page.waitForFunction(()=>document.getElementById('edit-job-dialog').hidden);
   assert.equal(save.get('scope'),'job_update');assert.equal(save.get('job_source_keep[0]'),'3');assert.equal(save.get('job_source_review[0]'),'a'.repeat(48));
   await page.locator('#replication-shared summary').click();await page.locator('[data-restore-tuning]').click();assert.equal(await page.locator('[name="job_source_keep[0]"]').inputValue(),'3','Tuning defaults changed cleanup authorization');
   await page.locator('#save_send_btn').click();await page.waitForTimeout(250);assert.equal(save.get('scope'),'shared');assert.equal(save.get('job_source_keep[0]'),null);
   assert.equal(await page.locator('#zfsas_send_jobs_body [name="job_source_review[0]"]').inputValue(),'','Saved review token remained stale');
-  await page.getByRole('button',{name:'Edit',exact:true}).click();slow=true;
+  await page.locator('#replication-job-list').getByRole('button',{name:'Edit',exact:true}).click();await page.locator('.ui-job-review').getByRole('button',{name:'Edit',exact:true}).last().click();slow=true;
   await page.getByRole('button',{name:'Review source snapshots',exact:true}).click();
   await page.locator('#job-editor-body').getByLabel('Source checkpoint count',{exact:true}).fill('4');await page.waitForTimeout(900);
   assert.equal(await page.getByRole('button',{name:'Use this retention policy',exact:true}).count(),0,'Stale review appeared after count changed');
   assert.equal(await page.locator('#job-editor-body [name="job_source_review[0]"]').inputValue(),'');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button',{name:'Edit',exact:true}).click();assert.equal(await page.locator('#job-editor-body').getByLabel('Source checkpoint count',{exact:true}).inputValue(),'3','Cancel edit lost count');
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#cancel-job-edit').click();
+  await page.locator('#replication-job-list').getByRole('button',{name:'Edit',exact:true}).click();await page.locator('.ui-job-review').getByRole('button',{name:'Edit',exact:true}).last().click();assert.equal(await page.locator('#job-editor-body').getByLabel('Source checkpoint count',{exact:true}).inputValue(),'3','Cancel edit lost count');
   assert.deepEqual(errors,[]);assert(starts===2&&polls>=2);
   console.log('PASS: Chromium source retention defaults, bounded review pagination, path wrapping, explicit approval/save, tuning preservation and stale-response rejection');
  }finally{await browser.close();}

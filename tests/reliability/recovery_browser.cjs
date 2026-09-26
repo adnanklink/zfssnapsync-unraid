@@ -31,6 +31,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   assert(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop>0));
   await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop=100);await page.locator('#activity-refresh').evaluate(el=>el.click());await page.waitForTimeout(150);
   assert.equal(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop),100);
+  await page.getByText('More log options',{exact:true}).click();
   await page.getByRole('button',{name:'Shared replication log — includes other jobs',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('OTHER JOB'));
   await page.getByRole('button',{name:'Review recovery',exact:true}).click();await page.getByRole('button',{name:'Retry 1 reviewed datasets',exact:true}).waitFor({timeout:5000}).catch(async e=>{throw new Error(e.message+' STATUS: '+await page.locator('.recovery-status').textContent());});
   assert.match(await page.locator('.recovery-status').textContent(),/1 eligible; 1 unavailable/);
