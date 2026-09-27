@@ -70,7 +70,7 @@ def main():
         name = 'snapsync-test-' + uuid.uuid4().hex[:12]
         flags = ['--rm', '--name', name, '--network', 'none', '--shm-size', '256m', '-v', str(ROOT) + ':/work:ro', '-w', '/work']
         if profile == 'readonly':
-            flags += ['--tmpfs', '/boot:ro']
+            flags += ['-v', str(ROOT / 'tests/runtime/boot') + ':/boot:ro']
         if profile in ('mount', 'zfs'):
             flags += ['--cap-add', 'SYS_ADMIN', '--security-opt', 'apparmor=unconfined']
         if profile == 'zfs':

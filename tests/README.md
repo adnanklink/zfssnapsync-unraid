@@ -19,6 +19,9 @@ and `all`. `--filter substring` selects a focused suite; this is not full accept
 selects an explicitly prepared alternative image and its digest is recorded.
 
 `flash` needs container mount capability, but does not expose host ZFS devices.
+Read-only flash suites mount `tests/runtime/boot` at `/boot:ro`. This fixture
+configures one fake Auto Snapshot dataset with scheduling disabled; the tests
+cannot initialize or change flash configuration.
 `zfs` and `all` additionally require an image with compatible ZFS userland,
 `/dev/zfs`, and `ZFSAS_DISPOSABLE_POOL_TEST=1`. Run them only on the dedicated
 acceptance host: containers share its ZFS kernel. The fixtures create uniquely
