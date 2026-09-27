@@ -46,22 +46,24 @@ $inputs='/tmp/zfs-snapsync-coordinator/attempt-inputs';mkdir($inputs,0775,true);
 $proc=proc_open([PHP_BINARY,__FILE__,'server'],[0=>['file','/dev/null','r'],1=>['file',$root.'/server.log','a'],2=>['file',$root.'/server.log','a']],$pipes);
 try{
     until(function(){try{rpc(['action'=>'status']);return true;}catch(Throwable $e){return false;}});
-    foreach(['normal','held','changed','failure'] as $case){
+    foreach(['normal','held','changed','unbound','failure'] as $case){
         $id='delete-'.$case;$path=$inputs.'/'.$id.'.job';
-        check(zfsas_ops_write_job_file($path,['JOB_ID'=>$id,'DATASET'=>'tank/data','SNAPSHOT'=>'tank/data@auto-'.$case,'SNAPSHOT_GUID'=>'123','SEND_CONFIG_HASH'=>$hash,'SEND_PROTECTED'=>'0','DELETE_SCOPE'=>'snapshot']),'Job capture failed');
+        check(zfsas_ops_write_job_file($path,['JOB_TYPE'=>'delete','JOB_ID'=>$id,'DATASET'=>'tank/data','SNAPSHOT'=>'tank/data@auto-'.$case,'SNAPSHOT_GUID'=>'123','SEND_CONFIG_HASH'=>$hash,'SEND_PROTECTED'=>'0','DELETE_SCOPE'=>'snapshot']),'Job capture failed');
         if($case==='normal'){
             @mkdir(zfsas_ops_status_dir().'/delete-results',0775,true);
             file_put_contents(zfsas_ops_status_dir().'/delete-results/'.$id.'.result', "skipped\tStale compatibility projection\n");
         }
-        $receipt=rpc(['action'=>'submit','commandId'=>$id,'spec'=>['tasks'=>['delete'=>['kind'=>'delete','dataset'=>'tank/data','parameters'=>['path'=>$path]]]]]);$task=$receipt['runId'].':delete';
-        until(function()use($task,$case){$state=rpc(['action'=>'status']);return $state['tasks'][$task]['state']===($case==='failure'?'retry_wait':'complete');});
+        $capture=zfsas_ops_parse_job_file($path);
+        if($case==='unbound'){$capture['SNAPSHOT_GUID']='999';}
+        $receipt=rpc(['action'=>'submit','commandId'=>$id,'spec'=>['tasks'=>['delete'=>['kind'=>'delete','dataset'=>'tank/data','parameters'=>['path'=>$path,'deleteJob'=>$capture]]]]]);$task=$receipt['runId'].':delete';
+        until(function()use($task,$case){$state=rpc(['action'=>'status']);return $state['tasks'][$task]['state']===($case==='failure'?'retry_wait':($case==='unbound'?'failed':'complete'));});
         $state=rpc(['action'=>'status']);$result=$state['tasks'][$task]['result'];
-        check($result['itemState']===($case==='normal'?'completed':($case==='failure'?'failed':'skipped')),'Incorrect explicit deletion outcome');
+        check($result['itemState']===($case==='normal'?'completed':(in_array($case,['failure','unbound'],true)?'failed':'skipped')),'Incorrect explicit deletion outcome');
         if($case==='normal'){
             check(file_get_contents(zfsas_ops_status_dir().'/delete-results/'.$id.'.result')==="skipped\tStale compatibility projection\n",'Worker rewrote compatibility evidence');
         }else{check(!is_file(zfsas_ops_status_dir().'/delete-results/'.$id.'.result'),'Worker published authoritative result file');}
         if($case==='failure'){check($state['tasks'][$task]['attemptCount']===1,'Worker retried internally');rpc(['action'=>'cancel','runId'=>$receipt['runId']]);}
     }
     check(file($root.'/destroy',FILE_IGNORE_NEW_LINES)===['tank/data@auto-normal','tank/data@auto-failure'],'Unsafe or repeated destroy');
-    echo "PASS: granted single deletion adapter, exact GUID and hold checks, explicit outcomes, no worker queue publication, coordinator-owned retry\n";
+    echo "PASS: granted single deletion adapter, exact GUID and hold checks, rejected unbound mutation, explicit outcomes, no worker queue publication, coordinator-owned retry\n";
 }finally{proc_terminate($proc,9);proc_close($proc);}

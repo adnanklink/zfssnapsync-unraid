@@ -5,10 +5,11 @@ require_once __DIR__ . "/coordinator-journal.php";
 require_once __DIR__ . "/coordinator-indexes.php";
 require_once __DIR__ . "/coordinator-items.php";
 require_once __DIR__ . "/coordinator-references.php";
+require_once __DIR__ . "/coordinator-delete-authority.php";
 /** Single-writer, boot-local coordinator state. Never place this under /boot. */
 final class ZfsasCoordinatorState
 {
-    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences;
+    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences, ZfsasCoordinatorDeleteAuthority;
     private string $root;
     private $lock;
     public array $state;

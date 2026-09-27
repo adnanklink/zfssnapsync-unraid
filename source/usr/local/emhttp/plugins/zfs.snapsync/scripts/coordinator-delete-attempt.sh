@@ -32,15 +32,26 @@ queue_remove_job() { OUTCOME=success; RESULT_STATE=completed; RESULT_MESSAGE='A 
 complete_delete_job() { OUTCOME=success; RESULT_STATE=completed; RESULT_MESSAGE="$1"; }
 skip_delete_job() { OUTCOME=success; RESULT_STATE=skipped; RESULT_MESSAGE="$1"; }
 retry_delete_job() { OUTCOME=wait; RESULT_REASON=resource; RESULT_MESSAGE="$1"; }
+authorize_delete_mutation() {
+  if ! php -r 'echo json_encode(["jobId"=>$argv[1],"snapshot"=>$argv[2],"guid"=>$argv[3]]);' \
+    "$CURRENT_JOB_ID" "${ATTEMPT_JOB[SNAPSHOT]}" "${ATTEMPT_JOB[SNAPSHOT_GUID]}" \
+    | php "$CLIENT" delete_authorize "$RESULT_SEQUENCE" >/dev/null; then
+    fail_delete_job 'Deletion ownership expired before mutation.'
+    return 1
+  fi
+  RESULT_SEQUENCE=$((RESULT_SEQUENCE + 1))
+}
 destroy_single_snapshot_with_retries() {
   local snapshot="$1" output
   [[ "$(zfs_guid_for_transport "$snapshot" local)" == "${ATTEMPT_JOB[SNAPSHOT_GUID]}" ]] || return 1
+  authorize_delete_mutation || return 1
   if ! output="$(zfs destroy "$snapshot" 2>&1)"; then
     OUTCOME=transient_failure; RESULT_STATE=failed; RESULT_MESSAGE="$output"
     return 1
   fi
 }
 execute_remote_snapshot_delete() {
+  authorize_delete_mutation || return 1
   if ! eval "$1"; then
     OUTCOME=transient_failure; RESULT_STATE=failed
     return 1

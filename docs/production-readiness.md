@@ -9,7 +9,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 1. Reproducible verification and repaired fixtures | Complete |
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
-| 4. Independent shared cleanup owners | Pending |
+| 4. Independent shared cleanup owners | In progress; final mutation authority check implemented, sharing not enabled |
 | 5. Native SSH execution and recovery | Pending |
 | 6. SSH cleanup parity | Pending |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
@@ -91,3 +91,31 @@ not native SSH execution or real-host acceptance. The handshake advertises an
 additive endpointIdentity capability; protocol 1 and journal format 3 remain
 compatible because captured parameters and reference records already support
 these fields. Existing build-identity checks still reject mixed running builds.
+
+## Task 4 work in progress
+
+The deletion adapter now requests a live, identity-bound coordinator grant
+immediately before local or legacy SSH destruction. This rechecks the exact
+captured job, owner state, manual item approval where applicable, and protected
+replication references. Replayed requests revalidate current authority. Existing
+worker metadata, configuration, hold/clone and cleanup-policy checks still apply.
+The reliability suite, syntax checks, actual deletion adapter, cancellation
+endpoint and captured-approval tests pass. Expanded focused tests cover manual
+approval revocation, protected references, and a worker capture that disagrees
+with the coordinator grant. Full batch integration passes, including the 601-item
+manifest, real retry delays, failed-only retry and daemon restart. The read-only
+flash runner initially failed because it mounted an empty configuration; a
+separate fixture repair supplies the documented disabled schedule and fake
+dataset. Both read-only runtime suites pass with that corrected setup. These are
+scoped checks, not all-path flash tracing or dedicated-host acceptance.
+
+This is a prerequisite, not completed shared cleanup. The remaining implementation
+must give each authorizing run its own immutable policy/review binding and result
+projection, with physical deletion lifetime independent of the first owner.
+Canceling one owner may retain execution only when another independently valid
+owner still authorizes that exact mutation. Losing the last owner must stop the
+worker and verify shutdown before cancellation finishes. Different conditional
+cleanup policies must never be combined into broader deletion authority.
+Legacy queue identity or a protected-reference owner cannot grant cleanup rights.
+Restart, pruning, duplicate admission and all-owner cancellation need regression
+coverage before this task is committed or marked complete.
