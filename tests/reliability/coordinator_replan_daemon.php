@@ -13,7 +13,10 @@ function request($action, $extra = []) {
     return $response['result'];
 }
 function until($predicate): void {
-    for ($i = 0; $i < 300; $i++) { if ($predicate()) { return; } usleep(20000); }
+    // Status reads deliberately do not wake admission. Releasing an external
+    // config lock is observed by the normal (at most 30-second) idle tick.
+    $deadline = hrtime(true) + 45_000_000_000;
+    do { if ($predicate()) { return; } usleep(50000); } while (hrtime(true) < $deadline);
     throw new RuntimeException('Daemon fixture timed out: ' . @file_get_contents('/tmp/replan-daemon.log'));
 }
 $dir = '/boot/config/plugins/zfs.snapsync'; mkdir($dir, 0775, true);

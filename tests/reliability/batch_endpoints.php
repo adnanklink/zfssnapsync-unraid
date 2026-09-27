@@ -4,6 +4,7 @@ if (!file_exists('/.dockerenv')) { throw new RuntimeException('Use the disposabl
 $base = realpath(__DIR__ . '/../../source/usr/local/emhttp/plugins/zfs.snapsync/php');
 require $base . '/snapshot-manager-helpers.php';
 require_once $base . '/coordinator-state.php';
+require_once $base . '/coordinator-client.php';
 function check($ok, $message) { if (!$ok) { throw new RuntimeException($message); } }
 $dir = '/boot/config/plugins/zfs.snapsync'; @mkdir($dir, 0775, true);
 file_put_contents($dir . '/zfs_snapsync.conf', "PREFIX=\"auto-\"\nDATASETS=\"tank/data:10G\"\n");
@@ -63,12 +64,26 @@ function wait_batch($token) {
     do { usleep(100000); $r=endpoint(['action'=>'status','token'=>$token]); check($r['ok'],'Status failed'); if ($r['state']==='complete') return $r; } while(microtime(true)<$until);
     throw new RuntimeException('Batch did not complete: '.json_encode($r).' '.@file_get_contents('/var/log/zfs_snapsync_snapshot_manager.log'));
 }
+// Status endpoints no longer start privileged workers. Start the real service,
+// as the installed root watchdog does, before submitting work.
+@mkdir('/var/local/emhttp',0775,true);
+file_put_contents('/var/local/emhttp/var.ini', 'mdState="STARTED"');
+$daemon=proc_open([PHP_BINARY,$base.'/coordinator-daemon.php'],
+    [0=>['file','/dev/null','r'],1=>['file','/tmp/batch-fixture/daemon.log','a'],2=>['file','/tmp/batch-fixture/daemon.log','a']],$pipes);
+try {
+    $ready=false;
+    for($attempt=0;$attempt<100;$attempt++) {
+        try { $ready=!empty(zfsas_coordinator_request(['action'=>'status'])['ok']); } catch(Throwable $error) {}
+        if($ready) break;
+        usleep(50000);
+    }
+    check($ready,'Coordinator failed to start: '.@file_get_contents('/tmp/batch-fixture/daemon.log'));
 $items=array_map(fn($r)=>['snapshot'=>$r[0],'guid'=>$r[5]],array_values($rows));
 $over=endpoint(['action'=>'capture','operation'=>'hold','dataset'=>'tank/data','items'=>json_encode($items),'seal'=>'1']);check(!$over['ok'],'Explicit request limit bypassed');
 $r=capture('hold',$items);check($r['eligible']===601,'Large review omitted items');
 check(!file_exists('/tmp/batch-fixture/actions'),'Review mutated snapshots');
 $token=$r['token'];
-$submitted=endpoint(['action'=>'submit','token'=>$token]); check($submitted['ok'] && !empty($submitted['runId']),'Submit failed');
+$submitted=endpoint(['action'=>'submit','token'=>$token]); check($submitted['ok'] && !empty($submitted['runId']),'Submit failed: '.json_encode($submitted));
 check(endpoint(['action'=>'submit','token'=>$token])['runId']===$submitted['runId'],'Duplicate submit lost run identity');
 $r=wait_batch($token);check($r['counts']['completed']===600 && $r['counts']['failed']===1,'Partial failure accounting: '.json_encode($r['counts']));
 check(count(file('/tmp/batch-fixture/actions'))===600,'Duplicate actions repeated successes');
@@ -112,3 +127,5 @@ unlink('/tmp/batch-fixture/fail');
 $retry=endpoint(['action'=>'retry','token'=>$failedDelete['token']]);check($retry['selected']===1 && $retry['eligible']===1,'Failed delete was not eligible for retry');
 endpoint(['action'=>'submit','token'=>$retry['token']]);check(wait_batch($retry['token'])['counts']['completed']===1,'Failed delete retry did not recover');
 echo "PASS: actual batch endpoints, 601-item manifests, 500-item limit, duplicate submissions, partial failures, failed-only retry, changed GUID, expired approval, held cleanup, exact deletion, daemon restart and deletion retry\n";
+
+} finally { if (is_resource($daemon)) { proc_terminate($daemon); proc_close($daemon); } }

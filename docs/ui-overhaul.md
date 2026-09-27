@@ -28,4 +28,4 @@ Local replication uses native coordinator phases; SSH retains the network queue 
 - `source_retention_browser.cjs` and `recovery_browser.cjs`: review binding, log scope, partial recovery and stale-response rejection.
 - `workspace_endpoints.php`: actual legacy routes and bounded read-only runtime interfaces.
 
-The older `config_browser.cjs` still references removed editor controls and is not current coverage of this UI. Its relevant journeys are covered by the suites above. Run production-path fixtures only in disposable containers. [Screenshot documentation](screenshots/README.md) explains current captures; fixture screenshots do not replace validation within an actual Unraid host theme.
+`config_browser.cjs` covers current guided-form configuration tools, filtered selection, tuning resets and prefix validation. Job create/edit/save journeys remain covered by the suites above. Run production-path fixtures only in disposable containers. [Screenshot documentation](screenshots/README.md) explains current captures; fixture screenshots do not replace validation within an actual Unraid host theme.

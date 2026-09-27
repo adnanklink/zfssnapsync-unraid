@@ -15,7 +15,11 @@ function endpoint($name,$method,$post=[],$get=[]){global $runner,$base;$proc=pro
 $post=['csrf_token'=>'fixture','ajax'=>'save','config_revision'=>zfsas_config_revision($dir)];foreach($job as $key=>$value)$post['job_'.$key]=[$value];
 $daemon=proc_open([PHP_BINARY,$base.'/coordinator-daemon.php'],[1=>['file','/tmp/source-endpoints.log','a'],2=>['file','/tmp/source-endpoints.log','a']],$pipes);
 try{
- zfsas_coordinator_ensure();
+ $ready=false;
+ for($i=0;$i<100;$i++) {
+  try { zfsas_coordinator_ensure(); $ready=true; break; } catch(RuntimeException $error) { usleep(50000); }
+ }
+ check($ready,'Coordinator failed to start: '.@file_get_contents('/tmp/source-endpoints.log'));
  check(!endpoint('source-retention-preview.php','POST',[])['ok'],'Review accepted missing CSRF');
  $bad=endpoint('save-send-settings.php','POST',$post+['job_source_keep'=>['3']]);check(empty($bad['saved']),'Existing source cleanup enabled without review');
  $before=file_get_contents($dir.'/zfs_send.conf');

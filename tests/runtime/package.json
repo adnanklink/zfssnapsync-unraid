@@ -1,0 +1,5 @@
+{
+  "name": "snapsync-test-runtime",
+  "private": true,
+  "dependencies": { "playwright-core": "1.63.0" }
+}
