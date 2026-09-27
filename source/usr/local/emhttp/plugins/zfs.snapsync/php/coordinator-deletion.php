@@ -210,7 +210,7 @@ final class ZfsasCoordinatorDeletion
             }
         }
         $job = $task['parameters']['deleteJob'];
-        $owners = $this->journal->deletionReferenceOwners($job['SNAPSHOT'], $job['SNAPSHOT_GUID']);
+        $owners = $this->journal->deletionReferenceOwners($job['SNAPSHOT'], $job['SNAPSHOT_GUID'],ZfsasEndpointIdentity::deletionEndpoint($task['parameters']));
         if ($owners) { return ['outcome'=>'wait', 'reason'=>'dependency', 'owners'=>$owners,
             'message'=>'Snapshot is registered as a replication source, base, checkpoint or resume reference.']; }
         $path = $this->root . '/attempt-inputs/' . hash('sha256', $task['id']) . '.job';

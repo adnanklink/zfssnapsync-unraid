@@ -4,6 +4,7 @@ trait ZfsasCoordinatorItems
 {
     private static function checkedItems(array $task): void
     {
+        if (isset($task['parameters']['endpoint'])) { ZfsasEndpointIdentity::validate($task['parameters']['endpoint']); }
         if (!isset($task['items'])) { return; }
         if ($task['kind'] !== 'batch' || !is_array($task['items']) || !array_is_list($task['items']) || count($task['items']) > 50000) {
             throw new InvalidArgumentException('Invalid approved item list.');

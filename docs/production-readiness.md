@@ -8,7 +8,7 @@ remain separate from source. This record is not a release acceptance certificate
 | --- | --- |
 | 1. Reproducible verification and repaired fixtures | Complete |
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
-| 3. Endpoint-aware coordination | Pending |
+| 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
 | 4. Independent shared cleanup owners | Pending |
 | 5. Native SSH execution and recovery | Pending |
 | 6. SSH cleanup parity | Pending |
@@ -73,3 +73,21 @@ repository-relative `evidence` path and its SHA-256; soak also contains elapsed
 `seconds` of at least 172800. `platforms` records passing versioned
 unraidMinimum (6.12.0), unraidCurrent (7.x), and linuxReceiver acceptance.
 No such passing record is created until those tests actually finish.
+
+## Task 3 verification
+
+Inspection now separates source and receiver reads, and captured plans bind the
+receiver identity. References and resource locks distinguish verified storage
+endpoints; legacy unknown identities remain conservative. Local lock names stay
+compatible with existing workers. Multiple resource gates acquire in stable
+order and release everything on contention. SSH aliases use verified host-key
+and pool identity, with locally imported pools sharing local gates.
+
+The reliability suite, deletion-adapter endpoint suite, and syntax checks pass.
+Regressions cover identical snapshot names/GUIDs on distinct endpoints, alias
+identity, local pool collapse, lock rollback, receiver-only reads, resume tokens,
+and changed-identity rejection. This introduces the coordination primitives,
+not native SSH execution or real-host acceptance. The handshake advertises an
+additive endpointIdentity capability; protocol 1 and journal format 3 remain
+compatible because captured parameters and reference records already support
+these fields. Existing build-identity checks still reject mixed running builds.

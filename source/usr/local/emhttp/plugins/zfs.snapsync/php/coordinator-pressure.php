@@ -16,7 +16,7 @@ trait ZfsasCoordinatorPressure
         if ($type==='pressure_authorize') {
             if (empty($p['pressure']) || $payload) { throw new InvalidArgumentException('Invalid pressure deletion grant.'); }
             $job=$p['deleteJob'];
-            if ($this->deletionReferenceOwners($job['SNAPSHOT'],$job['SNAPSHOT_GUID'])) {
+            if ($this->deletionReferenceOwners($job['SNAPSHOT'],$job['SNAPSHOT_GUID'],ZfsasEndpointIdentity::deletionEndpoint($p))) {
                 throw new InvalidArgumentException('Snapshot acquired a protected replication reference.');
             }
             return ['authorized'=>true];
@@ -90,11 +90,11 @@ trait ZfsasCoordinatorPressure
         }
         $header=&$this->state['plans'][$taskId.':pressure']; $index=$header['cursor']++;
         // Other runs' references are exclusions, not destructive retry attempts.
-        if ($this->deletionReferenceOwners($candidate['SNAPSHOT'],$candidate['SNAPSHOT_GUID'])) {
+        if ($this->deletionReferenceOwners($candidate['SNAPSHOT'],$candidate['SNAPSHOT_GUID'],$task['parameters']['endpoint'] ?? 'local')) {
             return ['outcome'=>'wait','reason'=>'space','delay'=>1,'message'=>'Skipped an anchor protected by another replication run.'];
         }
         $id=$task['runId'].':pressure-'.substr(hash('sha256',$taskId.':'.$index),0,32);
-        $parameters=['deleteJob'=>$candidate,'nativeSchedule'=>true,'pressure'=>[
+        $parameters=['endpoint'=>$task['parameters']['endpoint'] ?? 'local','deleteJob'=>$candidate,'nativeSchedule'=>true,'pressure'=>[
             'gateId'=>$taskId,'requiredBytes'=>$result['requiredBytes'],
             'revision'=>$task['parameters']['revision'],'policy'=>$task['parameters']['cleanupPolicy'],
             'inspection'=>$task['parameters']['inspection'],'replication'=>$task['parameters']['replication']]];

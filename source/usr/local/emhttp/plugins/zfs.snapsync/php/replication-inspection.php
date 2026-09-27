@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/operation-diagnostics.php';
+require_once __DIR__.'/endpoint-identity.php';
 final class ZfsasReplicationCommandError extends RuntimeException
 {
     public string $diagnostic;
@@ -128,12 +129,12 @@ final class ZfsasReplicationInspection
         return ltrim($decimal,'0') ?: '0';
     }
 
-    private static function inspectResume(array $request, callable $read, string $token, string $sourceGuid, string $destinationGuid): array
+    private static function inspectResume(array $request, callable $read, string $token, string $sourceGuid, string $destinationGuid, callable $readReceiver, string $receiverEndpoint): array
     {
         if (($request['allowResume'] ?? false) !== true) {
             return ['outcome'=>'validation_failure','recoveryRequired'=>true,
                 'failureCode'=>'interrupted_receive','message'=>'An earlier transfer is unfinished at the destination. Review recovery before sending another snapshot.',
-                'inspection'=>['sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,'resumeRequired'=>true]];
+                'inspection'=>['receiverEndpoint'=>$receiverEndpoint,'sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,'resumeRequired'=>true]];
         }
         $metadata = $read(['send','-nvt',$token]); $fields = [];
         foreach (explode("\n",$metadata) as $line) {
@@ -147,55 +148,56 @@ final class ZfsasReplicationInspection
         }
         $source=explode('@',$request['sourceSnapshot'])[0]; $destination=$request['destination'];
         if (self::guid($read,$request['sourceSnapshot']) !== $request['sourceGuid']) { throw new InvalidArgumentException('Resume source snapshot identity changed.'); }
-        $reference = static fn($role,$dataset,$datasetGuid,$snapshot,$guid)=>compact('role','dataset','datasetGuid','snapshot','guid')+['endpoint'=>'local'];
+        $reference = static fn($role,$dataset,$datasetGuid,$snapshot,$guid,$endpoint='local')=>compact('role','dataset','datasetGuid','snapshot','guid','endpoint');
         $references=[$reference('source',$source,$sourceGuid,$request['sourceSnapshot'],$request['sourceGuid'])];
         $from=self::tokenGuid($fields['fromguid'] ?? '0'); $base=null;
         if ($from !== '0') {
-            $sources=self::inventory($read,$source); $destinations=self::inventory($read,$destination);
+            $sources=self::inventory($read,$source); $destinations=self::inventory($readReceiver,$destination);
             foreach ($sources as $row) {
                 if ($row['guid'] !== $from) { continue; }
                 $target=$destination.'@'.explode('@',$row['snapshot'])[1];
                 if (($destinations[$target]['guid'] ?? '') !== $from) { continue; }
                 $base=$row+['destinationSnapshot'=>$target]; break;
             }
-            if (!$base || self::guid($read,$base['snapshot']) !== $from || self::guid($read,$base['destinationSnapshot']) !== $from) {
+            if (!$base || self::guid($read,$base['snapshot']) !== $from || self::guid($readReceiver,$base['destinationSnapshot']) !== $from) {
                 throw new InvalidArgumentException('Resume base is absent or its source/receiver GUID differs.');
             }
             $references[]=$reference('base',$source,$sourceGuid,$base['snapshot'],$from);
-            $references[]=$reference('resume',$destination,$destinationGuid,$base['destinationSnapshot'],$from);
+            $references[]=$reference('resume',$destination,$destinationGuid,$base['destinationSnapshot'],$from,$receiverEndpoint);
         }
-        if (self::guid($read,$source) !== $sourceGuid || self::guid($read,$destination) !== $destinationGuid
-            || trim($read(['get','-H','-o','value','receive_resume_token','--',$destination])) !== $token) {
+        if (self::guid($read,$source) !== $sourceGuid || self::guid($readReceiver,$destination) !== $destinationGuid
+            || trim($readReceiver(['get','-H','-o','value','receive_resume_token','--',$destination])) !== $token) {
             throw new InvalidArgumentException('Resume identities changed during validation.');
         }
-        return ['outcome'=>'success','inspection'=>['mode'=>'resume','sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,
+        return ['outcome'=>'success','inspection'=>['receiverEndpoint'=>$receiverEndpoint,'mode'=>'resume','sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,
             'sourceSnapshot'=>$request['sourceSnapshot'],'sourceGuid'=>$request['sourceGuid'],'base'=>$base,
             'destinationSnapshot'=>$destination.'@'.explode('@',$request['sourceSnapshot'])[1],
             'resumeRequired'=>true,'resumeHash'=>hash('sha256',$token),'references'=>$references]];
     }
 
-    public static function inspect(array $request, ?callable $read = null): array
+    public static function inspect(array $request, ?callable $read = null, ?callable $readReceiver = null, string $receiverEndpoint = 'local'): array
     {
         self::validate($request); $read ??= [self::class,'command'];
+        $readReceiver ??= $read; ZfsasEndpointIdentity::validate($receiverEndpoint);
         $source = explode('@',$request['sourceSnapshot'])[0]; $destination = $request['destination'];
         $sourceGuid = self::guid($read,$source);
-        if (self::receiverAbsent($request,$read)) {
+        if (self::receiverAbsent($request,$readReceiver)) {
             if (self::guid($read,$request['sourceSnapshot']) !== $request['sourceGuid']) { throw new InvalidArgumentException('Selected source snapshot identity changed.'); }
-            if (!self::receiverAbsent($request,$read) || self::guid($read,$source) !== $sourceGuid) { throw new InvalidArgumentException('Replication identities changed during new receiver inspection.'); }
-            return ['outcome'=>'success','inspection'=>['mode'=>'full','sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>null,
+            if (!self::receiverAbsent($request,$readReceiver) || self::guid($read,$source) !== $sourceGuid) { throw new InvalidArgumentException('Replication identities changed during new receiver inspection.'); }
+            return ['outcome'=>'success','inspection'=>['receiverEndpoint'=>$receiverEndpoint,'mode'=>'full','sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>null,
                 'sourceSnapshot'=>$request['sourceSnapshot'],'sourceGuid'=>$request['sourceGuid'],'destinationSnapshot'=>$destination.'@'.explode('@',$request['sourceSnapshot'])[1],
                 'base'=>null,'sourceCount'=>1,'destinationCount'=>0,'resumeRequired'=>false,
                 'references'=>[['role'=>'source','endpoint'=>'local','dataset'=>$source,'datasetGuid'=>$sourceGuid,'snapshot'=>$request['sourceSnapshot'],'guid'=>$request['sourceGuid']]]]];
         }
-        $destinationGuid = self::guid($read,$destination);
+        $destinationGuid = self::guid($readReceiver,$destination);
         if ($sourceGuid === $destinationGuid) { throw new InvalidArgumentException('Source and receiver identify the same dataset.'); }
         if (isset($request['destinationGuid']) && $request['destinationGuid'] !== $destinationGuid) { throw new InvalidArgumentException('Destination identity changed; review replication again.'); }
-        $resume = trim($read(['get','-H','-o','value','receive_resume_token','--',$destination]));
+        $resume = trim($readReceiver(['get','-H','-o','value','receive_resume_token','--',$destination]));
         if ($resume === '') { throw new RuntimeException('Incomplete receiver resume metadata.'); }
         if ($resume !== '-') {
-            return self::inspectResume($request,$read,$resume,$sourceGuid,$destinationGuid);
+            return self::inspectResume($request,$read,$resume,$sourceGuid,$destinationGuid,$readReceiver,$receiverEndpoint);
         }
-        $sources = self::inventory($read,$source); $destinations = self::inventory($read,$destination);
+        $sources = self::inventory($read,$source); $destinations = self::inventory($readReceiver,$destination);
         $selected = $sources[$request['sourceSnapshot']] ?? null;
         if (!$selected || $selected['guid'] !== $request['sourceGuid']) { throw new InvalidArgumentException('Selected source snapshot is missing or its GUID changed.'); }
         $bases = []; $conflicts = [];
@@ -207,11 +209,11 @@ final class ZfsasReplicationInspection
         }
         usort($bases,fn($a,$b)=>self::compareDecimal($b['txg'],$a['txg']));
         $base = $bases[0] ?? null;
-        $reference = static fn($role,$dataset,$datasetGuid,$snapshot,$guid) => compact('role','dataset','datasetGuid','snapshot','guid') + ['endpoint'=>'local'];
+        $reference = static fn($role,$dataset,$datasetGuid,$snapshot,$guid,$endpoint='local') => compact('role','dataset','datasetGuid','snapshot','guid','endpoint');
         $references = [$reference('source',$source,$sourceGuid,$selected['snapshot'],$selected['guid'])];
         if ($base) {
             $references[] = $reference('base',$source,$sourceGuid,$base['snapshot'],$base['guid']);
-            $references[] = $reference('checkpoint',$destination,$destinationGuid,$base['destinationSnapshot'],$base['guid']);
+            $references[] = $reference('checkpoint',$destination,$destinationGuid,$base['destinationSnapshot'],$base['guid'],$receiverEndpoint);
         }
         // Receiver TXGs are comparable only within the receiver pool. Never compare
         // them with source TXGs or infer that rollback is safe from name ordering.
@@ -227,7 +229,7 @@ final class ZfsasReplicationInspection
         }
         if ($completed) {
             $mode = 'already_received';
-            $references[] = $reference('checkpoint',$destination,$destinationGuid,$target,$completed['guid']);
+            $references[] = $reference('checkpoint',$destination,$destinationGuid,$target,$completed['guid'],$receiverEndpoint);
         } elseif ($base) {
             $checkpoint = $destinations[$base['destinationSnapshot']];
             foreach ($destinations as $row) {
@@ -245,23 +247,23 @@ final class ZfsasReplicationInspection
             $mode = 'full_requires_receiver_approval';
         }
         // Identity is checked again after inventory to reject replacement races.
-        if (self::guid($read,$source) !== $sourceGuid || self::guid($read,$destination) !== $destinationGuid
+        if (self::guid($read,$source) !== $sourceGuid || self::guid($readReceiver,$destination) !== $destinationGuid
             || self::guid($read,$selected['snapshot']) !== $selected['guid']) { throw new InvalidArgumentException('Replication identities changed during inspection.'); }
         if ($base && (self::guid($read,$base['snapshot']) !== $base['guid']
-            || self::guid($read,$base['destinationSnapshot']) !== $base['guid'])) {
+            || self::guid($readReceiver,$base['destinationSnapshot']) !== $base['guid'])) {
             throw new InvalidArgumentException('Incremental base identities changed during inspection.');
         }
-        if ($completed && self::guid($read,$target) !== $selected['guid']) {
+        if ($completed && self::guid($readReceiver,$target) !== $selected['guid']) {
             throw new InvalidArgumentException('Completed receiver snapshot changed during inspection.');
         }
-        if (self::inventory($read,$destination) !== $destinations) {
+        if (self::inventory($readReceiver,$destination) !== $destinations) {
             throw new InvalidArgumentException('Receiver snapshot inventory changed during inspection; replan before mutation.');
         }
-        if (trim($read(['get','-H','-o','value','receive_resume_token','--',$destination])) !== '-') {
+        if (trim($readReceiver(['get','-H','-o','value','receive_resume_token','--',$destination])) !== '-') {
             throw new InvalidArgumentException('Receiver resume state changed during inspection; review the interrupted transfer.');
         }
         return ['outcome'=>'success','message'=>'Read-only replication inspection completed; transfer admission still requires a validated plan.',
-            'inspection'=>['sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,
+            'inspection'=>['receiverEndpoint'=>$receiverEndpoint,'sourceDatasetGuid'=>$sourceGuid,'destinationDatasetGuid'=>$destinationGuid,
                 'sourceSnapshot'=>$selected['snapshot'],'sourceGuid'=>$selected['guid'], 'base'=>$base,
                 'mode'=>$mode,'destinationSnapshot'=>$target,'latestDestinationSnapshot'=>$latest,
                 'sourceCount'=>count($sources),'destinationCount'=>count($destinations),

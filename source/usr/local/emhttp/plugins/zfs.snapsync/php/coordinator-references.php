@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/endpoint-identity.php';
 /** Exact replication references, committed before dependent cleanup admission. */
 trait ZfsasCoordinatorReferences
 {
@@ -53,15 +54,12 @@ trait ZfsasCoordinatorReferences
             $job = $parameters['deleteJob'] ?? null;
             foreach (($parameters['phase'] ?? '') === 'source_retention_delete' ? ($parameters['candidates'] ?? []) : [] as $candidate) {
                 foreach ($references as $reference) {
-                    if ($reference['snapshot']===$candidate['snapshot'] || $reference['guid']===$candidate['guid']) { throw new InvalidArgumentException('Source cleanup owns this snapshot; prepare after verified shutdown.'); }
+                    if (self::referenceMatches($reference,$candidate['snapshot'],$candidate['guid'],'local')) { throw new InvalidArgumentException('Source cleanup owns this snapshot; prepare after verified shutdown.'); }
                 }
             }
             if (!$job) { continue; }
             foreach ($references as $reference) {
-                // Snapshot GUIDs can be preserved by replication. Without a
-                // verified receiver identity, conservatively exclude both names
-                // and matching GUIDs rather than assuming hosts are distinct.
-                if ($reference['snapshot'] === $job['SNAPSHOT'] || $reference['guid'] === $job['SNAPSHOT_GUID']) {
+                if (self::referenceMatches($reference,$job['SNAPSHOT'],$job['SNAPSHOT_GUID'],ZfsasEndpointIdentity::deletionEndpoint($parameters))) {
                     throw new InvalidArgumentException('Deletion already owns a required reference; prepare again after verified shutdown.');
                 }
             }
@@ -75,13 +73,13 @@ trait ZfsasCoordinatorReferences
         foreach ($tasks as $task) {
             foreach (($task['parameters']['phase'] ?? '')==='source_retention_delete' ? ($task['parameters']['candidates'] ?? []) : [] as $candidate) {
                 foreach ($references as $reference) {
-                    if ($reference['snapshot']===$candidate['snapshot'] || $reference['guid']===$candidate['guid']) { throw new InvalidArgumentException('Source cleanup would delete a required reference.'); }
+                    if (self::referenceMatches($reference,$candidate['snapshot'],$candidate['guid'],'local')) { throw new InvalidArgumentException('Source cleanup would delete a required reference.'); }
                 }
             }
             $job = $task['parameters']['deleteJob'] ?? null;
             if (!$job) { continue; }
             foreach ($references as $reference) {
-                if ($reference['snapshot'] === ($job['SNAPSHOT'] ?? '') || $reference['guid'] === ($job['SNAPSHOT_GUID'] ?? '')) {
+                if (self::referenceMatches($reference,$job['SNAPSHOT'] ?? '',$job['SNAPSHOT_GUID'] ?? '',ZfsasEndpointIdentity::deletionEndpoint($task['parameters']))) {
                     throw new InvalidArgumentException('Cleanup plan would delete its own required replication reference.');
                 }
             }
@@ -97,12 +95,19 @@ trait ZfsasCoordinatorReferences
         }
     }
 
-    public function deletionReferenceOwners(string $snapshot, string $guid): array
+    private static function referenceMatches(array $reference, string $snapshot, string $guid, ?string $endpoint): bool
+    {
+        return ZfsasEndpointIdentity::mayOverlap($reference['endpoint'] ?? null,$endpoint)
+            && ($reference['snapshot'] === $snapshot || $reference['guid'] === $guid);
+    }
+
+    public function deletionReferenceOwners(string $snapshot, string $guid, ?string $endpoint = null): array
     {
         $owners = [];
         $matching = ($this->referenceNames[$snapshot] ?? []) + ($this->referenceGuids[$guid] ?? []);
         foreach ($matching as $id => $_) {
             $reference = $this->state['references'][$id];
+            if (!self::referenceMatches($reference,$snapshot,$guid,$endpoint)) { continue; }
             $run = $this->state['runs'][$reference['runId']] ?? null;
             if (!$run || (self::terminal($run['state']) && !$this->runRequiresReview($run['id']))) { continue; }
             $owners[$run['id']] = true;

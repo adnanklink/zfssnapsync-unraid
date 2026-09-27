@@ -32,7 +32,7 @@ function zfsas_coordinator_source_command(array $task,ZfsasCoordinatorState $jou
         $p['protectedGuids']=[];$p['protectedNames']=[];
         foreach ($journal->state['references'] as $ref) {
             $owner=$journal->state['runs'][$ref['runId']] ?? null;
-            if ($owner && (!ZfsasCoordinatorState::terminal($owner['state']) || $journal->runRequiresReview($owner['id']))) {
+            if (ZfsasEndpointIdentity::mayOverlap($ref['endpoint'] ?? null,'local') && $owner && (!ZfsasCoordinatorState::terminal($owner['state']) || $journal->runRequiresReview($owner['id']))) {
                 $p['protectedGuids'][$ref['guid']]=true;$p['protectedNames'][$ref['snapshot']]=true;
             }
         }
@@ -41,7 +41,7 @@ function zfsas_coordinator_source_command(array $task,ZfsasCoordinatorState $jou
         $allowed=[];$skipped=[];
         foreach ($p['candidates'] as $row) {
             if (isset($task['sourceResults'][$row['guid']])) { continue; }
-            if ($journal->deletionReferenceOwners($row['snapshot'],$row['guid'])) { $skipped[]=$row['snapshot']; }
+            if ($journal->deletionReferenceOwners($row['snapshot'],$row['guid'],'local')) { $skipped[]=$row['snapshot']; }
             else { $allowed[]=$row; }
         }
         $p['candidates']=$allowed;$p['referenceSkipped']=count($skipped);

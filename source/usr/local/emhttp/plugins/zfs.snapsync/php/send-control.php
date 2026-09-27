@@ -162,29 +162,42 @@ function zfsas_ops_resume_schedule($scheduleId, &$error = null)
     } finally { flock($lock, LOCK_UN); fclose($lock); }
 }
 
-function zfsas_ops_dataset_gates($dataset)
+function zfsas_ops_dataset_gates($dataset, string $endpoint = 'local')
 {
-    $names = [];
-    do { $names[] = $dataset; $position = strrpos($dataset, '/'); $dataset = $position === false ? '' : substr($dataset, 0, $position); } while ($dataset !== '');
-    sort($names, SORT_STRING); $locks = [];
-    $dir = zfsas_ops_root_dir() . '/dataset-locks'; zfsas_ops_ensure_dir($dir);
-    $autoPath = zfsas_ops_root_dir() . '/auto-cleanup.lock';
-    $auto = fopen($autoPath, 'c');
-    if (!$auto || !flock($auto, LOCK_SH | LOCK_NB)) { if ($auto) { fclose($auto); } return false; }
-    zfsas_ops_apply_owner($autoPath); @chmod($autoPath, 0660); $locks[] = $auto;
-    foreach ($names as $name) {
-        $lock = fopen($dir . '/' . hash('sha256', $name) . '.lock', 'c');
-        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+    return zfsas_ops_resource_gates([['endpoint'=>$endpoint,'dataset'=>$dataset]]);
+}
+
+/** All gates are acquired nonblocking in one stable order, or none are retained. */
+function zfsas_ops_resource_gates(array $resources)
+{
+    require_once __DIR__.'/endpoint-identity.php';
+    if (!$resources || count($resources)>1000) { throw new InvalidArgumentException('Invalid dataset resource list.'); }
+    $names=[]; $local=false;
+    foreach ($resources as $resource) {
+        $endpoint=ZfsasEndpointIdentity::validate($resource['endpoint'] ?? '');
+        $dataset=$resource['dataset'] ?? '';
+        $local=$local || $endpoint==='local';
+        do {
+            $names[ZfsasEndpointIdentity::resource($endpoint,$dataset)]=true;
+            $position=strrpos($dataset,'/');$dataset=$position===false?'':substr($dataset,0,$position);
+        } while ($dataset!=='');
+    }
+    ksort($names,SORT_STRING);$locks=[];
+    $dir=zfsas_ops_root_dir().'/dataset-locks';zfsas_ops_ensure_dir($dir);
+    $paths=$local?[zfsas_ops_root_dir().'/auto-cleanup.lock'=>LOCK_SH]:[];
+    foreach ($names as $name=>$_) { $paths[$dir.'/'.hash('sha256',$name).'.lock']=LOCK_EX; }
+    foreach ($paths as $path=>$mode) {
+        $lock=fopen($path,'c');
+        if (!$lock || !flock($lock,$mode|LOCK_NB)) {
             if ($lock) { fclose($lock); }
             foreach ($locks as $held) { fclose($held); }
             return false;
         }
-        zfsas_ops_apply_owner($dir . '/' . hash('sha256', $name) . '.lock');
-        @chmod($dir . '/' . hash('sha256', $name) . '.lock', 0660);
-        $locks[] = $lock;
+        zfsas_ops_apply_owner($path);@chmod($path,0660);$locks[]=$lock;
     }
     return $locks;
 }
+
 
 function zfsas_ops_pause_schedule($scheduleId, &$error = null)
 {
