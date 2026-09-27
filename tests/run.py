@@ -35,6 +35,10 @@ def suites(group):
             yield 'standard', ['node', str(path.relative_to(ROOT))]
     if group in ('ci', 'all', 'syntax'):
         yield 'standard', ['bash', 'tests/syntax.sh']
+    if group in ('ci', 'all', 'package'):
+        yield 'standard', ['python3', 'tests/reliability/package_content.py']
+        yield 'standard', ['python3', 'tests/reliability/release_acceptance.py']
+        yield 'standard', ['bash', 'tests/reliability/package_build.sh']
     if group in ('all', 'flash'):
         yield 'readonly', ['bash', 'tests/reliability/ram_runtime.sh']
         yield 'readonly', ['php', 'tests/reliability/coordinator_flash.php']
@@ -46,7 +50,7 @@ def suites(group):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('group', choices=['ci', 'unit', 'endpoints', 'browser', 'syntax', 'flash', 'zfs', 'all'])
+    parser.add_argument('group', choices=['ci', 'unit', 'endpoints', 'browser', 'syntax', 'package', 'flash', 'zfs', 'all'])
     parser.add_argument('--output', type=Path)
     parser.add_argument('--filter', default='', help='Run only commands containing this substring; report remains scoped.')
     args = parser.parse_args()

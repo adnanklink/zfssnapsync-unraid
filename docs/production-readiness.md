@@ -7,7 +7,7 @@ remain separate from source. This record is not a release acceptance certificate
 | Task | Status |
 | --- | --- |
 | 1. Reproducible verification and repaired fixtures | Complete |
-| 2. Release gates and content verification | In progress |
+| 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Pending |
 | 4. Independent shared cleanup owners | Pending |
 | 5. Native SSH execution and recovery | Pending |
@@ -48,3 +48,28 @@ following repair. No production behavior was changed to make fixtures pass.
 The repaired 601-item batch fixture uses the real coordinator and real retry
 delays; the configuration browser covers the current guided forms. Flash,
 real-ZFS and dedicated-host acceptance are not claimed by this CI baseline.
+
+## Task 2 verification and promotion contract
+
+Candidate generation is manual and read-only to GitHub; it never commits or
+publishes a package. CI runs the isolated suite inventory and package regressions.
+The `package` check on main-targeting PRs and main requires
+`scripts/verify-promotion.sh`: matching source bytes, canonical modes, links,
+root ownership, production URLs, checksums and passing acceptance evidence.
+Require the `tests` and `package` checks in branch protection before final merge;
+remote protection settings have not yet been changed or certified.
+
+Package and manifest reproducibility, altered payload rejection, and missing,
+stale, skipped, wrong-platform and insufficient-soak acceptance records pass
+regression tests. Archive permissions are canonical Git-style 0755/0644 (0777
+for symlinks), independent of developer checkout umask. The accepted candidate
+must be retained and promoted unchanged, not rebuilt after the evidence commit.
+
+The eventual `docs/releases/<VERSION>.json` record must contain `version`,
+`status: passed`, `inputDigest` (from `verify-acceptance.py --digest`), and
+`packageSha256`. Its `checks` map requires ci, local-zfs, ssh-zfs, cleanup,
+replanning, lifecycle, flash, scale, webgui and soak. Each contains `status`, a
+repository-relative `evidence` path and its SHA-256; soak also contains elapsed
+`seconds` of at least 172800. `platforms` records passing versioned
+unraidMinimum (6.12.0), unraidCurrent (7.x), and linuxReceiver acceptance.
+No such passing record is created until those tests actually finish.

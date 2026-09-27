@@ -13,7 +13,7 @@ It disables networking, records image ID, source revision, dirty state, exit
 codes and durations, and saves logs plus `results.json` under a unique `/tmp`
 directory. Nonzero exits, including skipped tests (77), are failures.
 
-Groups: `unit`, `endpoints`, `browser`, `syntax`, `ci` (all four), `flash`, `zfs`,
+Groups: `unit`, `endpoints`, `browser`, `syntax`, `package`, `ci` (all five), `flash`, `zfs`,
 and `all`. `--filter substring` selects a focused suite; this is not full acceptance.
 `--output /new/path` selects an unused report directory. `SNAPSYNC_TEST_IMAGE`
 selects an explicitly prepared alternative image and its digest is recorded.

@@ -77,4 +77,6 @@ if [[ ! -f "$TEMPLATE" ]] || ! grep -F 'name="zfs.snapsync"' "$TEMPLATE" >/dev/n
   exit 1
 fi
 
+python3 "$ROOT_DIR/scripts/verify-package-content.py" "$PKG_PATH" "$SRC_DIR"
+
 echo "Verified release package contents against source tree: $PKG_PATH"

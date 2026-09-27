@@ -1,87 +1,39 @@
-name: Build Release Artifacts
+name: Build Release Candidate
 
+# Candidate creation does not publish an update or write to a branch.
+# Production artifacts are committed separately after host acceptance.
 on:
-  push:
-    branches:
-      - main
-      - testing
-    paths-ignore:
-      - 'dist/**'
-      - 'zfs.snapsync.plg'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-release:
+  candidate:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Read release version
-        shell: bash
+      - name: Build candidate
+        id: build
+        env:
+          REPOSITORY: ${{ github.repository }}
         run: |
-          set -euo pipefail
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          if [[ -z "$VERSION" ]]; then
-            echo "VERSION file is empty." >&2
+          version="$(tr -d '[:space:]' < VERSION)"
+          if git ls-files --error-unmatch "dist/zfs-snapsync-${version}-noarch-1.txz" >/dev/null 2>&1; then
+            echo 'Choose a new unused VERSION before building a release candidate.' >&2
             exit 1
           fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/dist" >> "$GITHUB_ENV"
-
-      - name: Validate an existing release or prepare a new version
-        shell: bash
-        run: |
-          set -euo pipefail
-          CURRENT_PACKAGE="dist/zfs-snapsync-${VERSION}-noarch-1.txz"
-
-          if git ls-files --error-unmatch "$CURRENT_PACKAGE" >/dev/null 2>&1; then
-            ./scripts/verify-release.sh "$CURRENT_PACKAGE"
-            cmp dist/zfs.snapsync.plg zfs.snapsync.plg
-            grep -Fq "version=\"${VERSION}\"" dist/zfs.snapsync.plg
-            grep -Fq "pluginURL=\"${BASE_URL}/zfs.snapsync.plg\"" dist/zfs.snapsync.plg
-            echo "RELEASE_EXISTS=true" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build release artifacts
-        if: env.RELEASE_EXISTS != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./scripts/build-release.sh "$VERSION" "$BASE_URL"
-
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+          ./scripts/build-release.sh "https://raw.githubusercontent.com/${REPOSITORY}/main/dist"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          sha256sum "dist/zfs-snapsync-${version}-noarch-1.txz"
+          python3 scripts/verify-acceptance.py --digest
+      - uses: actions/upload-artifact@v4
         with:
-          name: zfs-snapsync-${{ env.VERSION }}
+          name: candidate-${{ github.sha }}
           path: |
-            dist/zfs-snapsync-${{ env.VERSION }}-noarch-1.txz
+            dist/zfs-snapsync-${{ steps.build.outputs.version }}-noarch-1.txz
             dist/zfs.snapsync.plg
             dist/zfs-snapsync.png
             zfs.snapsync.plg
-
-      - name: Commit generated artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            "dist/zfs-snapsync-${VERSION}-noarch-1.txz" \
-            "dist/zfs.snapsync.plg" \
-            "dist/zfs-snapsync.png" \
-            "zfs.snapsync.plg"
-
-          if git diff --cached --quiet; then
-            echo "No generated artifact changes to commit."
-            exit 0
-          fi
-
-          git commit -m "Build release ${VERSION}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"

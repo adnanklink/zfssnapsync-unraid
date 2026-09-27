@@ -1,27 +1,43 @@
-name: Verify Package
+name: Verify
 
 on:
   pull_request:
   push:
-    paths-ignore:
-      - 'dist/**'
-      - 'zfs.snapsync.plg'
 
 permissions:
   contents: read
 
 jobs:
-  verify:
+  tests:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
     steps:
-      - name: Check out branch
-        uses: actions/checkout@v4
-
-      - name: Build verification package
-        shell: bash
+      - uses: actions/checkout@v4
+      - name: Build pinned test runtime
+        run: docker build -t snapsync-test-runtime:production-readiness -f tests/runtime/Dockerfile .
+      - name: Run isolated CI suites
+        run: python3 tests/run.py ci --output "${RUNNER_TEMP}/test-results"
+      - name: Retain verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ github.sha }}
+          path: ${{ runner.temp }}/test-results
+          if-no-files-found: error
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify content checker and acceptance gate
         run: |
-          set -euo pipefail
-          VERSION="ci-${GITHUB_SHA::12}"
-          BASE_URL="https://example.invalid/${GITHUB_REF_NAME}/dist"
-          ./scripts/build-release.sh "$VERSION" "$BASE_URL"
+          python3 tests/reliability/package_content.py
+          python3 tests/reliability/release_acceptance.py
+      - name: Verify deterministic candidate packaging
+        run: bash tests/reliability/package_build.sh
+      - name: Verify production promotion
+        if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+        env:
+          PROMOTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/verify-promotion.sh
