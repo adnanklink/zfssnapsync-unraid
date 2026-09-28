@@ -1,4 +1,6 @@
-# Current-status documentation audit
+# Release 2026.09.26.02 documentation audit
+
+> Historical release baseline. The unreleased candidate has since implemented native SSH, independently authorized shared cleanup, individual Auto mutations and safe partial continuation. See [production readiness](production-readiness.md) for current code and outstanding acceptance gates.
 
 Audited against release **2026.09.26.02** on **2026-09-26**. This audit compares repository source, shipped artifacts, test fixtures, and later implementation notes. It does not certify every runtime path or perform a new live-Unraid/real-ZFS acceptance run.
 

@@ -3,6 +3,15 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
+## Unreleased production-readiness candidate
+
+- Coordinate local and SSH replication, reviewed recovery and retention cleanup through the same ownership safeguards. Receivers use a temporary helper.
+- Allow independently approved cleanup requests to share a deletion while preserving each owner's authorization and cancellation.
+- Track automatic snapshot creation and deletion individually. Continue eligible automatic work after settings change while preserving verified completed snapshots.
+- Recover recorded workers after a coordinator crash; keep updates blocked until local and remote shutdown is verified.
+- Show automatic operation stages and explicit receiver-shutdown waits. Keep superseded failures in history rather than current status.
+- Freeze verification inputs and add 10,000-task journal coverage. Publication still requires dedicated-host acceptance and a 48-hour soak.
+
 ## Development releases
 
 ### 2026.09.26.02 (2026-09-26)

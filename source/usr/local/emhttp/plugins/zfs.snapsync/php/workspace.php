@@ -56,7 +56,7 @@ if ($uiStandalone) { ?><!doctype html><html lang="en"><head><meta charset="utf-8
   }
   ?>
   <script src="/plugins/zfs.snapsync/js/workflow-layout.js?v=<?= (int) filemtime(__DIR__ . '/../js/workflow-layout.js') ?>"></script>
-  <footer class="ui-footer">ZFS SnapSync by Adnan Nashawaty <span>Development preview · Full replication coordination is still in progress.</span> <a href="https://www.paypal.com/paypalme/adnanklink" target="_blank" rel="noopener noreferrer">Support development ↗</a></footer>
+  <footer class="ui-footer">ZFS SnapSync by Adnan Nashawaty <span>Development preview · Production acceptance is pending.</span> <a href="https://www.paypal.com/paypalme/adnanklink" target="_blank" rel="noopener noreferrer">Support development ↗</a></footer>
 </main>
 </div>
 <?php if ($uiStandalone) { ?></body></html><?php }

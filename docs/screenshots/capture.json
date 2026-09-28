@@ -1,0 +1,34 @@
+{
+  "scope": "Unreleased candidate production views with controlled demo endpoint data; not live Unraid acceptance",
+  "inputDigest": "29229182e0496264b1c3ba709bce946c05d472a83ae35e98036b8cc28698e97b",
+  "images": {
+    "overview.png": {
+      "capture": "section-overview-light.png",
+      "sha256": "8a9c382126d32fdecc267c02367b0cb2de3f6505e16c10933424465d46983830"
+    },
+    "automation.png": {
+      "capture": "automation-configured.png",
+      "sha256": "e2a3698c00b3cae0ba140b61cdd8bc656b4f1dd0695cdd69f98cf8672f3083f4"
+    },
+    "automation-history.png": {
+      "capture": "automation-history.png",
+      "sha256": "a6b39ce74dff1fd3a8d26166f8a862f860f74f3b363611e937076b0e9fd3e834"
+    },
+    "automation-advanced.png": {
+      "capture": "automation-advanced.png",
+      "sha256": "45a7f95a22fb4c545e60125acfb02f59d746d326177c4447515467288dab57b9"
+    },
+    "snapshots.png": {
+      "capture": "snapshots-browse-light-1440.png",
+      "sha256": "9861469f9932fa92405447bf964be6bc8bddbe7d8f5ab45b0493dbd7bdb1e8b4"
+    },
+    "snapshots-selected.png": {
+      "capture": "snapshots-selected-light-1440.png",
+      "sha256": "46d9f38ab99f2712bfe652cb8aede04d50691e6fe563df65d4aa26804bf9d63b"
+    },
+    "replication-dark.png": {
+      "capture": "replication-editing-dark-1440.png",
+      "sha256": "d1cbc083d018ae75d74b6b33bdd85da5ba198afa8ae84ba2aea497f3dc237ea0"
+    }
+  }
+}

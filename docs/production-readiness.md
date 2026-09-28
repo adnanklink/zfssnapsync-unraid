@@ -17,7 +17,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 9. Lifecycle and reboot compatibility | Complete in fixtures; actual watchdog/installer regressions pass; Unraid platform acceptance remains separate |
 | 10. Operational UI feedback | Complete in fixtures; status, browser and syntax checks pass |
 | 11. Fault, flash-write and scale acceptance | Deterministic fault/flash/10,000-task checks pass; real-host scale and 48-hour soak pending |
-| 12. Documentation, screenshots and release preparation | Pending |
+| 12. Documentation, screenshots and release preparation | Candidate docs and inspected screenshots updated; version/artifact promotion awaits acceptance |
 | 13. Dedicated host acceptance | Pending host connection details |
 | 14. Verified artifact publication | Blocked until acceptance passes |
 
@@ -317,3 +317,18 @@ All three read-only flash/mount suites pass after the Auto and lifecycle changes
 Existing fault suites cover policy-driver/daemon loss, receiver disconnect, stale
 identity, canceled shared owners and denied authorization. Real-pool pressure,
 platform restart and the full 48-hour soak remain required dedicated-host evidence.
+
+## Task 12 documentation and candidate visuals
+
+README and unreleased changelog now describe local/SSH ownership, source retention,
+pressure cleanup, temporary receiver helpers, partial Auto continuation and current
+acceptance limits. Published 2026.09.26.02 behavior is explicitly separated from this
+candidate. The old status audit remains a labeled historical release baseline.
+The in-app development footer now says production acceptance is pending.
+
+Seven README screenshots were regenerated from production views with demo data.
+History/Advanced fields, snapshot actions and pagination were inspected, alongside
+light/dark desktop/narrow empty, editing, selected, running-draft and error states.
+All three capture suites passed. Screenshot hashes and capture input digest are in
+`docs/screenshots/capture.json`; these are fixture images, not host acceptance.
+Versioned release artifacts remain unchanged until an accepted candidate is ready.

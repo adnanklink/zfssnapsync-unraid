@@ -1,6 +1,6 @@
 # Workspace screenshots
 
-These images show the **2026.09.26.02 production PHP views and JavaScript**, rendered in Chromium with controlled demo data. They do not show a live server or the surrounding Unraid shell. The separate `docs/preview` prototype is not the source of these screenshots.
+These images show the **unreleased production-readiness candidate PHP views and JavaScript**, rendered in Chromium with controlled demo data. They do not show a live server or the surrounding Unraid shell. The separate `docs/preview` prototype is not the source of these screenshots.
 
 | Image | View | Capture output |
 | --- | --- | --- |
@@ -21,10 +21,12 @@ Run these suites in the disposable test runtime from the repository root. They r
 ```sh
 mkdir -p /tmp/zfsas-ui-screenshots
 docker run --rm -e ZFSAS_DOC_CAPTURE=1 -v "$PWD:/work:ro" \
-  -v "$(command -v node):/usr/local/bin/node:ro" \
   -v /tmp/zfsas-ui-screenshots:/tmp/zfsas-ui-screenshots \
-  -w /work zfsas-test-runtime bash -c \
+  -w /work snapsync-test-runtime:production-readiness bash -c \
   'node tests/reliability/workspace_browser.cjs && node tests/reliability/guided_workflow_browser.cjs && node tests/reliability/browser.cjs'
 ```
 
-Use a host Node version compatible with the installed Playwright runtime. Copy the output files listed above from `/tmp/zfsas-ui-screenshots`, inspect each image, and update the README captions if the flow changes. The suites also capture dark and narrow layouts and verify branding, selection, saves and keyboard behavior.
+The pinned image supplies Node and Playwright; no host Node bind mount is needed. Copy the output files listed above from `/tmp/zfsas-ui-screenshots`, inspect each image, and update the README captions if the flow changes. The suites also capture dark and narrow layouts and verify branding, selection, saves and keyboard behavior.
+
+`capture.json` records image hashes and the candidate input digest. These captures
+are documentation fixtures and cannot satisfy dedicated-host WebGUI acceptance.

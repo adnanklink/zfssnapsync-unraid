@@ -10,13 +10,18 @@ Native local replication supports manual sends, automatic schedules and Run all 
 
 Deletion batches use coordinator-owned item execution. Non-delete batches use bounded workers with coordinator item authorization/results. Installation checks ownership before package replacement, blocks busy updates, and verifies explicit activation. The production workspace includes task navigation, guided setup, direct scoped job saves and reviewed snapshot actions.
 
-## Remaining work
+## Unreleased candidate and remaining acceptance
 
-1. Integrate SSH/network work into native coordinator phases. Existing SSH execution remains available; spiped is hidden from the WebGUI.
-2. Implement independently validated shared cleanup owners. Current shared reference protection does not grant multiple cleanup authorizations.
-3. Extend safe replanning beyond queued, never-attempted automatic work. Do not infer that partially executed mutations are safe to replay after a revision change.
-4. Represent remaining internal Auto Snapshot mutations as individual coordinator tasks. Existing run ownership and dataset/migration gates remain in force.
-5. Complete broad release acceptance: all-path flash-write tracing, reboot/fault, scale/idle and actual Unraid-host checks. Later implementation records already contain scoped real-ZFS and tracing evidence; those results are not a claim of full coverage.
+The production-readiness branch implements native SSH execution/recovery, independent
+cleanup owners, individual Auto mutations and conservative partial continuation.
+It also adds crash recovery and recorded Auto operation stages. These changes are
+not in the published version above. Fixture checks pass; they are not production
+host acceptance.
+
+Remaining gates are dedicated Unraid 6.12.0 and stable 7.x installation/reboot,
+a separate Linux OpenZFS receiver, real-pool fault/scale testing, cross-host WebGUI
+access and a 48-hour soak. Final publication must promote the exact accepted package
+bytes. See the [per-task readiness record](production-readiness.md).
 
 Runtime histories and reviews remain in RAM. After reboot, manual work requires explicit recovery/review; exactly-once execution and reconstructed manual authority are not promised. Persistent pauses and migration recovery checkpoints remain separate.
 

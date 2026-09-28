@@ -6,7 +6,7 @@ Manage snapshots, replicate datasets, and follow storage operations from one Unr
 
 **Current testing release: `2026.09.26.02` · Requires Unraid 6.12.0 or newer**
 
-SnapSync is a standalone plugin under active development. Local replication, schedules, and reviewed local recovery use the coordinator. SSH still uses the older execution path; shared cleanup authorization and broader partial-execution replanning remain incomplete. Start testing with disposable datasets. See [Testing and known limitations](#testing-and-known-limitations) before enabling unattended work.
+This branch documents the **unreleased production-readiness candidate**. The installation URL still serves `2026.09.26.02`; it does not include these candidate changes. Local and SSH jobs now use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Dedicated-host acceptance and a 48-hour soak must pass before publication. See [readiness progress](docs/production-readiness.md).
 
 ## Install and update
 
@@ -132,11 +132,11 @@ A backup job specifies a source, destination, schedule, whether to include child
 
 **Run all jobs now** runs saved jobs. Each row’s **Actions** menu contains schedule pause/resume, applicable recovery review, and removal. Monitor execution in **Activity**.
 
-Local scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification. Recursive membership is captured for the run, and every expected child must report verified success before the run completes. Snapshot Manager also supports explicit local sends and validated Retry of interrupted receives.
+Local and SSH scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification. Recursive membership is captured for the run, and every expected child must report verified success before the run completes. Snapshot Manager also supports explicit local sends and validated Retry of interrupted receives.
 
 In a job’s **Details**, the outcome and next action appear above a replication checklist: **Check datasets → Create source snapshots → Inspect destinations → Cleanup → Check space → Transfer → Verify**. Expand a stage for dataset results and attempt counts, with pages of up to 50 datasets. Failed stages open initially. Unplanned or unexecuted work is not shown as successful; manual sends and recovery reuse captured snapshots. Linked source-retention cleanup remains a separate operation. Timestamps, IDs, and raw diagnostics are under expandable technical details. **Show job log** shows only that run’s steps and attempts, including available ZFS error output. Shared category logs are labeled separately and can include other jobs. Older attempts may lack diagnostics because earlier versions did not preserve them.
 
-For an unfinished local receive, choose **Review recovery** in Details or in its saved Backup copies row’s Actions menu. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
+For an unfinished local or SSH receive, choose **Review recovery** in Details or in its saved Backup copies row’s Actions menu. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
 
 Reviews are stored in RAM. After reboot, a fresh explicit review can inspect current interrupted receives, but missing history does not authorize retrying other snapshots. Configuration or identity changes require another review. SnapSync never automatically discards an interrupted receive or forces receiver rollback.
 
@@ -144,23 +144,23 @@ Replication checkpoints use a separate prefix from Auto Snapshot. The defaults a
 
 SnapSync verifies destination identity, snapshot GUIDs, incremental bases, and resume targets. It does not automatically destroy a destination or force receive rollback to make a transfer succeed. An existing receiver without a suitable base requires explicit resolution.
 
-SSH jobs currently use the existing network execution path; native coordinator SSH integration is unfinished. The incomplete spiped transport is hidden from the WebGUI. The local low-space policy below does not apply to network jobs.
+SSH receivers require ordinary Linux OpenZFS and working key-based SSH access with a trusted host key. The receiver helper runs temporarily; no permanent SnapSync installation is required. Each operation binds the verified host key, pool identity and boot identity. Changed or unavailable receiver identity blocks mutation. Cancel remains pending until remote shutdown is verified. The incomplete spiped transport remains hidden from the WebGUI.
 
 ### Source snapshot retention
 
-New local jobs default to **Keep latest 3** source checkpoints per job and dataset. Choose **Keep all** or a count from 1–1,000 in **Edit → History → Edit**, under **Source snapshots**. Existing jobs remain on Keep all until explicitly enabled. A new job with no existing owned checkpoints can be saved directly; an existing checkpoint backlog requires **Review source snapshots → Use this retention policy**, followed by **Create job** or **Save job** within five minutes. Reducing the count or expanding an existing authorization also requires review.
+New local and SSH jobs default to **Keep latest 3** source checkpoints per job and dataset. Choose **Keep all** or a count from 1–1,000 in **Edit → History → Edit**, under **Source snapshots**. Existing jobs remain on Keep all until explicitly enabled. A new job with no existing owned checkpoints can be saved directly; an existing checkpoint backlog requires **Review source snapshots → Use this retention policy**, followed by **Create job** or **Save job** within five minutes. Reducing the count or expanding an existing authorization also requires review.
 
 Source cleanup runs only after the entire replication run succeeds, including every recursive member. Activity shows a separate **Source cleanup** operation linked to the completed replication, with deleted/skipped counts and protection reasons. Cleanup failure does not repeat or undo a successful transfer. Saving a policy does not immediately delete snapshots.
 
-Cleanup uses SnapSync creation properties and dataset/snapshot GUIDs, never a prefix alone. It preserves the newest requested count, the verified checkpoint, incremental bases for all configured receivers (including paused jobs), active/recovery references, ZFS holds, and clones. These protections may retain more than the configured count. Unknown metadata, unavailable receivers, remote consumers, and unresolved resume tokens defer affected cleanup. New recursive members require review before source cleanup gains authority over them.
+Cleanup uses SnapSync creation properties and dataset/snapshot GUIDs, never a prefix alone. It preserves the newest requested count, the verified checkpoint, incremental bases for all configured receivers (including paused jobs), active/recovery references, ZFS holds, and clones. These protections may retain more than the configured count. Unknown metadata, unavailable or unverified receivers, and unresolved resume tokens defer affected cleanup. New recursive members require review before source cleanup gains authority over them.
 
 Older checkpoints from unsuccessful transfers may be removed once a newer checkpoint is fully verified, unless recovery or another protection still needs them. Untagged snapshots and snapshots made by other tools remain unmanaged. If an external script needs a SnapSync-created checkpoint, place a ZFS hold on it; SnapSync cannot discover an arbitrary script's future intentions.
 
-Source cleanup currently applies only to native local configured jobs, including Run Now. Snapshot Manager manual sends do not grant source cleanup authority. Review manifests, deletion results and pending cleanup live in RAM. Reboot discards them; cleanup requires a new successful replication and fresh inspection. The saved retention policy survives reboot.
+Source cleanup currently applies to native local and SSH configured jobs, including Run Now. Snapshot Manager manual sends do not grant source cleanup authority. Review manifests, deletion results and pending cleanup live in RAM. Reboot discards them; cleanup requires a new successful replication and fresh inspection. The saved retention policy survives reboot.
 
 ### Optional low-space anchor cleanup
 
-Local jobs default to **Preserve retained snapshots**. You can enable **Delete older retained snapshots when space is needed** for an individual job. Saving that choice authorizes future automatic removal of older daily/weekly restore points when ordinary retention cannot provide enough space.
+Local and SSH jobs default to **Preserve retained snapshots**. You can enable **Delete older retained snapshots when space is needed** for an individual job. Saving that choice authorizes future automatic removal of older daily/weekly restore points when ordinary retention cannot provide enough space.
 
 This policy:
 
@@ -171,9 +171,11 @@ This policy:
 
 Space approval requires the stream estimate plus the greater of the configured free-space target, 16 MiB, or 5% of the estimate. Estimated reclaimable bytes never substitute for measuring available space.
 
-The opt-in applies to local scheduled jobs and configured-job Run Now. It grants no cleanup authority to Snapshot Manager manual sends.
+The opt-in applies to local and SSH scheduled jobs and configured-job Run Now. It grants no cleanup authority to Snapshot Manager manual sends.
 
 ## Scheduling and cancellation
+
+Auto Details shows recorded policy evaluation, cleanup and snapshot creation. Each live mutation has its own coordinator task. A saved configuration change can continue eligible automatic work only after shutdown is verified and completed snapshot identities remain valid; completed mutations are retained. Changed schedules, manual work and uncertain mutation outcomes require a fresh decision.
 
 Auto Snapshot offers interval, daily, weekly, and custom five-field cron schedules. Replication offers its configured intervals and daily/weekly start-time controls, using the host timezone.
 
@@ -221,7 +223,7 @@ This testing build has passed reliability and stage-one suites, actual PHP endpo
 
 The traced native anchor-cleanup fixture ran with `/boot` read-only and recorded no file-write opens or path-metadata mutation attempts on boot flash. This is scoped evidence, not verification of every plugin path.
 
-Remaining work includes native SSH coordination, independently shared cleanup authorization, safe replanning after partially executed mutations, complete per-mutation Auto Snapshot ownership, and comprehensive release acceptance. Reviewed local recovery already works; automatic reconstruction of lost manual authority and exactly-once execution across reboot are not promised. The [current-status audit](docs/status-audit.md) separates superseded claims from remaining gaps. These limits are tracked in the [standalone roadmap](docs/standalone-development.md), [implementation record](docs/job-coordination-progress.md), and [reliability audit](docs/reliability-audit.md).
+The candidate’s deterministic suites cover native SSH ownership, shared cleanup, individual Auto mutations, partial continuation, daemon loss and 10,000-task journal behavior. These checks do not certify real receiver/pool behavior or a production release. Remaining gates include dedicated Unraid 6.12.0 and stable 7.x installation/reboot tests, a separate Linux OpenZFS receiver, real-pool fault/scale checks, access from another host and a 48-hour soak. Manual authority is never reconstructed after reboot; exactly-once execution is not promised. Track evidence in [production readiness](docs/production-readiness.md).
 
 For initial host testing, use disposable source and destination datasets. Exercise a snapshot run, a local transfer, Cancel/Resume, and recovery behavior before enabling recurring work. Keep low-space anchor cleanup off until you have reviewed its retention tradeoff.
 
