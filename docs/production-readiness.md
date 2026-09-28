@@ -332,3 +332,7 @@ light/dark desktop/narrow empty, editing, selected, running-draft and error stat
 All three capture suites passed. Screenshot hashes and capture input digest are in
 `docs/screenshots/capture.json`; these are fixture images, not host acceptance.
 Versioned release artifacts remain unchanged until an accepted candidate is ready.
+
+The remaining dedicated-host execution and evidence checklist is in
+[host acceptance](host-acceptance.md). Host connection details and disposable roots
+are still required; no platform or soak acceptance is claimed.
