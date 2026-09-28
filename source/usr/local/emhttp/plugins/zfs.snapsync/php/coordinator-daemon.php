@@ -6,6 +6,7 @@ $service = zfsas_service_handshake();
 require_once __DIR__ . '/coordinator-executor.php';
 require_once __DIR__ . '/coordinator-remote-shutdown.php';
 require_once __DIR__ . '/coordinator-retention.php';
+require_once __DIR__.'/coordinator-retirement.php';
 require_once __DIR__ . '/operation-diagnostics.php';
 require_once __DIR__ . '/coordinator-source-retention.php';
 require_once __DIR__ . '/coordinator-auto-admission.php';
@@ -60,6 +61,7 @@ $command = static function (array $task) use ($root, $configDir, $journal, $dele
     // No unrelated work gains admission through the lifecycle barrier.
     $autoChild=isset($task['parameters']['autoMutation']) && $journal->autoMutationParentLive($task);
     if (!$autoChild && (is_file($configDir . '/maintenance') || is_file('/var/run/zfs-snapsync-coordinator/refresh.json'))) { return null; }
+    if(str_starts_with($task['parameters']['phase'] ?? '', 'retirement_'))return zfsas_retirement_command($task,$root,zfsas_config_revision($configDir));
     if(isset($task['parameters']['autoMutation']) && $task['kind']!=='delete') {return zfsas_coordinator_auto_mutation_command($task,$journal,$root,zfsas_config_revision($configDir));}
     if (str_starts_with($task['parameters']['phase'] ?? '', 'recovery_')) { return zfsas_recovery_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (in_array($task['parameters']['phase'] ?? '',['replication_schedule','replication_snapshot','replication_member','replication_run_verify'],true)) { return zfsas_coordinator_schedule_command($task,$journal,$root,zfsas_config_revision($configDir)); }
@@ -93,6 +95,7 @@ $command = static function (array $task) use ($root, $configDir, $journal, $dele
     return zfsas_coordinator_auto_command($journal, $task, $pair, $root);
 };
 $outcome = static function ($task, $code) use ($configDir, $journal): array {
+    if(str_starts_with($task['parameters']['phase'] ?? '', 'retirement_'))return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Retirement work stopped without verified completion. Inspect remaining snapshots again.'];
     if(isset($task['parameters']['autoMutation'])) {return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Automatic mutation stopped without a verified result. Review before another run.'];}
     if(!empty($task['parameters']['individualMutations']) && $code!==0) {
         $changed=$task['parameters']['revision']!==zfsas_config_revision($configDir);
@@ -124,6 +127,7 @@ foreach ($journal->state['runs'] as $run) {
 }
 $handler = static function (array $request) use ($journal, $executor, $submitAuto, $loadConfig, $deletion, $service, &$config): array {
     $action = $request['action'] ?? '';
+    if(str_starts_with($action,'retirement_')){if(!$loadConfig())throw new InvalidArgumentException('Configuration is busy. Retry.');$result=zfsas_retirement_request($journal,$request,$config,$executor);if($action==='retirement_stop')$loadConfig();return $result;}
     if ($action === 'handshake') { return $service; }
     if ($action === 'auto_mutation_status') {return $executor->autoMutationStatus($request);}
     if ($action==='recovery_status') return zfsas_recovery_status($journal,(string)($request['reviewId'] ?? ''),(int)($request['offset'] ?? 0));
@@ -149,10 +153,11 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
             $run['nativeReplication']=isset($journal->state['tasks'][$run['id'].':prepare']['parameters']['replication']) || !empty($journal->state['tasks'][$run['id'].':prepare']['parameters']['nativeSchedule']);
             $run['sourceCleanup']=['deleted'=>0,'skipped'=>0,'protected'=>0,'deferred'=>0,'protectedReasons'=>[],'skippedReasons'=>[]];
             $run['cleanup'] = ['policy'=>'retention_only','deleted'=>0,'skipped'=>0,'phase'=>'','currentSnapshot'=>null,'requiredBytes'=>null,'availableBytes'=>null,'stopReason'=>''];
-            $run['kinds'] = []; $run['taskStatus'] = []; $run['blockedReasons'] = []; $run['nextRetry'] = null; $run['recoveryRequired'] = false;
+            $run['retirement']=false; $run['kinds'] = []; $run['taskStatus'] = []; $run['blockedReasons'] = []; $run['nextRetry'] = null; $run['recoveryRequired'] = false;
             foreach ($run['tasks'] as $id) {
                 $task = $journal->state['tasks'][$id];
                 if (!empty($task['supersededBy'])) { continue; }
+                if(str_starts_with($task['parameters']['phase'] ?? '', 'retirement_'))$run['retirement']=true;
                 if (($task['parameters']['phase'] ?? '')==='source_retention_review') { $run['sourceReview']=true; }
                 if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) {
                     foreach ($task['sourceResults'] ?? [] as $item) {
@@ -265,7 +270,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         $pauseAuto = false;
         foreach ($run['tasks'] as $taskId) {
             $kind = $journal->state['tasks'][$taskId]['kind'];
-            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']) && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'source_retention_') && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'recovery_')) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
+            if (!in_array($kind, ['auto', 'batch'], true) && !isset($journal->state['tasks'][$taskId]['parameters']['replication']) && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']) && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'source_retention_') && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'recovery_') && !str_starts_with($journal->state['tasks'][$taskId]['parameters']['phase'] ?? '', 'retirement_')) { throw new InvalidArgumentException('Cancel this task through its owning run.'); }
             $pauseAuto = $pauseAuto || ($kind === 'auto' && empty($journal->state['tasks'][$taskId]['parameters']['nativeSchedule']));
         }
         $scheduleId=$pauseAuto ? 'auto' : ($journal->state['tasks'][$runId.':prepare']['parameters']['job']['id'] ?? '');

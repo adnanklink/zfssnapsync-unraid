@@ -381,10 +381,10 @@ final class ZfsasCoordinatorState
         if ($run['state'] === 'canceling') {
             $task['state'] = 'canceled';
             $this->finishCancellation($run['id'], $now);
-        } elseif (!empty($task['parameters']['individualMutations']) || isset($task['parameters']['autoMutation'])) {
+        } elseif (isset($task['parameters']['retirement']) || !empty($task['parameters']['individualMutations']) || isset($task['parameters']['autoMutation'])) {
             $task['state']='failed';$task['blocked']='recovery_required';
             $task['result']=['outcome'=>'validation_failure','recoveryRequired'=>true,
-                'message'=>'Automatic work stopped after interruption. Completed mutations are retained; review the remaining work before another run.'];
+                'message'=>isset($task['parameters']['retirement']) ? 'Dataset cleanup stopped after interruption. Completed deletions remain; review the remaining snapshots before another cleanup.' : 'Automatic work stopped after interruption. Completed mutations are retained; review the remaining work before another run.'];
             $this->settle($run['id'],$now);
         } elseif (!empty($task['parameters']['remoteOwnership'])) {
             $task['state']='failed';$task['blocked']='recovery_required';

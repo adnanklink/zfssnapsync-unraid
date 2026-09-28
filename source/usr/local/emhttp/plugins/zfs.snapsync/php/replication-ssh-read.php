@@ -35,7 +35,7 @@ final class ZfsasSshReceiverRead
 
     private function query(string $program, array $arguments): string
     {
-        if (!array_is_list($arguments) || !in_array($arguments[0] ?? '',['get','list'],true)
+        if (!array_is_list($arguments) || !in_array($arguments[0] ?? '',$program==='zfs'?['get','list','holds']:['get','list'],true)
             || count($arguments)>256) { throw new InvalidArgumentException('Only bounded receiver metadata reads are allowed.'); }
         foreach ($arguments as $argument) {
             if (!is_string($argument) || $argument==='' || strlen($argument)>4096 || strpbrk($argument,"\0\r\n")!==false) {

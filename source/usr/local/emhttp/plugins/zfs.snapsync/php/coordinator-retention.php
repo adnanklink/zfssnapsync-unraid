@@ -28,6 +28,15 @@ function zfsas_coordinator_prune_artifacts(ZfsasCoordinatorState $journal, strin
             $activeBatches[$task['parameters']['token']] = true;
         }
     }
+    $retirementInputs=[];
+    foreach($journal->state['tasks'] as $task)if(str_starts_with($task['parameters']['phase'] ?? '', 'retirement_'))$retirementInputs[hash('sha256',$task['id'])]=true;
+    foreach(['.retirement.json','.retirement-review.json'] as $suffix)foreach(glob($root.'/attempt-inputs/*'.$suffix) ?: [] as $path)if(!isset($retirementInputs[basename($path,$suffix)]))@unlink($path);
+    foreach(glob($root.'/retirements/*.json') ?: [] as $path){
+        if(is_link($path)||filemtime($path)>=$now-86400)continue;
+        $session=json_decode((string)file_get_contents($path),true);$owned=false;
+        foreach(['reviewRun','deleteRun'] as $key)if(isset($journal->state['runs'][$session[$key] ?? '']))$owned=true;
+        if(!$owned)@unlink($path);
+    }
     $recoveryInputs=[];
     foreach($journal->state['tasks'] as $task)if(str_starts_with($task['parameters']['phase'] ?? '', 'recovery_'))$recoveryInputs[hash('sha256',$task['id'])]=true;
     foreach(glob($root.'/attempt-inputs/*.recovery.json') ?: [] as $path)if(!isset($recoveryInputs[basename($path,'.recovery.json')]))@unlink($path);

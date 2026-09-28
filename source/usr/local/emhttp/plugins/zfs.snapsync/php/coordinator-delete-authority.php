@@ -28,6 +28,13 @@ trait ZfsasCoordinatorDeleteAuthority
             || !empty($owner['upgradeReviewRequired']) || !empty($run['upgradeReviewRequired'])) {
             throw new InvalidArgumentException('Deletion owner no longer authorizes execution.');
         }
+        if (($job['DELETE_SCOPE'] ?? '')==='retirement') {
+            $approval=$parameters['retirement'] ?? null;
+            if (!$approval || ($approval['row']['snapshot'] ?? '')!==$job['SNAPSHOT'] || ($approval['row']['guid'] ?? '')!==$job['SNAPSHOT_GUID']
+                || ($parameters['revision'] ?? '')!==zfsas_config_revision('/boot/config/plugins/zfs.snapsync')) {
+                throw new InvalidArgumentException('Retirement approval or configuration changed.');
+            }
+        }
         if (str_starts_with($job['JOB_ID'], 'sm-')) {
             $item = $this->state['items'][$parameters['ownerItemId'] ?? ''] ?? null;
             $parent = $item ? ($this->state['tasks'][$item['taskId']] ?? null) : null;

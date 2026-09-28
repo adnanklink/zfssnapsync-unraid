@@ -42,6 +42,7 @@ function zfsas_operation_problem(array $tasks): ?array
     if (!empty($p['individualMutations']) || !empty($p['autoMutation'])) {
         $next='Review the current snapshot settings and recorded results before starting another run. Completed mutations are retained.';
     }
+    if(str_starts_with($p['phase'] ?? '', 'retirement_'))$next='Automation remains stopped. Inspect the remaining source and destination snapshots in Stop automation and clean up before submitting another deletion review.';
     return ['code'=>$code,'summary'=>$code==='interrupted_receive'?'An earlier transfer is unfinished at the destination.':zfsas_diagnostic_text($message),
         'nextAction'=>$next,'source'=>$r['blockedReceivers'][0]['source'] ?? $p['source'] ?? explode('@',$p['replication']['sourceSnapshot'] ?? $task['dataset'] ?? '')[0],
         'destination'=>$r['blockedReceivers'][0]['destination'] ?? $p['destination'] ?? $p['replication']['destination'] ?? $p['job']['destination'] ?? '',
