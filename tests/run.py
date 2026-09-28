@@ -4,6 +4,9 @@ import argparse
 import datetime
 import json
 import os
+import runpy
+import shutil
+import tempfile
 from pathlib import Path
 import subprocess
 import sys
@@ -74,12 +77,22 @@ def main():
     report = {'group': args.group, 'filter': args.filter, 'image': image_id,
               'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True)), 'results': []}
+    digest = runpy.run_path(str(ROOT / 'scripts/verify-acceptance.py'))['input_digest']
+    before = digest(ROOT)
+    # Freeze the complete checkout once; every isolated suite sees identical bytes.
+    frozen = tempfile.TemporaryDirectory(prefix='snapsync-test-input-')
+    input_root = Path(frozen.name) / 'checkout'
+    shutil.copytree(ROOT, input_root, symlinks=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    report['inputDigest'] = digest(input_root)
+    if before != report['inputDigest'] or before != digest(ROOT):
+        frozen.cleanup()
+        raise RuntimeError('Inputs changed while capturing the test checkout; rerun with stable inputs.')
     print('Results: ' + str(output), flush=True)
     for index, (profile, command) in enumerate(jobs):
         name = 'snapsync-test-' + uuid.uuid4().hex[:12]
-        flags = ['--rm', '--name', name, '--network', 'none', '--shm-size', '256m', '-v', str(ROOT) + ':/work:ro', '-w', '/work']
+        flags = ['--rm', '--name', name, '--network', 'none', '--shm-size', '256m', '-v', str(input_root) + ':/work:ro', '-w', '/work']
         if profile == 'readonly':
-            flags += ['-v', str(ROOT / 'tests/runtime/boot') + ':/boot:ro']
+            flags += ['-v', str(input_root / 'tests/runtime/boot') + ':/boot:ro']
         if profile in ('mount', 'zfs'):
             flags += ['--cap-add', 'SYS_ADMIN', '--security-opt', 'apparmor=unconfined']
         if profile == 'zfs':
@@ -103,6 +116,7 @@ def main():
         print(('PASS' if code == 0 else 'FAIL (%s)' % code) + ' ' + str(log), flush=True)
         if code:
             print(log.read_text()[-5000:], flush=True)
+    frozen.cleanup()
     return int(any(row['exitCode'] != 0 for row in report['results']))
 
 

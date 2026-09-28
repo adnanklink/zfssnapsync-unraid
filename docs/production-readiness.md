@@ -16,7 +16,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 8. Safe partial automatic replanning | Implemented; state and actual-daemon continuation/identity regressions pass |
 | 9. Lifecycle and reboot compatibility | Complete in fixtures; actual watchdog/installer regressions pass; Unraid platform acceptance remains separate |
 | 10. Operational UI feedback | Complete in fixtures; status, browser and syntax checks pass |
-| 11. Fault, flash-write and scale acceptance | Pending |
+| 11. Fault, flash-write and scale acceptance | Deterministic fault/flash/10,000-task checks pass; real-host scale and 48-hour soak pending |
 | 12. Documentation, screenshots and release preparation | Pending |
 | 13. Dedicated host acceptance | Pending host connection details |
 | 14. Verified artifact publication | Blocked until acceptance passes |
@@ -301,3 +301,19 @@ Status regressions cover supersession, absent mutation evidence and receiver shu
 The browser regression opens Auto Details and expands its checklist using the keyboard
 at 1440px and 390px, then verifies focus restoration. All ten existing browser suites,
 reliability units and syntax checks passed. No navigation or execution behavior changed.
+
+## Task 11 reproducible fault and scale evidence
+
+The runner freezes the checkout once for all suites and records its acceptance
+input digest. It rejects changes during capture, preventing a long regression run
+from combining source versions. Every suite still receives a separate container.
+
+The actual coordinator journal accepts 10,000 tasks, preserves duplicate receipts,
+records completion, reloads persisted state, returns a bounded final checklist page,
+and cancels pending work without changing the completed result. A measured run took
+0.402 seconds with 100,532,224 bytes of peak PHP allocation; the regression enforces
+30 seconds and 512 MiB. This is a journal measurement, not execution throughput.
+All three read-only flash/mount suites pass after the Auto and lifecycle changes.
+Existing fault suites cover policy-driver/daemon loss, receiver disconnect, stale
+identity, canceled shared owners and denied authorization. Real-pool pressure,
+platform restart and the full 48-hour soak remain required dedicated-host evidence.

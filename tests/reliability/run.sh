@@ -15,6 +15,7 @@ bash tests/reliability/local_send_cutover.sh
 php tests/reliability/transfer_progress.php
 php tests/reliability/operation_diagnostics.php
 php tests/reliability/operation_stages.php
+php tests/reliability/coordinator_scale.php
 php tests/reliability/lifecycle_ownership.php
 php tests/reliability/replication_recovery.php
 php tests/reliability/pause_schedule.php
