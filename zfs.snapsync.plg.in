@@ -2,6 +2,9 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Testing candidate: dedicated-host acceptance and 48-hour soak are pending.
+- Add explicit dataset retirement with reviewed destination-first cleanup, including removed jobs.
+- Use native SSH ownership, shared cleanup authorization, and individually owned Auto mutations.
 - Show automatic snapshot section fields directly, without redundant dropdowns.
 - Align snapshot actions and pagination, and remove empty space above the snapshot list.
 - Separate Automatic snapshots, Snapshots and Backup copies, with utilities in Settings and compatible legacy links.
@@ -46,7 +49,7 @@
 - Coordinator-owned deletion and batch journals with verified cancellation and RAM-only runtime history.
 - Native local scheduled replication and Run Now with measured space approval and verified completion.
 - Opt-in per-job retention anchor cleanup preserves the keep-all window and protected checkpoints.
-- Testing build: native SSH, shared cleanup ownership and broader release gates remain unfinished.
+- Testing build: platform, real-pool fault/scale and soak acceptance remain required.
 - Stop original-plugin work and disable its schedules before using the same datasets; configuration is not imported.
 
   </CHANGES>

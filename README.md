@@ -284,7 +284,7 @@ cd zfssnapsync-unraid
 
 Update `VERSION`, [CHANGELOG.md](CHANGELOG.md), and `zfs.snapsync.plg.in` for each release. The build verifies package contents and generates the manifest, package, and icon. Commit generated artifacts separately from source changes. Building or pushing source alone does not publish an installable update.
 
-The release workflow runs automatically on `main` and `testing`, or explicitly through workflow dispatch. Promoted releases include verified packages; the workflow validates these without replacing an existing version. Endpoint and ZFS tests require the documented disposable test environment; they use production-style paths and must not be run casually on a live Unraid host.
+Verification runs on pushes and pull requests. The candidate build workflow is manually dispatched; production promotion requires recorded host acceptance and never replaces an existing package version. Endpoint and ZFS tests require the documented disposable test environment; they use production-style paths and must not be run casually on a live Unraid host.
 
 ## Support development
 
