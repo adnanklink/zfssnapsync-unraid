@@ -22,11 +22,15 @@
     },
     "snapshots.png": {
       "capture": "snapshots-browse-light-1440.png",
-      "sha256": "9861469f9932fa92405447bf964be6bc8bddbe7d8f5ab45b0493dbd7bdb1e8b4"
+      "sha256": "ab31783972b75ecc95da7d0acbbe7478879e154d0c6c6ca1bb464c28c1ecd3d8",
+      "sourceRevision": "4464eea",
+      "note": "Refreshed for the retirement dataset action; capture harness checks alignment of all three actions."
     },
     "snapshots-selected.png": {
       "capture": "snapshots-selected-light-1440.png",
-      "sha256": "46d9f38ab99f2712bfe652cb8aede04d50691e6fe563df65d4aa26804bf9d63b"
+      "sha256": "8e82eaa32059c7b0bbffd411f24abf18aa4aad880802ac74cc62cdc7cb4ea06e",
+      "sourceRevision": "4464eea",
+      "note": "Refreshed for the retirement dataset action; capture harness checks alignment of all three actions."
     },
     "replication-dark.png": {
       "capture": "replication-editing-dark-1440.png",
