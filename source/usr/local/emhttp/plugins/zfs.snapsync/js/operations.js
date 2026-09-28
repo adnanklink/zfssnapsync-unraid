@@ -76,6 +76,7 @@
       if(message.textContent!==messageText)message.textContent=messageText;
       phase.title=phaseText;message.title=messageText;
       activity.classList.toggle('is-replication',op.type==='replication');
+      activity.classList.toggle('is-auto',op.type==='auto');
       // Reserve the same bar/text space while queued, checking resources and
       // transferring. Updating samples must not move the rows below this one.
       const showBar=active(op)&&op.type==='replication'&&(Number.isFinite(op.progress)||op.phase?.includes('transfer'));

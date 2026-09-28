@@ -807,7 +807,7 @@
   -webkit-line-clamp:2; -webkit-box-orient:vertical;
 }
 .zfsas-workspace table.ui-operations-table .ui-transfer-status:not(.is-replication) progress,
-.zfsas-workspace table.ui-operations-table .ui-transfer-status:not(.is-replication) .ui-transfer-message { display:none; }
+.zfsas-workspace table.ui-operations-table .ui-transfer-status:not(.is-replication):not(.is-auto) .ui-transfer-message { display:none; }
 .zfsas-workspace table.ui-operations-table td:nth-child(3) > .ui-badge {
   display:block; width:max-content; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
 }
