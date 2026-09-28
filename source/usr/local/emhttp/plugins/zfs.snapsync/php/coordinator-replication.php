@@ -9,6 +9,15 @@ function zfsas_coordinator_replication_command(array $task, string $root, string
     }
     try { ZfsasReplicationInspection::validate($parameters['replication'] ?? []); }
     catch (InvalidArgumentException $error) { return ['outcome'=>'validation_failure','message'=>$error->getMessage()]; }
+    if (($parameters['replication']['transport'] ?? 'local')==='ssh') {
+        try {
+            require_once __DIR__.'/replication-ssh-receiver.php';
+            new ZfsasSshReceiver($parameters['receiverCapture'] ?? []);
+            if (($parameters['endpoint'] ?? '')==='local' || (in_array($parameters['phase'],['replication_transfer','replication_verify'],true) && empty($parameters['remoteOwnership']))) {
+                throw new InvalidArgumentException('Remote execution requires captured receiver ownership.');
+            }
+        } catch (InvalidArgumentException $error) {return ['outcome'=>'validation_failure','message'=>$error->getMessage()];}
+    }
     if ($task['kind'] === 'finalize' && $journal !== null) {
         foreach ($task['dependencies'] as $id) {
             $child = $journal->state['tasks'][$id];
@@ -40,7 +49,7 @@ function zfsas_coordinator_replication_command(array $task, string $root, string
         throw new RuntimeException('Cannot publish captured replication parameters.');
     }
     return ['/bin/bash',__DIR__.'/../scripts/coordinator-replication-attempt.sh',$path,
-        explode('@',$parameters['replication']['sourceSnapshot'])[0],$parameters['replication']['destination']];
+        explode('@',$parameters['replication']['sourceSnapshot'])[0],$parameters['replication']['destination'],$parameters['replication']['transport'] ?? 'local'];
 }
 
 function zfsas_coordinator_submit_replication(ZfsasCoordinatorState $journal, array $request, string $revision, array $sendConfig = []): array
@@ -48,6 +57,7 @@ function zfsas_coordinator_submit_replication(ZfsasCoordinatorState $journal, ar
     $replication = $request['replication'] ?? [];
     if (!is_array($replication)) { throw new InvalidArgumentException('Captured replication request required.'); }
     ZfsasReplicationInspection::validate($replication);
+    if (($replication['transport'] ?? 'local')!=='local') { throw new InvalidArgumentException('Manual Send requires a local receiver. Use a configured SSH replication job.'); }
     if (($replication['purpose'] ?? 'backup') === 'restore' && empty($replication['createDestination'])) { throw new InvalidArgumentException('Restore requires a new destination dataset.'); }
     $sourceDatasetGuid = $request['sourceDatasetGuid'] ?? '';
     if (!is_string($sourceDatasetGuid) || !preg_match('/^[0-9]{1,20}$/D',$sourceDatasetGuid)

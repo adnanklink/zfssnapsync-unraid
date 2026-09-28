@@ -4,6 +4,7 @@ require_once __DIR__ . '/coordinator-socket.php';
 require_once __DIR__ . '/coordinator-service.php';
 $service = zfsas_service_handshake();
 require_once __DIR__ . '/coordinator-executor.php';
+require_once __DIR__ . '/coordinator-remote-shutdown.php';
 require_once __DIR__ . '/coordinator-retention.php';
 require_once __DIR__ . '/operation-diagnostics.php';
 require_once __DIR__ . '/coordinator-source-retention.php';
@@ -102,8 +103,10 @@ $outcome = static function ($task, $code) use ($configDir, $journal): array {
     }
     return ['outcome' => $code === 0 ? 'success' : 'transient_failure', 'exitCode' => $code];
 };
+$remoteShutdown = new ZfsasRemoteShutdown();
 $executor = new ZfsasCoordinatorExecutor($journal, $root, $runtime, $command, $outcome, [],
-    static function($taskId) use ($journal, $deletion) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); zfsas_coordinator_source_followup($journal,$journal->state['tasks'][$taskId]['runId']); });
+    static function($taskId) use ($journal, $deletion) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); zfsas_coordinator_source_followup($journal,$journal->state['tasks'][$taskId]['runId']); },
+    [$remoteShutdown,'poll']);
 foreach (array_keys($journal->state['runs']) as $runId) { zfsas_coordinator_source_followup($journal,$runId); }
 // Replay persistent decisions before allowing recovery to admit another attempt.
 foreach ($journal->state['runs'] as $run) {

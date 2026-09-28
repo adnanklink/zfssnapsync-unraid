@@ -13,8 +13,8 @@ final class ZfsasReplicationInspection
     public static function validate(array $request): void
     {
         if (array_diff(array_keys($request), ['sourceSnapshot','sourceGuid','destination','destinationGuid','destinationParentGuid','createDestination','allowResume','transport','purpose'])
-            || ($request['transport'] ?? 'local') !== 'local') {
-            throw new InvalidArgumentException('This inspection phase requires a local receiver.');
+            || !in_array($request['transport'] ?? 'local',['local','ssh'],true)) {
+            throw new InvalidArgumentException('Invalid replication transport or request fields.');
         }
         if (!in_array($request['purpose'] ?? 'backup', ['backup','restore'], true)) { throw new InvalidArgumentException('Invalid receive purpose.'); }
         foreach (['sourceSnapshot','destination'] as $field) {
@@ -25,8 +25,8 @@ final class ZfsasReplicationInspection
         foreach ([$source[0], $request['destination']] as $dataset) {
             if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9_.:+-]*(?:\/[A-Za-z0-9_.:+-]+)*$/D', $dataset)) { throw new InvalidArgumentException('Invalid dataset.'); }
         }
-        if ($source[0] === $request['destination'] || str_starts_with($request['destination'], $source[0] . '/')
-            || str_starts_with($source[0], $request['destination'] . '/')) {
+        if (($request['transport'] ?? 'local')==='local' && ($source[0] === $request['destination'] || str_starts_with($request['destination'], $source[0] . '/')
+            || str_starts_with($source[0], $request['destination'] . '/'))) {
             throw new InvalidArgumentException('Source and destination trees overlap.');
         }
         foreach (['sourceGuid','destinationGuid','destinationParentGuid'] as $field) {
@@ -178,6 +178,10 @@ final class ZfsasReplicationInspection
     public static function inspect(array $request, ?callable $read = null, ?callable $readReceiver = null, string $receiverEndpoint = 'local'): array
     {
         self::validate($request); $read ??= [self::class,'command'];
+        if (($request['transport'] ?? 'local')==='ssh') {
+            if ($readReceiver===null) { throw new InvalidArgumentException('SSH inspection requires a verified receiver reader.'); }
+            if ($receiverEndpoint==='local') { self::validate(array_replace($request,['transport'=>'local'])); }
+        }
         $readReceiver ??= $read; ZfsasEndpointIdentity::validate($receiverEndpoint);
         $source = explode('@',$request['sourceSnapshot'])[0]; $destination = $request['destination'];
         $sourceGuid = self::guid($read,$source);

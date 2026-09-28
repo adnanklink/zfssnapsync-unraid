@@ -11,15 +11,17 @@ final class ZfsasCoordinatorExecutor
     private $command;
     private $outcome;
     private $onTransition;
+    private $receiverStopped;
     private array $processes = [];
     private array $stopping = [];
     private array $exitCodes = [];
     private array $limits;
     private string $lastDataset = '';
 
-    public function __construct(ZfsasCoordinatorState $journal, string $root, string $runtime, callable $command, callable $outcome, array $limits = [], ?callable $onTransition = null)
+    public function __construct(ZfsasCoordinatorState $journal, string $root, string $runtime, callable $command, callable $outcome, array $limits = [], ?callable $onTransition = null, ?callable $receiverStopped = null)
     {
         $this->journal = $journal; $this->root = $root; $this->command = $command; $this->outcome = $outcome; $this->onTransition = $onTransition;
+        $this->receiverStopped = $receiverStopped;
         $this->limits = $limits + ['auto' => 1, 'send' => 1, 'prepare' => 16, 'delete' => 1, 'batch' => 16, 'finalize' => 16];
         if (!is_dir($runtime) && !mkdir($runtime, 0770, true)) { throw new RuntimeException('Cannot create coordinator ownership directory.'); }
         $this->generation = bin2hex(random_bytes(24)); $this->generationFile = $runtime . '/generation';
@@ -86,6 +88,21 @@ final class ZfsasCoordinatorExecutor
     public function workerReport(array $request): array
     {
         return $this->journal->workerReport($request, $this->generation, time());
+    }
+
+    private function receiverShutdownVerified(array $task, array $attempt): bool
+    {
+        if (empty($task['parameters']['remoteOwnership'])) { return true; }
+        // The callback must poll independent bounded work, never perform network
+        // I/O in this event loop. Missing adapters retain ownership, fail closed.
+        $verified = $this->receiverStopped !== null && ($this->receiverStopped)($task,$attempt) === true;
+        $blocked = $verified ? '' : 'receiver_shutdown';
+        if ($this->journal->state['tasks'][$task['id']]['blocked'] !== $blocked) {
+            $this->journal->state['tasks'][$task['id']]['blocked'] = $blocked;
+            $this->journal->commit();
+            if ($this->onTransition) { ($this->onTransition)($task['id']); }
+        }
+        return $verified;
     }
 
     public function cancel(string $runId): void
@@ -163,6 +180,7 @@ final class ZfsasCoordinatorExecutor
                     $signal = $now - $this->stopping[$token]['since'] >= 2 ? 9 : 15;
                     foreach ($members as $member) { self::signal($member, $signal); }
                 } else {
+                    if (!$this->receiverShutdownVerified($task,$attempt)) { continue; }
                     $this->journal->stopped($token, time(), $now);
                     if ($this->onTransition) { ($this->onTransition)($taskId); } unset($this->stopping[$token], $this->exitCodes[$token]);
                 }
@@ -172,6 +190,7 @@ final class ZfsasCoordinatorExecutor
                     $this->stopping[$token] = ['since' => $now, 'recovery' => true];
                     $this->journal->state['tasks'][$taskId]['state'] = 'stopping'; $this->journal->commit();
                 } else {
+                    if (!$this->receiverShutdownVerified($task,$attempt)) { continue; }
                     $reported = $this->journal->state['attempts'][$token]['reportedResult'] ?? null;
                     $result = $reported ?? ($this->outcome)($task, $this->exitCodes[$token], $dir);
                     if ($reported !== null && $this->exitCodes[$token] !== 0 && $reported['outcome'] === 'success') {

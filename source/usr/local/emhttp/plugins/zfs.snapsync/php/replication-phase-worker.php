@@ -6,6 +6,7 @@ require_once __DIR__ . '/send-helpers.php';
 require_once __DIR__ . '/replication-pressure.php';
 require_once __DIR__ . '/transfer-progress.php';
 require_once __DIR__ . '/operation-diagnostics.php';
+require_once __DIR__ . '/replication-ssh-phase.php';
 try {
     zfsas_coordinator_worker_report('progress',2,['phase'=>'replication_validation','message'=>'Revalidating captured replication identities.']);
     $path = $argv[1] ?? ''; $task = getenv('ZFSAS_TASK_ID');
@@ -19,6 +20,10 @@ try {
         if ($parameters['revision'] !== zfsas_config_revision('/boot/config/plugins/zfs.snapsync')) {
             throw new InvalidArgumentException('Configuration changed; review replication again.');
         }
+        if (($parameters['replication']['transport'] ?? 'local')==='ssh') {
+            $sequence=3;
+            $result=zfsas_replication_ssh_phase($parameters,$sequence,'zfsas_coordinator_worker_report');
+        } else {
         $result = zfsas_replication_revalidate($parameters);
         if ($result['outcome'] === 'success') {
             $complete = $result['inspection']['mode'] === 'already_received';
@@ -80,7 +85,11 @@ try {
                 }
             } else { throw new InvalidArgumentException('Unknown native replication phase.'); }
         }
+        }
     } catch (InvalidArgumentException $error) { $result=zfsas_replication_error_result($error,'validation_failure'); }
       catch (RuntimeException $error) { $result=zfsas_replication_error_result($error,'transient_failure'); }
+    if (!empty($parameters['remoteOwnership']) && !in_array($result['outcome'],['success','wait'],true)) {
+        $result['outcome']='validation_failure';$result['recoveryRequired']=true;
+    }
     zfsas_coordinator_worker_report('result',$sequence ?? 3,$result);
 } catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n"); exit(1); }

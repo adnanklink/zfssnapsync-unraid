@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/send-helpers.php';
+require_once __DIR__.'/replication-ssh-connection.php';
 require_once __DIR__.'/replication-inspection.php';
 
 /** Read-only SSH inspection. No receiver plugin, installation, or mutation. */
@@ -11,15 +11,7 @@ final class ZfsasSshReceiverRead
 
     public function __construct(array $config, string $pool, array $localPoolGuids=[], ?array $expected=null)
     {
-        $this->connection=[
-            'host'=>zfsas_send_normalize_ssh_host($config['SEND_SSH_HOST'] ?? ''),
-            'port'=>zfsas_send_normalize_ssh_port($config['SEND_SSH_PORT'] ?? '22'),
-            'user'=>zfsas_send_normalize_ssh_user($config['SEND_SSH_USER'] ?? 'root'),
-            'key'=>zfsas_send_normalize_ssh_key_path($config['SEND_SSH_KEY_PATH'] ?? ''),
-        ];
-        if (in_array(null,$this->connection,true) || $this->connection['host']==='') {
-            throw new InvalidArgumentException('A valid saved SSH connection is required.');
-        }
+        $this->connection=ZfsasSshConnection::normalize($config);
         ZfsasEndpointIdentity::resource('local',$pool);
         if (str_contains($pool,'/')) { throw new InvalidArgumentException('Receiver pool name required.'); }
         $this->pool=$pool;
@@ -29,7 +21,7 @@ final class ZfsasSshReceiverRead
         }
         $probe=$this->execute(null,[]);
         $this->identity=['endpoint'=>ZfsasEndpointIdentity::receiver($probe['hostKey'],$probe['poolGuid'],$localPoolGuids),
-            'hostKey'=>$probe['hostKey'],'poolGuid'=>$probe['poolGuid'],'pool'=>$pool,'connectionDigest'=>$binding];
+            'hostKey'=>$probe['hostKey'],'poolGuid'=>$probe['poolGuid'],'pool'=>$pool,'connectionDigest'=>$binding,'bootId'=>$probe['bootId']];
         if ($expected!==null && $this->identity!==$expected) {
             throw new InvalidArgumentException('Verified SSH receiver identity changed; inspect it again.');
         }
@@ -51,7 +43,7 @@ final class ZfsasSshReceiverRead
         }
         if (strlen(json_encode($arguments,JSON_THROW_ON_ERROR))>32768) { throw new InvalidArgumentException('Receiver inspection is too large.'); }
         $result=$this->execute($program,$arguments);
-        if ($result['hostKey']!==$this->identity['hostKey'] || $result['poolGuid']!==$this->identity['poolGuid']) {
+        if ($result['hostKey']!==$this->identity['hostKey'] || $result['poolGuid']!==$this->identity['poolGuid'] || $result['bootId']!==$this->identity['bootId']) {
             throw new InvalidArgumentException('Verified SSH receiver identity changed during inspection.');
         }
         return $result['output'];
@@ -61,20 +53,13 @@ final class ZfsasSshReceiverRead
     {
         // One verified connection returns the pool identity and the requested
         // metadata. Never trust a separate unauthenticated ssh-keyscan result.
-        $script='set -eu; zpool get -H -p -o value guid '.escapeshellarg($this->pool).';';
+        $script='set -eu; zpool get -H -p -o value guid '.escapeshellarg($this->pool).'; cat /proc/sys/kernel/random/boot_id;';
         if ($program!==null) { $script.=' exec '.implode(' ',array_map('escapeshellarg',array_merge([$program],$arguments))); }
         $sessionLog=tempnam('/tmp','snapsync-ssh-read-');
         if ($sessionLog===false) { throw new RuntimeException('Cannot capture verified SSH connection identity.'); }
         chmod($sessionLog,0600);
-        $ssh=['/usr/bin/timeout','--foreground','--signal=TERM','--kill-after=2','20','ssh','-T','-v','-E',$sessionLog,
-            '-o','BatchMode=yes','-o','PasswordAuthentication=no','-o','KbdInteractiveAuthentication=no',
-            '-o','StrictHostKeyChecking=yes','-o','UpdateHostKeys=no','-o','VerifyHostKeyDNS=no',
-            '-o','ControlMaster=no','-o','ControlPath=none','-o','ControlPersist=no',
-            '-o','ClearAllForwardings=yes','-o','ForwardAgent=no','-o','ForwardX11=no',
-            '-o','ConnectTimeout=10','-o','ConnectionAttempts=1','-o','ServerAliveInterval=5','-o','ServerAliveCountMax=2',
-            '-p',$this->connection['port']];
-        if ($this->connection['key']!=='') { array_push($ssh,'-i',$this->connection['key']); }
-        array_push($ssh,'--',$this->connection['user'].'@'.$this->connection['host'],'LC_ALL=C sh -c '.escapeshellarg($script));
+        $ssh=array_merge(['/usr/bin/timeout','--foreground','--signal=TERM','--kill-after=2','20'],ZfsasSshConnection::arguments($this->connection));
+        array_push($ssh,'-v','-E',$sessionLog,'--',ZfsasSshConnection::target($this->connection),'LC_ALL=C sh -c '.escapeshellarg($script));
         $process=proc_open($ssh,[0=>['file','/dev/null','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
         if (!is_resource($process)) { unlink($sessionLog);throw new RuntimeException('Unable to start receiver inspection.'); }
         foreach ($pipes as $pipe) { stream_set_blocking($pipe,false); }
@@ -100,9 +85,10 @@ final class ZfsasSshReceiverRead
             if (!preg_match('/^debug1: Server host key: \S+ (SHA256:[A-Za-z0-9+\/]{43})\r?$/m',$connectionLog,$match)) {
                 throw new RuntimeException('SSH did not report a verified receiver host-key identity.');
             }
-            $parts=explode("\n",$output,2);$guid=trim($parts[0]);
+            $parts=explode("\n",$output,3);$guid=trim($parts[0]);$boot=trim($parts[1] ?? '');
             if (!preg_match('/^[0-9]{1,20}$/D',$guid)) { throw new RuntimeException('Incomplete receiver pool identity.'); }
-            return ['hostKey'=>$match[1],'poolGuid'=>$guid,'output'=>$parts[1] ?? ''];
+            if (!preg_match('/^[a-f0-9-]{36}$/D',$boot)) { throw new RuntimeException('Incomplete receiver boot identity.'); }
+            return ['hostKey'=>$match[1],'poolGuid'=>$guid,'bootId'=>$boot,'output'=>$parts[2] ?? ''];
         } finally { foreach ($pipes as $pipe) { fclose($pipe); } proc_close($process);unlink($sessionLog); }
     }
 }

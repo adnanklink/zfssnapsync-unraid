@@ -33,19 +33,21 @@ function zfsas_recovery_preflight(array $job,array $members,?callable $read=null
         'message'=>'An earlier transfer is unfinished at the destination. Review recovery before sending another snapshot.',
         'blockedReceivers'=>array_slice($blocked,0,20),'blockedCount'=>count($blocked)];
 }
-function zfsas_recovery_inspect_member(array $p,?callable $read=null): array
+function zfsas_recovery_inspect_member(array $p,?callable $read=null,?callable $readReceiver=null,string $receiverEndpoint='local'): array
 {
     $read ??= [ZfsasReplicationInspection::class,'command'];
     $base=['source'=>$p['source'],'destination'=>$p['destination'],'eligible'=>false];
     try{
+        if (($p['transport'] ?? 'local')==='ssh' && $readReceiver===null) {throw new InvalidArgumentException('Recovery requires a verified SSH receiver reader.');}
+        $readReceiver ??= $read;ZfsasEndpointIdentity::validate($receiverEndpoint);
         if(array_key_exists('receiverGuid',$p)){
             $receivers=[];
             if($p['receiverGuid']!==null)$receivers[$p['destination']]=$p['receiverGuid'];
             if($p['receiverParentGuid']!==null)$receivers[substr($p['destination'],0,strrpos($p['destination'],'/'))]=$p['receiverParentGuid'];
-        }else $receivers=zfsas_recovery_receivers(['destination'=>$p['destination']],$read);
+        }else $receivers=zfsas_recovery_receivers(['destination'=>$p['destination']],$readReceiver);
         $guid=trim($read(['get','-H','-p','-o','value','guid','--',$p['source']]));
         if($guid!==$p['sourceDatasetGuid'])throw new InvalidArgumentException('Source dataset identity changed. Review the configuration.');
-        $token=isset($receivers[$p['destination']])?trim($read(['get','-H','-o','value','receive_resume_token','--',$p['destination']])):'-';
+        $token=isset($receivers[$p['destination']])?trim($readReceiver(['get','-H','-o','value','receive_resume_token','--',$p['destination']])):'-';
         if($token==='')throw new RuntimeException('Receiver interruption metadata is unavailable.');
         $snapshot=$p['snapshot']['snapshot'] ?? ''; $snapshotGuid=$p['snapshot']['guid'] ?? '';
         if($token!=='-'){
@@ -62,13 +64,14 @@ function zfsas_recovery_inspect_member(array $p,?callable $read=null): array
         }
         if($snapshot==='')return $base+['message'=>'No interrupted transfer or retained original snapshot is available. No new snapshot will be created.'];
         $request=['sourceSnapshot'=>$snapshot,'sourceGuid'=>$snapshotGuid,'destination'=>$p['destination'],'allowResume'=>true];
+        if (($p['transport'] ?? 'local')==='ssh') {$request['transport']='ssh';}
         if(isset($receivers[$p['destination']]))$request['destinationGuid']=$receivers[$p['destination']];
         else{
             $parent=substr($p['destination'],0,strrpos($p['destination'],'/'));
             if(!isset($receivers[$parent]))throw new InvalidArgumentException('Receiver parent is absent. Recover its parent first, then review again.');
             $request+=['createDestination'=>true,'destinationParentGuid'=>$receivers[$parent]];
         }
-        $result=ZfsasReplicationInspection::inspect($request,$read);
+        $result=ZfsasReplicationInspection::inspect($request,$read,$readReceiver,$receiverEndpoint);
         if($result['outcome']!=='success')throw new InvalidArgumentException($result['message']);
         if($result['inspection']['sourceDatasetGuid']!==$p['sourceDatasetGuid'])throw new InvalidArgumentException('Source identity changed during recovery review.');
         return array_replace($base,['eligible'=>true,'request'=>$request,'inspection'=>$result['inspection'],'snapshot'=>$snapshot,

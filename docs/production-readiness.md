@@ -10,7 +10,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
-| 5. Native SSH execution and recovery | In progress; verified read-only receiver transport, execution not enabled |
+| 5. Native SSH execution and recovery | In progress; owned phase execution and shutdown verified in fixtures; scheduled cutover awaits cleanup parity |
 | 6. SSH cleanup parity | Pending |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
 | 8. Safe partial automatic replanning | Pending |
@@ -145,5 +145,31 @@ identity changes, connection binding, local-pool identity, shell argument isolat
 and refusal of mutation commands. Oversized output, remote command failures and
 stalled connections are rejected within bounded reads and timeouts; private SSH
 diagnostic files are removed after success and failure. The SSH fixture and
-repository syntax suite pass. Native SSH execution remains disabled until
-remote ownership, cancellation, shutdown verification and recovery are integrated.
+repository syntax suite pass.
+
+The native phase adapter now executes full, incremental and explicitly reviewed
+resume streams over SSH, verifies exact receiver checkpoints, applies read-only
+backup or writable restore policy, and preserves unmounted receive semantics.
+An ephemeral Bash helper owns each receiver attempt in an independent process
+group, holds compatible ancestor dataset gates, and checks pool, dataset and boot
+identity before mutation. Receiver authority records require tmpfs `/dev/shm`;
+the receiver needs no permanent plugin installation.
+
+Cancellation fences both receiver sub-operations before checking their process
+groups. The fence rejects delayed launches and duplicate tokens. Independent,
+bounded SSH probes verify shutdown after local client loss; unreachable or
+ambiguous receivers retain coordinator ownership and block recovery grants.
+Host-key pinning rejects a changed key before executing a captured mutation even
+if that new key has since been added to known_hosts. Journal format 5 is published
+before granting remote mutation authority, so earlier executors cannot recover
+that work using local-only shutdown rules. Local-only journals keep their existing
+format until this boundary is needed.
+
+Real SSH fixtures with deterministic ZFS commands cover full/incremental/resume
+phases, protection and mount policy, disconnects, unreachable receivers, delayed
+launches, PID identity changes, orphaned descendants, duplicate execution,
+compatible locks and coordinator restart barriers. Reliability regressions pass.
+The completed owned-phase checkpoint passed all 36 isolated CI suites.
+These are transport and execution fixtures, not real OpenZFS or host acceptance.
+Scheduled SSH admission and its public recovery flow remain on their existing
+path until remote cleanup and source-retention parity can be enabled together.

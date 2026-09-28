@@ -24,6 +24,12 @@ $target='elsewhere@A';check(!zfsas_recovery_inspect_member($p,$read)['eligible']
 $sourceGuid='11';check(!zfsas_recovery_inspect_member($p,$read)['eligible'],'Changed source GUID was accepted');$sourceGuid='10';
 $blocked=zfsas_recovery_preflight(['destination'=>'backup/target'],[$p],$read);check($blocked['failureCode']==='interrupted_receive','Run Now preflight ignored interrupted receive');
 $token='-';$no=$p;unset($no['snapshot']);check(!zfsas_recovery_inspect_member($no,$read)['eligible'],'Lost RAM reconstructed snapshot authority');$token='private-token';
+$remoteEndpoint=ZfsasEndpointIdentity::receiver('SHA256:'.str_repeat('a',43),'789');
+$sourceRead=static function($args)use($read){check($args[0]==='send'||str_starts_with(end($args),'tank/'),'Source reader inspected the receiver');return $read($args);};
+$receiverRead=static function($args)use($read){check($args[0]!=='send'&&str_starts_with(end($args),'backup'),'Receiver reader inspected source state');return $read($args);};
+$remoteReview=zfsas_recovery_inspect_member($p+['transport'=>'ssh'],$sourceRead,$receiverRead,$remoteEndpoint);
+check($remoteReview['eligible'] && $remoteReview['request']['transport']==='ssh' && $remoteReview['inspection']['receiverEndpoint']===$remoteEndpoint,'SSH recovery did not preserve endpoint identity');
+check(!zfsas_recovery_inspect_member($p+['transport'=>'ssh'],$sourceRead)['eligible'],'SSH recovery silently used local receiver metadata');
 $j=new ZfsasCoordinatorState('/tmp/recovery-'.bin2hex(random_bytes(8)));$revision=str_repeat('a',64);
 $job=['id'=>'abcdef123456','source'=>'tank/source','destination'=>'backup/target','frequency'=>'1d','threshold'=>'0G','children'=>'0','transport'=>'local'];
 $config=['revision'=>$revision,'send'=>['SEND_JOBS'=>zfsas_send_render_jobs_string([$job]),'SEND_RATE_LIMIT'=>'0']];

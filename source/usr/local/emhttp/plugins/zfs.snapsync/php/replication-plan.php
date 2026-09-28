@@ -2,7 +2,7 @@
 require_once __DIR__ . '/replication-inspection.php';
 
 /** Build a frozen graph; publishing it atomically registers all snapshot references. */
-function zfsas_replication_plan(array $request, array $inspection, string $revision, string $rateLimit = '0'): array
+function zfsas_replication_plan(array $request, array $inspection, string $revision, string $rateLimit = '0', ?array $receiverCapture = null): array
 {
     ZfsasReplicationInspection::validate($request);
     if (!preg_match('/^[a-f0-9]{64}$/D', $revision)) { throw new InvalidArgumentException('Captured configuration revision required.'); }
@@ -12,8 +12,16 @@ function zfsas_replication_plan(array $request, array $inspection, string $revis
     if (empty($request['createDestination'])) { $request['destinationGuid'] = $inspection['destinationDatasetGuid']; }
     if (!preg_match('/^(?:0|[1-9][0-9]*[bBkKmMgG]?)$/D',$rateLimit)) { throw new InvalidArgumentException('Invalid captured transfer rate.'); }
     $parameters = ['endpoint'=>ZfsasEndpointIdentity::validate($inspection['receiverEndpoint'] ?? 'local'),'rateLimit'=>$rateLimit,'replication'=>$request, 'inspection'=>$inspection, 'revision'=>$revision];
+    if (($request['transport'] ?? 'local')==='ssh') {
+        require_once __DIR__.'/replication-ssh-receiver.php';
+        new ZfsasSshReceiver($receiverCapture ?? []);
+        if ($parameters['endpoint']==='local' || $parameters['endpoint']!==($receiverCapture['identity']['endpoint'] ?? '')) {
+            throw new InvalidArgumentException('Remote plan requires a matching captured receiver endpoint.');
+        }
+        $parameters['receiverCapture']=$receiverCapture;
+    }
     $task = static fn($kind,$phase,$dependencies) => ['kind'=>$kind,'dataset'=>$request['destination'],
-        'parameters'=>$parameters+['phase'=>$phase], 'references'=>$inspection['references'], 'dependencies'=>$dependencies];
+        'parameters'=>$parameters+['phase'=>$phase]+($receiverCapture!==null && $kind!=='prepare' ? ['remoteOwnership'=>true] : []), 'references'=>$inspection['references'], 'dependencies'=>$dependencies];
     if ($inspection['mode'] === 'already_received') {
         return ['tasks'=>['verify'=>$task('finalize','replication_verify',[])]];
     }

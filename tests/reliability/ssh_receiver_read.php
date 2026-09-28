@@ -1,6 +1,7 @@
 <?php
 if (!is_file('/.dockerenv')) { throw new RuntimeException('Requires disposable SSH container.'); }
 require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/replication-ssh-read.php';
+require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-remote-shutdown.php';
 function check($ok,$message) {if (!$ok) {throw new RuntimeException($message);}}
 function command(array $args): void {
     $p=proc_open($args,[0=>['file','/dev/null','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
@@ -15,8 +16,19 @@ file_put_contents($root.'/pool-guid','789');
 file_put_contents('/usr/local/bin/zpool',"#!/bin/sh\ncat /tmp/ssh-read-fixture/pool-guid\nprintf '\\n'\n");chmod('/usr/local/bin/zpool',0755);
 file_put_contents('/usr/local/bin/zfs', <<<'PY'
 #!/usr/bin/python3
-import sys,json,time
+import sys,json,time,os,signal
 args=sys.argv[1:]
+if os.path.exists('/tmp/ssh-read-fixture/owned-mode'):
+ if args[0]=='get':
+  print('123')
+  sys.exit(0)
+ if args[0] in ('receive','set'):
+  with open('/tmp/ssh-read-fixture/owned-mutations','a') as out: out.write(json.dumps(args)+'\n')
+  if os.path.exists('/tmp/ssh-read-fixture/owned-block'):
+   signal.signal(signal.SIGTERM,signal.SIG_IGN)
+   signal.signal(signal.SIGHUP,signal.SIG_IGN)
+   time.sleep(60)
+  sys.exit(0)
 if args[0] not in ('get','list'):
  open('/tmp/ssh-read-mutation','w').write('unsafe')
  sys.exit(1)
@@ -77,11 +89,46 @@ try {
     check((new ZfsasSshReceiverRead($config,'backup',['789']))->identity()['endpoint']==='local','Locally imported pool lost local identity');
     check((new ZfsasSshReceiverRead($config,'backup',[],$identity))->identity()===$identity,'Unchanged captured identity rejected');
     rejected(fn()=>new ZfsasSshReceiverRead($alias,'backup',[],$identity));
+    // Exercise the delivered ownership helper over an actual SSH connection,
+    // including local-client loss and an independent cancellation connection.
+    $capture=['config'=>$config,'identity'=>$identity];$receiver=new ZfsasSshReceiver($capture);
+    file_put_contents($root.'/owned-mode','1');file_put_contents($root.'/owned-mutations','');chmod($root.'/owned-mutations',0666);
+    $attempt=bin2hex(random_bytes(24));
+    command($receiver->mutation($attempt,'receive','backup/data','123','on'));
+    check(count(file($root.'/owned-mutations'))===1,'SSH owned receive did not execute');
+    $shutdown=new ZfsasRemoteShutdown();
+    $task=['parameters'=>['receiverCapture'=>$capture]];
+    $poll=static function($token)use($shutdown,$task):void {
+        $end=microtime(true)+10;
+        do {$started=microtime(true);$done=$shutdown->poll($task,['token'=>$token]);check(microtime(true)-$started<.5,'Remote shutdown blocked coordinator polling');if($done)return;usleep(20000);}while(microtime(true)<$end);
+        throw new RuntimeException('SSH receiver shutdown was not verified');
+    };
+    $poll($attempt);
+    $fenced=bin2hex(random_bytes(24));$poll($fenced);
+    rejected(fn()=>command($receiver->mutation($fenced,'receive','backup/data','123','on')));
+    check(count(file($root.'/owned-mutations'))===1,'Canceled SSH launch reached mutation');
+    file_put_contents($root.'/owned-block','1');$attempt=bin2hex(random_bytes(24));
+    $client=proc_open($receiver->mutation($attempt,'receive','backup/data','123','on'),[0=>['file','/dev/null','r'],1=>['file','/dev/null','w'],2=>['file',$root.'/owned-client.log','a']],$pipes);
+    $end=microtime(true)+5;while(count(file($root.'/owned-mutations'))<2 && microtime(true)<$end){usleep(20000);}
+    check(count(file($root.'/owned-mutations'))===2,'Blocking remote receive did not start');
+    proc_terminate($client,9);proc_close($client);
+    proc_terminate($ssh);proc_close($ssh);
+    for($i=0;$i<30;$i++) {
+        $started=microtime(true);check(!$shutdown->poll($task,['token'=>$attempt]),'Unreachable receiver was treated as stopped');
+        check(microtime(true)-$started<.5,'Unreachable receiver blocked coordinator polling');usleep(20000);
+    }
+    $ssh=server('host');
+    $poll($attempt);unlink($root.'/owned-block');
+    unlink($root.'/owned-mode');
     file_put_contents($root.'/pool-guid','790');rejected(fn()=>$reader->read($query));
     rejected(fn()=>new ZfsasSshReceiverRead($config,'backup',[],$identity));file_put_contents($root.'/pool-guid','789');
     proc_terminate($ssh);proc_close($ssh);$ssh=server('replacement');
     rejected(fn()=>$reader->read($query));
     trust('replacement');rejected(fn()=>$reader->read($query));
+    file_put_contents($root.'/owned-mode','1');
+    rejected(fn()=>command($receiver->mutation(bin2hex(random_bytes(24)),'receive','backup/data','123','on')));
+    check(count(file($root.'/owned-mutations'))===2,'Newly trusted host key executed an old captured mutation');
+    unlink($root.'/owned-mode');
     rejected(fn()=>new ZfsasSshReceiverRead($config,'backup',[],$identity));
     check((new ZfsasSshReceiverRead($config,'backup'))->identity()['hostKey']!==$identity['hostKey'],'Host-key replacement was not distinguished');
     echo "PASS: real SSH read-only inspection, strict host trust, immutable host/pool identity, aliases, local-pool collapse, argument isolation and mutation rejection\n";

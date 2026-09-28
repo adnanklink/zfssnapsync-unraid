@@ -211,6 +211,11 @@ final class ZfsasCoordinatorState
     public function claim(string $taskId, float $monotonic, int $now, string $generation = ''): string
     {
         if (!in_array($taskId, $this->runnable($monotonic), true)) { throw new InvalidArgumentException('Task is not runnable.'); }
+        if (!empty($this->state['tasks'][$taskId]['parameters']['remoteOwnership']) && $this->state['version']<5) {
+            // Publish the old-reader rejection boundary before a remote grant.
+            // Older executors cannot prove that an SSH receiver has stopped.
+            $this->state['version']=5;$this->checkpoint();
+        }
         $token = bin2hex(random_bytes(24));
         $task =& $this->state['tasks'][$taskId];
         $task['attempt'] = $token; $task['state'] = 'launching'; $task['blocked'] = '';
