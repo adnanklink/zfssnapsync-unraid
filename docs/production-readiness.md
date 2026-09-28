@@ -336,3 +336,29 @@ Versioned release artifacts remain unchanged until an accepted candidate is read
 The remaining dedicated-host execution and evidence checklist is in
 [host acceptance](host-acceptance.md). Host connection details and disposable roots
 are still required; no platform or soak acceptance is claimed.
+
+## Combined verification on 2026-09-28
+
+All 44 CI suites passed against the frozen clean checkout `620d3d0`, input digest
+`c39c7bd946522d6110eb3e61ab9e1e064ebf8bb5b3eb04063f8e42658a90663b`.
+The local report is `/tmp/snapsync-tests-20260928T165154-9fc53f/results.json`.
+This includes actual-daemon continuation/watchdog tests, real-SSH fixture ownership
+and cleanup, 11 browser suites, scheduling/retention regressions, syntax and package
+checks. The three flash suites also passed at
+`/tmp/snapsync-tests-20260928T165051-dccf59/results.json`.
+
+Later changes corrected dedicated-host fixture paths, Auto message CSS visibility
+and development wording. Focused Auto visibility/keyboard checks passed at
+`/tmp/snapsync-tests-20260928T165852-5b470d/results.json`; workspace capture and
+operation-layout suites passed in `/tmp/snapsync-readiness-final-layout.log`.
+Final syntax passed at `/tmp/snapsync-tests-20260928T170049-965f6a/results.json`.
+Separate package-content, acceptance-gate and reproducibility checks passed at
+`/tmp/snapsync-tests-20260928T165751-b48edd/results.json` before the final text/CSS
+changes. These scoped results do not claim a single final-candidate acceptance run.
+
+No release acceptance certificate, new versioned package, main merge or publication
+was produced. Dedicated Unraid minimum/current hosts, the separate Linux receiver,
+real-pool scale/fault evidence, cross-host WebGUI acceptance, 48-hour soak and final
+accepted-byte promotion remain outstanding. Required host connection details and
+disposable roots have been requested. The source branch and documentation are cleanly
+committed; final acceptance must use the eventual versioned candidate's exact inputs.
