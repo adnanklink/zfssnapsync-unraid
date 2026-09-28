@@ -12,10 +12,10 @@ remain separate from source. This record is not a release acceptance certificate
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
 | 5. Native SSH execution and recovery | Complete in fixtures; native admission enabled; 39-suite regression run passed; host acceptance remains separate |
 | 6. SSH cleanup parity | Complete in fixtures; real-SSH/coordinator checks and 39-suite regression run passed; host acceptance remains separate |
-| 7. Individual Auto Snapshot mutation tasks | Implemented; policy, actual-daemon, cancellation and lifecycle fixtures pass; full regression run in progress |
+| 7. Individual Auto Snapshot mutation tasks | Implemented; policy, actual-daemon, cancellation and lifecycle fixtures pass; 40-suite regression run passed |
 | 8. Safe partial automatic replanning | Implemented; state and actual-daemon continuation/identity regressions pass |
 | 9. Lifecycle and reboot compatibility | Complete in fixtures; actual watchdog/installer regressions pass; Unraid platform acceptance remains separate |
-| 10. Operational UI feedback | Pending |
+| 10. Operational UI feedback | Complete in fixtures; status, browser and syntax checks pass |
 | 11. Fault, flash-write and scale acceptance | Pending |
 | 12. Documentation, screenshots and release preparation | Pending |
 | 13. Dedicated host acceptance | Pending host connection details |
@@ -287,3 +287,17 @@ surviving descendants, reused identities, unverified receiver shutdown and uncha
 queued receipts. Coordinator and installer compatibility suites pass. Existing
 Auto tests cover complete RAM loss and preserved pause/Resume decisions. Real
 Unraid 6.12.0 and stable 7.x installation/reboot verification remains task 13.
+
+## Task 10 operational feedback
+
+Auto operation Details now shows recorded policy evaluation, cleanup and snapshot
+creation stages, grouped by dataset with bounded pages. Completed work remains
+visible after safe continuation; superseded failures remain in history without
+masking current status. Auto failures direct users to snapshot settings and recorded
+results instead of transfer recovery. Unverified receiver shutdown explicitly says
+that dataset ownership remains reserved while shutdown confirmation is pending.
+
+Status regressions cover supersession, absent mutation evidence and receiver shutdown.
+The browser regression opens Auto Details and expands its checklist using the keyboard
+at 1440px and 390px, then verifies focus restoration. All ten existing browser suites,
+reliability units and syntax checks passed. No navigation or execution behavior changed.

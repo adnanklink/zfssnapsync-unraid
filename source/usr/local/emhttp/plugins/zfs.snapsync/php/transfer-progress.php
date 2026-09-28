@@ -40,6 +40,9 @@ function zfsas_run_progress(array $run, int $now): array
         }
     }
     unset($task);
+    if (array_filter($tasks,static fn($task)=>($task['blocked'] ?? '')==='receiver_shutdown')) {
+        return ['stateLabel'=>'Verifying receiver shutdown','messages'=>['Waiting for confirmation that remote work has stopped. Dataset ownership remains reserved.'],'percent'=>null,'phase'=>'receiver_shutdown'];
+    }
     $running = array_values(array_filter($tasks, static fn($task)=>$task['state']==='running'));
     $current = $running ?: $tasks;
     $phases = []; $messages = []; $percent = null;

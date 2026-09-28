@@ -152,6 +152,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
             $run['kinds'] = []; $run['taskStatus'] = []; $run['blockedReasons'] = []; $run['nextRetry'] = null; $run['recoveryRequired'] = false;
             foreach ($run['tasks'] as $id) {
                 $task = $journal->state['tasks'][$id];
+                if (!empty($task['supersededBy'])) { continue; }
                 if (($task['parameters']['phase'] ?? '')==='source_retention_review') { $run['sourceReview']=true; }
                 if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) {
                     foreach ($task['sourceResults'] ?? [] as $item) {

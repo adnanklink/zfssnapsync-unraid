@@ -17,3 +17,15 @@ $d=stages([task('recovery_execute_start'),task('replication_verify')]);check(sta
 $tasks=[];for($i=0;$i<10000;$i++)$tasks[]=task('replication_transfer',$i===7654?'failed':'complete','tank/data'.$i);
 $d=stages($tasks,'failed','transfer',7650);check(count($d['page']['rows'])===50,'Dataset page unbounded');check($d['page']['rows'][4]['state']==='failed','Failed dataset missing');check($d['page']['total']===10000&&$d['page']['nextOffset']===7700,'Pagination incomplete');check($d['stages'][5]['counts']['completed']===9999,'Dataset count wrong');
 echo "PASS: recorded stages, failed/canceled/waiting/retrying, manual and recovery, unknown history, 10,000-dataset pagination\n";
+
+$old=task('auto','failed');$old['parameters']['individualMutations']=true;$old['supersededBy']='continued';
+$driver=task('auto','running');$driver['parameters']['individualMutations']=true;
+$deleted=task('auto_delete');$deleted['parameters']['autoMutation']=['proposal'=>['action'=>'delete']];
+$created=task('auto_snapshot');$created['parameters']['autoMutation']=['proposal'=>['action'=>'snapshot']];
+$d=stages([$old,$driver,$deleted,$created],'running','cleanup');
+check(state($d,'policy')==='running'&&state($d,'cleanup')==='completed'&&state($d,'snapshots')==='completed','Auto stages or superseded state incorrect');
+check($d['page']['total']===1&&count($d['page']['rows'])===1,'Auto evidence missing');
+check(zfsas_operation_problem([$old])===null,'Superseded failure is current problem');
+$driver['state']='failed';check(!str_contains(zfsas_operation_problem([$driver])['nextAction'],'transfer'),'Auto failure offers transfer recovery');
+check(state(stages([$driver],'failed'),'snapshots')==='not_reached','Absent Auto mutation invented success');
+echo "PASS: Auto mutation evidence and superseded failure projection\n";

@@ -36,3 +36,8 @@ $waiting['state']='running';$waiting['progress']=['phase'=>'transfer','percent'=
 $actual=zfsas_run_progress(['state'=>'running','taskStatus'=>[$waiting]],105);
 check($actual['percent']===42&&$actual['phase']==='transfer'&&$actual['stateLabel']===null);
 echo "PASS: resource rechecks keep a stable waiting status until real transfer progress starts\n";
+
+$waiting['state']='stopping';$waiting['blocked']='receiver_shutdown';
+$shutdown=zfsas_run_progress(['state'=>'canceling','taskStatus'=>[$waiting]],105);
+check($shutdown['stateLabel']==='Verifying receiver shutdown'&&$shutdown['percent']===null&&count($shutdown['messages'])===1);
+echo "PASS: unverified receiver shutdown retains explicit ownership status\n";

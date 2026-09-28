@@ -2,6 +2,10 @@
 /** Projection of recorded tasks only; absent tasks are never counted as successes. */
 function zfsas_operation_stages(array $tasks, string $runState, string $selected='', int $offset=0): array
 {
+    $tasks=array_values(array_filter($tasks,static fn($task)=>empty($task['supersededBy'])));
+    if(array_filter($tasks,static fn($task)=>!empty($task['parameters']['individualMutations'])||!empty($task['parameters']['autoMutation']))) {
+        return zfsas_auto_operation_stages($tasks,$runState,$selected,$offset);
+    }
     $labels=['datasets'=>'Check datasets','snapshots'=>'Create source snapshots','inspect'=>'Inspect destinations','cleanup'=>'Cleanup','space'=>'Check space','transfer'=>'Transfer','verify'=>'Verify'];
     $phases=['replication_schedule'=>'datasets','recovery_execute_start'=>'datasets','replication_snapshot'=>'snapshots',
         'replication_member'=>'inspect','replication_inspect'=>'inspect','replication_space'=>'space',
@@ -15,7 +19,7 @@ function zfsas_operation_stages(array $tasks, string $runState, string $selected
         if($stage===null)continue;$known=true;$scheduled=$scheduled||$phase==='replication_schedule';
         $dataset=$p['source'] ?? (isset($p['replication']['sourceSnapshot'])?explode('@',$p['replication']['sourceSnapshot'])[0]:($destinations[$task['dataset'] ?? ''] ?? $task['dataset'] ?? 'Recorded membership'));
         $state=$task['state'];$attempts=(int)($task['attemptCount'] ?? 0);
-        $state=match($state){'complete'=>'completed','retry_wait'=>'retry_scheduled','running','starting','stopping','canceling'=>'running','canceled'=>($attempts||$runState==='canceled')?'canceled':'not_reached',default=>$state};
+        $state=match($state){'complete'=>'completed','retry_wait'=>'retry_scheduled','running','launching','starting','stopping','canceling'=>'running','canceled'=>($attempts||$runState==='canceled')?'canceled':'not_reached',default=>$state};
         if(in_array($state,['queued','waiting'],true))$state=in_array($runState,['failed','canceled','complete'],true)?'not_reached':'waiting';
         if($stage==='cleanup' && $state==='completed' && ($task['result']['itemState'] ?? '')==='skipped')$state='not_required';
         $explanation=$task['result']['message'] ?? (($task['blocked'] ?? '') ?: '');
@@ -76,4 +80,37 @@ function zfsas_operation_stages(array $tasks, string $runState, string $selected
         if($key===$selected){$slice=array_slice($rows,$offset,50);$page=['stage'=>$key,'rows'=>$slice,'total'=>count($rows),'offset'=>$offset,'previousOffset'=>$offset?max(0,$offset-50):null,'nextOffset'=>$offset+count($slice)<count($rows)?$offset+count($slice):null];}
     }
     return ['available'=>true,'stages'=>$summaries,'page'=>$page];
+}
+
+/** Show only recorded Auto work; absent mutations do not imply success. */
+function zfsas_auto_operation_stages(array $tasks,string $runState,string $selected,int $offset): array
+{
+    $groups=['policy'=>[],'cleanup'=>[],'snapshots'=>[]];
+    $labels=['policy'=>'Evaluate snapshot policy','cleanup'=>'Delete eligible snapshots','snapshots'=>'Create snapshots'];
+    foreach($tasks as $task){
+        $p=$task['parameters'] ?? [];
+        if(!empty($p['individualMutations']))$stage='policy';
+        elseif(!empty($p['autoMutation']))$stage=($p['autoMutation']['action'] ?? $p['autoMutation']['proposal']['action'] ?? '')==='delete'?'cleanup':'snapshots';
+        else continue;
+        $state=match($task['state']){'complete'=>'completed','retry_wait'=>'retry_scheduled','launching','running','stopping'=>'running','queued','waiting'=>in_array($runState,['failed','canceled','complete'],true)?'not_reached':'waiting',default=>$task['state']};
+        if($state==='completed'&&($task['result']['itemState'] ?? '')==='skipped')$state='not_required';
+        $groups[$stage][]=['dataset'=>$task['dataset'] ?? 'Configured datasets','state'=>$state,'attempts'=>(int)($task['attemptCount'] ?? 0),'message'=>zfsas_diagnostic_text($task['result']['message'] ?? '')];
+    }
+    $stages=[];$page=[];$offset=max(0,$offset);
+    foreach($groups as $key=>$rows){
+        $datasets=[];
+        foreach($rows as $row)$datasets[$row['dataset']][]=$row;
+        $rows=[];
+        foreach($datasets as $dataset=>$items){
+            $states=array_column($items,'state');$state='not_reached';
+            foreach(['failed','running','retry_scheduled','waiting','canceled','not_reached','completed','not_required'] as $candidate)if(in_array($candidate,$states,true)){$state=$candidate;break;}
+            $rows[]=['dataset'=>$dataset,'state'=>$state,'attempts'=>array_sum(array_column($items,'attempts')),
+                'message'=>count($items).' recorded steps. '.zfsas_diagnostic_text(implode(' ',array_slice(array_unique(array_filter(array_column($items,'message'))),0,2)),512)];
+        }
+        $counts=array_count_values(array_column($rows,'state'));$state='not_reached';
+        foreach(['failed','running','retry_scheduled','waiting','canceled','completed','not_required'] as $candidate)if(isset($counts[$candidate])){$state=$candidate;break;}
+        $stages[]=['id'=>$key,'label'=>$labels[$key],'state'=>$state,'datasets'=>count($rows),'counts'=>$counts];
+        if($selected===$key){$slice=array_slice($rows,$offset,50);$page=['stage'=>$key,'rows'=>$slice,'total'=>count($rows),'offset'=>$offset,'previousOffset'=>$offset?max(0,$offset-50):null,'nextOffset'=>$offset+count($slice)<count($rows)?$offset+count($slice):null];}
+    }
+    return ['available'=>true,'stages'=>$stages,'page'=>$page];
 }

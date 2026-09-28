@@ -11,7 +11,7 @@ function zfsas_diagnostic_text(string $text, int $limit=4096): string
 }
 function zfsas_operation_problem(array $tasks): ?array
 {
-    $failures=array_values(array_filter($tasks,static fn($t)=>$t['state']==='failed'));
+    $failures=array_values(array_filter($tasks,static fn($t)=>$t['state']==='failed' && empty($t['supersededBy'])));
     if (!$failures) return null;
     // A dependency that never ran is not the cause. Prefer the actual failed result.
     $task=$failures[0];$r=$task['result'] ?? [];$p=$task['parameters'] ?? [];
@@ -39,6 +39,9 @@ function zfsas_operation_problem(array $tasks): ?array
         'timeout'=>'Check that the source and destination pools are available, then start a fresh recovery review.',
         'configuration'=>'Review the current configuration before submitting new work.',
         default=>'Read this job’s diagnostic details and review recovery before retrying an interrupted transfer.'};
+    if (!empty($p['individualMutations']) || !empty($p['autoMutation'])) {
+        $next='Review the current snapshot settings and recorded results before starting another run. Completed mutations are retained.';
+    }
     return ['code'=>$code,'summary'=>$code==='interrupted_receive'?'An earlier transfer is unfinished at the destination.':zfsas_diagnostic_text($message),
         'nextAction'=>$next,'source'=>$r['blockedReceivers'][0]['source'] ?? $p['source'] ?? explode('@',$p['replication']['sourceSnapshot'] ?? $task['dataset'] ?? '')[0],
         'destination'=>$r['blockedReceivers'][0]['destination'] ?? $p['destination'] ?? $p['replication']['destination'] ?? $p['job']['destination'] ?? '',

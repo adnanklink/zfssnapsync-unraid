@@ -71,7 +71,7 @@
       }
       const phase=activity.querySelector('.ui-transfer-phase'),bar=activity.querySelector('progress'),message=activity.querySelector('.ui-transfer-message');
       const phaseText=active(op)?(op.phase || (op.blocked||[]).join(', ') || '').replaceAll('_',' '):'';
-      const messageText=active(op)&&op.type==='replication'?op.message || '':'';
+      const messageText=active(op)?op.message || '':'';
       if(phase.textContent!==phaseText)phase.textContent=phaseText;
       if(message.textContent!==messageText)message.textContent=messageText;
       phase.title=phaseText;message.title=messageText;
@@ -118,7 +118,7 @@
       if(op.logDownloadUrl){const link=document.createElement('a');link.className='btn';link.textContent='Download failure log';link.href=op.logDownloadUrl;logs.append(link);}
     }
   }
-  function open(id,trigger) {const op=snapshot.operations.find(item=>item.id===id);if(!op)return;if(selected!==id){detailLogPoll?.stop();stagePoll?.stop();$('operation-checklist')?.remove();$('operation-log-panel')?.remove();}selected=id;$('operation-action-message').textContent='';detail(op);ZfsasUI.open($('operation-detail'),trigger);if(op.coordinator&&op.type==='replication'&&!op.sourceCleanupOf)showChecklist(op);}
+  function open(id,trigger) {const op=snapshot.operations.find(item=>item.id===id);if(!op)return;if(selected!==id){detailLogPoll?.stop();stagePoll?.stop();$('operation-checklist')?.remove();$('operation-log-panel')?.remove();}selected=id;$('operation-action-message').textContent='';detail(op);ZfsasUI.open($('operation-detail'),trigger);if(op.coordinator&&['replication','auto'].includes(op.type)&&!op.sourceCleanupOf)showChecklist(op);}
   async function perform(op,action) {
     if(busy)return;
     if(action==='review_recovery'){ZfsasRecovery.open(op.nativeId,op.scheduleId);return;}
@@ -182,7 +182,7 @@
   function showChecklist(op) {
     stagePoll?.stop();
     let panel=$('operation-checklist');
-    if(!panel){panel=document.createElement('section');panel.id='operation-checklist';panel.innerHTML='<h3>Replication stages</h3><p data-panel-status role="status">Loading stages…</p><div data-stages></div>';$('operation-metadata').after(panel);}
+    if(!panel){panel=document.createElement('section');panel.id='operation-checklist';panel.innerHTML='<h3>Operation stages</h3><p data-panel-status role="status">Loading stages…</p><div data-stages></div>';$('operation-metadata').after(panel);}
     const url=base+'operation-detail.php?operation_id='+encodeURIComponent(op.id)+'&offset=0';
     const stateLabel=state=>({completed:'Completed',running:'Running',waiting:'Waiting',retry_scheduled:'Retry scheduled',failed:'Failed',canceled:'Canceled',not_reached:'Not reached',not_required:'Not required'}[state]||state);
     const icon=state=>({completed:'✓',failed:'!',running:'▶',canceled:'×',not_required:'—'}[state]||'○');
