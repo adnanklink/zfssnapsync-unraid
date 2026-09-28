@@ -68,10 +68,25 @@ def verify(root, report_path, package):
         raise ValueError('The agreed Unraid compatibility matrix is incomplete')
 
 
+def verify_experimental(root, report_path, package):
+    report = json.loads(report_path.read_text())
+    if report.get('status') != 'experimental' or report.get('hostAcceptance') != 'pending':
+        raise ValueError('Experimental release must explicitly disclose pending host acceptance')
+    if report.get('version') != (root / 'VERSION').read_text().strip():
+        raise ValueError('Experimental version mismatch')
+    if report.get('inputDigest') != input_digest(root) or report.get('packageSha256') != file_hash(package):
+        raise ValueError('Experimental record does not match current inputs and package')
+    if not report.get('releasePolicy'):
+        raise ValueError('Experimental release policy is required')
+    if 'experimental' not in (root / 'README.md').read_text().lower():
+        raise ValueError('README must label the experimental release')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--digest', action='store_true')
+    parser.add_argument('--allow-experimental', action='store_true')
     parser.add_argument('report', type=Path, nargs='?')
     parser.add_argument('package', type=Path, nargs='?')
     args = parser.parse_args()
@@ -80,6 +95,10 @@ def main():
         return
     if not args.report or not args.package:
         parser.error('report and package are required unless --digest is used')
+    if args.allow_experimental and json.loads(args.report.read_text()).get('status') == 'experimental':
+        verify_experimental(args.root, args.report, args.package)
+        print('Verified experimental release identity; host acceptance is pending')
+        return
     verify(args.root, args.report, args.package)
     print('Verified complete acceptance evidence for these exact release inputs and package bytes')
 

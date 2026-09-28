@@ -5,26 +5,24 @@ PASS / FAIL / NOT TESTED for each item, with the operation ID and relevant logs.
 This supplements [host acceptance](host-acceptance.md); one personal server cannot
 establish compatibility with every supported Unraid version.
 
-## Install the opt-in candidate
+## Install the experimental release
 
 In Unraid **Plugins → Install Plugin**, use:
 
 ```text
-https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/testing/zfs.snapsync.plg
+https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg
 ```
 
 Confirm version **2026.09.28.01** after activation. This installs the testing build
 of the existing SnapSync plugin, not a separate side-by-side plugin. Its update URL
-tracks the testing manifest. Normal installs still use the unchanged production
-manifest. Preserve configuration before installation; do not downgrade with active
+tracks main, which now distributes this experimental release. Preserve configuration before installation; do not downgrade with active
 work or assume an older coordinator can read the candidate's runtime journal.
 
 Package SHA-256:
 `bffb71cfb032cc6a1c007e6b8a39018e4c08911aa8835f4bd69631da4757243b`.
 Candidate metadata is in `dist/testing/candidate.json`. It is not a passing
-production acceptance certificate. GitHub's production-package check remains red
-while the old normal-update package differs from current source; it must pass with
-accepted artifacts before production promotion.
+production acceptance certificate. The release record explicitly declares pending host acceptance; production-ready
+promotion still requires complete evidence.
 
 ## Before starting
 

@@ -52,6 +52,29 @@ class AcceptanceGate(unittest.TestCase):
             with self.assertRaises(ValueError): gate.verify(root, report, package)
             self.assertNotEqual(data['inputDigest'], self.changed_input(root))
 
+    def test_experimental_is_explicit_and_not_production_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ['source', 'scripts', 'tests']:
+                (root / name).mkdir()
+            (root / 'VERSION').write_text('2026.09.28.01')
+            (root / 'zfs.snapsync.plg.in').write_text('fixture')
+            (root / 'README.md').write_text('Experimental release')
+            package = root / 'package.txz'
+            package.write_bytes(b'fixture')
+            report = root / 'report.json'
+            data = {'version': '2026.09.28.01', 'status': 'experimental',
+                    'hostAcceptance': 'pending', 'releasePolicy': 'Experimental main',
+                    'inputDigest': gate.input_digest(root), 'packageSha256': gate.file_hash(package)}
+            report.write_text(json.dumps(data))
+            gate.verify_experimental(root, report, package)
+            with self.assertRaises(ValueError): gate.verify(root, report, package)
+            for key, value in [('hostAcceptance', 'passed'), ('version', 'wrong'),
+                               ('inputDigest', 'wrong'), ('packageSha256', 'wrong'), ('releasePolicy', '')]:
+                invalid = dict(data, **{key: value})
+                report.write_text(json.dumps(invalid))
+                with self.assertRaises(ValueError): gate.verify_experimental(root, report, package)
+
     @staticmethod
     def changed_input(root):
         (root / 'source/worker').write_text('changed')

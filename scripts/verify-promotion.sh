@@ -29,4 +29,4 @@ assert len(files) == 1, 'Missing or duplicate package file'
 assert (files[0].findtext('MD5') or '').strip() == checksum, 'Package checksum mismatch'
 assert (files[0].findtext('URL') or '').strip() == base + '/' + pathlib.Path(package).name, 'Wrong package URL'
 PY
-python3 scripts/verify-acceptance.py "docs/releases/${version}.json" "$package"
+python3 scripts/verify-acceptance.py --allow-experimental "docs/releases/${version}.json" "$package"

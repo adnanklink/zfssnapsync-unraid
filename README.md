@@ -4,9 +4,9 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current testing release: `2026.09.26.02` · Requires Unraid 6.12.0 or newer**
+**Current experimental release: `2026.09.28.01` · Requires Unraid 6.12.0 or newer**
 
-This branch documents the **unreleased production-readiness candidate**. The normal installation URL still serves `2026.09.26.02`; it does not include these candidate changes. An opt-in `2026.09.28.01` testing package and targeted checklist are available in [personal Unraid testing](docs/personal-unraid-checklist.md). Local and SSH jobs now use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Dedicated-host acceptance and a 48-hour soak must pass before publication. See [readiness progress](docs/production-readiness.md).
+Main is the experimental release channel. Local and SSH jobs use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Automated verification has passed, but dedicated-host acceptance and the 48-hour soak remain incomplete. This release is available for normal use and issue reporting; it is not certified production-ready. See [known testing gaps](docs/host-acceptance.md) and the optional [testing checklist](docs/personal-unraid-checklist.md).
 
 ## Install and update
 
@@ -284,7 +284,7 @@ cd zfssnapsync-unraid
 
 Update `VERSION`, [CHANGELOG.md](CHANGELOG.md), and `zfs.snapsync.plg.in` for each release. The build verifies package contents and generates the manifest, package, and icon. Commit generated artifacts separately from source changes. Building or pushing source alone does not publish an installable update.
 
-Verification runs on pushes and pull requests. The candidate build workflow is manually dispatched; production promotion requires recorded host acceptance and never replaces an existing package version. Endpoint and ZFS tests require the documented disposable test environment; they use production-style paths and must not be run casually on a live Unraid host.
+Verification runs on pushes and pull requests. The candidate build workflow is manually dispatched; production-ready promotion requires recorded host acceptance; experimental main releases explicitly record pending acceptance and never replaces an existing package version. Endpoint and ZFS tests require the documented disposable test environment; they use production-style paths and must not be run casually on a live Unraid host.
 
 ## Support development
 

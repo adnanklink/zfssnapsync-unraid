@@ -2,7 +2,7 @@
 
 This is the remaining execution checklist, not a passing record. Use the exact
 candidate package on dedicated test machines. Do not use production datasets.
-The published plugin and release artifacts remain unchanged until this finishes.
+Main may publish explicitly labeled experimental builds before this finishes. These gates remain required before claiming production readiness.
 
 ## Required environment record
 

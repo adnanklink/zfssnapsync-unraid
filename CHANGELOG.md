@@ -3,7 +3,7 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
-## Unreleased production-readiness candidate
+## 2026.09.28.01 — Experimental (2026-09-28)
 
 - Add **Stop automation and clean up…** for retiring one dataset, reviewing source and destination history, and deleting destinations before the source. Keep held snapshots, other jobs, clones and interrupted receives protected; require explicit review of any retired recovery references.
 
@@ -12,7 +12,7 @@ It answers one question: "What changed for me?"
 - Track automatic snapshot creation and deletion individually. Continue eligible automatic work after settings change while preserving verified completed snapshots.
 - Recover recorded workers after a coordinator crash; keep updates blocked until local and remote shutdown is verified.
 - Show automatic operation stages and explicit receiver-shutdown waits. Keep superseded failures in history rather than current status.
-- Freeze verification inputs and add 10,000-task journal coverage. Publication still requires dedicated-host acceptance and a 48-hour soak.
+- Freeze verification inputs and add 10,000-task journal coverage. Published on main as experimental; dedicated-host acceptance and a 48-hour soak remain incomplete.
 
 ## Development releases
 

@@ -436,3 +436,14 @@ The complete stage-one suite passed at
 earlier combined retirement run now have passing focused reruns. This does not
 replace a clean final-candidate CI run or the outstanding dedicated-host release
 gates. The obsolete current-failure notice was removed from README.
+
+## Experimental main publication policy — 2026-09-28
+
+The maintainer explicitly chose to distribute the current candidate through main
+and gather feedback through ordinary use and GitHub issues. Main is experimental;
+host acceptance and the soak are pending, not passed or waived as evidence.
+Production-ready release verification retains its full acceptance requirements.
+Experimental promotion requires an explicit versioned record bound to package bytes
+and current verification inputs, alongside normal package and manifest validation.
+Version 2026.09.28.01 promotes the exact previously published testing package bytes;
+only the normal-channel manifest URLs change. Optional host checklists remain available.
