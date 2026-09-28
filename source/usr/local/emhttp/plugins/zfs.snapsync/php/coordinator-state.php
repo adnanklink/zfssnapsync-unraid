@@ -379,6 +379,11 @@ final class ZfsasCoordinatorState
         if ($run['state'] === 'canceling') {
             $task['state'] = 'canceled';
             $this->finishCancellation($run['id'], $now);
+        } elseif (!empty($task['parameters']['remoteOwnership'])) {
+            $task['state']='failed';$task['blocked']='recovery_required';
+            $task['result']=['outcome'=>'validation_failure','recoveryRequired'=>true,
+                'message'=>'Remote worker shutdown verified after interruption. Review the original receiver checkpoint before another transfer.'];
+            $this->settle($run['id'],$now);
         } elseif (!empty($run['upgradeReviewRequired'])) {
             $task['state'] = 'failed'; $task['blocked'] = 'recovery_required';
             $task['result'] = ['outcome' => 'validation_failure', 'recoveryRequired' => true,

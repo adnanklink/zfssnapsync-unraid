@@ -9,6 +9,9 @@ $members=zfsas_replication_membership($job,$read);
 check(array_column($members,'destination')===['backup/copy','backup/copy/child','backup/copy/child/deep'],'Membership lost ancestor order or exact receiver mapping');
 check($members[1]['sourceDatasetGuid']==='18446744073709551615','Large dataset GUID lost precision');
 check(count($calls)===2 && !array_filter($calls,fn($a)=>$a[0]!=='list'),'Capture mutated or repeatedly scanned inventory');
+$remoteJob=array_replace($job,['transport'=>'ssh','destination'=>'tank/root']);
+check(count(zfsas_replication_membership($remoteJob,$read))===3,'Remote membership confused identical dataset paths with local overlap');
+reject(fn()=>zfsas_replication_membership(array_replace($remoteJob,['transport'=>'local']),$read));
 reject(fn()=>zfsas_replication_membership(array_replace($job,['children'=>'0']),$read));
 foreach (["tank/root/child\t11\n","tank/root\t10\ntank/root/a/b\t12\n","tank/root\t10\ntank/root\t11\n","tank/root\t10\ntank/other\t11\n"] as $bad) {
  reject(fn()=>zfsas_replication_membership($job,fn()=>$bad));

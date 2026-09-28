@@ -22,8 +22,9 @@ final class ZfsasSshReceiverRead
         $probe=$this->execute(null,[]);
         $this->identity=['endpoint'=>ZfsasEndpointIdentity::receiver($probe['hostKey'],$probe['poolGuid'],$localPoolGuids),
             'hostKey'=>$probe['hostKey'],'poolGuid'=>$probe['poolGuid'],'pool'=>$pool,'connectionDigest'=>$binding,'bootId'=>$probe['bootId']];
-        if ($expected!==null && $this->identity!==$expected) {
-            throw new InvalidArgumentException('Verified SSH receiver identity changed; inspect it again.');
+        if ($expected!==null) {
+            $actual=$this->identity;ksort($actual,SORT_STRING);ksort($expected,SORT_STRING);
+            if ($actual!==$expected) {throw new InvalidArgumentException('Verified SSH receiver identity changed; inspect it again.');}
         }
     }
 

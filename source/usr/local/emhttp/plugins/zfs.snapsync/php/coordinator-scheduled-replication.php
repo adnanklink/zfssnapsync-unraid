@@ -28,7 +28,8 @@ function zfsas_coordinator_schedule_command(array $task, ZfsasCoordinatorState $
     $text=json_encode(['taskId'=>$task['id'],'parameters'=>$parameters],JSON_THROW_ON_ERROR);
     if(@file_get_contents($path)!==$text && (file_put_contents($path.'.pending',$text)!==strlen($text)||!rename($path.'.pending',$path))){throw new RuntimeException('Cannot publish scheduled task capture.');}
     return ['/bin/bash',__DIR__.'/../scripts/coordinator-schedule-attempt.sh',$path,
-        $parameters['source']??$parameters['job']['source'],$parameters['destination']??$parameters['job']['destination'],$parameters['phase']];
+        $parameters['source']??$parameters['job']['source'],$parameters['destination']??$parameters['job']['destination'],$parameters['phase'],
+        $parameters['transport'] ?? $parameters['job']['transport'] ?? 'local'];
 }
 
 function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array $job, array $config, int $occurrence, bool $manual=false, ?string $command=null): array

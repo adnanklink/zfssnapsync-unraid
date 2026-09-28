@@ -4,7 +4,9 @@
 require __DIR__.'/ssh_receiver_read.php';
 require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/replication-ssh-phase.php';
 require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/replication-recovery.php';
+require __DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php/replication-receiver-context.php';
 $ssh=server('replacement');
+file_put_contents('/usr/local/bin/zpool',"#!/bin/sh\nif [ \"\$1\" = list ]; then printf '111\\n'; else printf '789\\n'; fi\n");
 $stateFile=$root.'/phase.json';
 file_put_contents($stateFile,json_encode(['new'=>false,'received'=>false,'readonly'=>'off']));chmod($stateFile,0666);
 file_put_contents($root.'/phase-commands','');chmod($root.'/phase-commands',0666);
@@ -55,6 +57,10 @@ $attempts=[];
 try {
     $reader=new ZfsasSshReceiverRead($config,'backup');$identity=$reader->identity();
     $capture=['config'=>$config,'identity'=>$identity];
+    $context=zfsas_receiver_context(['transport'=>'ssh','destination'=>'backup/data'],$config);
+    check($context['capture']===$capture && $context['endpoint']===$identity['endpoint'],'Worker receiver context lost captured identity');
+    $canonical=$capture;ksort($canonical['identity'],SORT_STRING);
+    check(zfsas_receiver_context(['transport'=>'ssh','destination'=>'backup/data'],$config,$canonical)['capture']===$capture,'Persisted worker capture could not be revalidated');
     $request=['transport'=>'ssh','sourceSnapshot'=>'tank/source@next','sourceGuid'=>'200','destination'=>'backup/data','destinationGuid'=>'333'];
     $inspection=ZfsasReplicationInspection::inspect($request,null,[$reader,'read'],$identity['endpoint']);
     check($inspection['inspection']['mode']==='incremental','Remote common base was not selected');

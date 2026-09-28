@@ -6,6 +6,7 @@ require_once __DIR__.'/replication-snapshot.php';
 require_once __DIR__.'/replication-cleanup.php';
 require_once __DIR__.'/send-helpers.php';
 require_once __DIR__.'/replication-recovery.php';
+require_once __DIR__.'/replication-receiver-context.php';
 try{
     zfsas_coordinator_worker_report('progress',2,['phase'=>'scheduled_preparation','message'=>'Checking captured scheduled replication work.']);$sequence=3;
     $path=$argv[1]??'';$task=getenv('ZFSAS_TASK_ID');
@@ -19,7 +20,9 @@ try{
             $result=['outcome'=>'success','message'=>'Every captured replication member completed verification.'];
         }elseif($p['phase']==='replication_schedule'){
             $members=zfsas_replication_membership($p['job']);
-            $result=zfsas_recovery_preflight($p['job'],$members);
+            $context=zfsas_receiver_context($p['job'],$p['receiverConfig'] ?? []);
+            if ($context['capture']!==null) {$p['receiverCapture']=$context['capture'];}
+            $result=zfsas_recovery_preflight($p['job'],$members,$context['read']);
             if($result===null){
                 $plan=zfsas_replication_schedule_plan($p,null,$members);zfsas_replication_publish_plan($plan,$sequence);
                 $result=['outcome'=>'success','message'=>'Captured fixed dataset membership and scheduled child tasks.'];
@@ -27,21 +30,30 @@ try{
         }elseif($p['phase']==='replication_snapshot'){
             $result=zfsas_replication_snapshot($p);
         }elseif($p['phase']==='replication_member'){
+            $remote=isset($p['receiverCapture']);
+            $context=zfsas_receiver_context(['transport'=>$remote?'ssh':'local','destination'=>$p['destination']],$p['receiverCapture']['config'] ?? [],$p['receiverCapture'] ?? null);
+            $readReceiver=$context['read'];
             $request=['sourceSnapshot'=>$p['source'].'@'.$p['snapshotName'],'sourceGuid'=>$p['sourceGuid'],'destination'=>$p['destination']];
+            if ($context['capture']!==null) {$request['transport']='ssh';}
             $parent=substr($p['destination'],0,strrpos($p['destination'],'/'));
-            $names=explode("\n",trim(ZfsasReplicationInspection::command(['list','-H','-o','name','-r','-d','1','--',$parent])));
+            $names=explode("\n",trim($readReceiver(['list','-H','-o','name','-r','-d','1','--',$parent])));
             if(!in_array($parent,$names,true)){throw new RuntimeException('Receiver parent inventory is unavailable.');}
-            $identity=trim(ZfsasReplicationInspection::command(['get','-H','-p','-o','value','guid','--',in_array($p['destination'],$names,true)?$p['destination']:$parent]));
+            $identity=trim($readReceiver(['get','-H','-p','-o','value','guid','--',in_array($p['destination'],$names,true)?$p['destination']:$parent]));
             if(in_array($p['destination'],$names,true)){$request['destinationGuid']=$identity;}
             else{$request+=['createDestination'=>true,'destinationParentGuid'=>$identity];}
-            $result=ZfsasReplicationInspection::inspect($request);
+            $result=ZfsasReplicationInspection::inspect($request,null,$readReceiver,$context['endpoint']);
             if($result['outcome']==='success'){
                 if($result['inspection']['sourceDatasetGuid']!==$p['sourceDatasetGuid']){throw new InvalidArgumentException('Captured member dataset changed.');}
-                $plan=zfsas_replication_plan($request,$result['inspection'],$p['revision'],$p['rateLimit']);
+                $plan=zfsas_replication_plan($request,$result['inspection'],$p['revision'],$p['rateLimit'],$context['capture']);
                 if ($result['inspection']['mode']!=='already_received' && is_array($p['cleanupPolicy'] ?? null)) {
                     foreach (['space','transfer'] as $phase) { $plan['tasks'][$phase]['parameters']['freeSpaceFloor']=$p['cleanupPolicy']['freeSpaceFloor'] ?? '0G'; }
                     $plan['tasks']['space']['parameters']['cleanupPolicy']=$p['cleanupPolicy'];
-                    $cleanup=zfsas_replication_cleanup($request,$result['inspection'],$p['cleanupPolicy']);
+                    $cleanup=zfsas_replication_cleanup($request,$result['inspection'],$p['cleanupPolicy'],$readReceiver);
+                    if ($context['capture']!==null) {
+                        foreach($cleanup as &$cleanupTask) {
+                            $cleanupTask['parameters']+=['receiverCapture'=>$context['capture'],'remoteOwnership'=>true,'revision'=>$p['revision']];
+                        }unset($cleanupTask);
+                    }
                     $plan['tasks']['space']['dependencies']=array_keys($cleanup);
                     $plan['tasks']=$cleanup+$plan['tasks'];
                 }

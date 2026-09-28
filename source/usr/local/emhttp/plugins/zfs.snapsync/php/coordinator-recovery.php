@@ -50,7 +50,7 @@ function zfsas_recovery_status(ZfsasCoordinatorState $j,string $id,int $offset=0
         $r=$j->state['tasks'][$taskId]['result']['review'] ?? null;
         if(!$r)continue;
         if($r['eligible'])$eligible++;else $blocked++;
-        unset($r['request'],$r['inspection']);$rows[]=$r;
+        unset($r['request'],$r['inspection'],$r['receiverCapture']);$rows[]=$r;
     }
     $expires=$run['finishedAt']===null?null:$run['finishedAt']+300;
     return ['reviewId'=>$id,'state'=>$run['state'],'expiresAt'=>$expires,'expired'=>$expires!==null && time()>=$expires,
@@ -72,7 +72,7 @@ function zfsas_recovery_execute(ZfsasCoordinatorState $j,string $id,array $confi
         $r=$j->state['tasks'][$taskId]['result']['review'] ?? null;
         if(empty($r['eligible']))continue;
         $prefix='member-'.($index++).'-';
-        $plan=zfsas_replication_plan($r['request'],$r['inspection'],$config['revision'],$config['send']['SEND_RATE_LIMIT'] ?? '0');
+        $plan=zfsas_replication_plan($r['request'],$r['inspection'],$config['revision'],$config['send']['SEND_RATE_LIMIT'] ?? '0',$r['receiverCapture'] ?? null);
         foreach($plan['tasks'] as $name=>$task){
             $task['parameters']['reviewRunId']=$id;
             $task['parameters']['freeSpaceFloor']=$p['job']['threshold'];
@@ -92,5 +92,5 @@ function zfsas_recovery_command(array $task,ZfsasCoordinatorState $j,string $roo
     if(!is_dir(dirname($path)))mkdir(dirname($path),0700,true);
     $text=json_encode(['taskId'=>$task['id'],'parameters'=>$p],JSON_THROW_ON_ERROR);
     if(file_put_contents($path.'.pending',$text)!==strlen($text)||!rename($path.'.pending',$path))throw new RuntimeException('Cannot publish recovery worker input.');
-    return ['/bin/bash',__DIR__.'/../scripts/coordinator-recovery-attempt.sh',$path,$p['source'] ?? $p['job']['source'] ?? $task['dataset'],$p['destination'] ?? $p['job']['destination'] ?? $task['dataset']];
+    return ['/bin/bash',__DIR__.'/../scripts/coordinator-recovery-attempt.sh',$path,$p['source'] ?? $p['job']['source'] ?? $task['dataset'],$p['destination'] ?? $p['job']['destination'] ?? $task['dataset'],$p['transport'] ?? $p['job']['transport'] ?? 'local'];
 }

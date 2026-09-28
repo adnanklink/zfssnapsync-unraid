@@ -17,6 +17,12 @@ $rows="tank/root\t10\n";for($i=1;$i<26;$i++)$rows.="tank/root/c$i\t".(10+$i)."\n
 $parameters=['job'=>['source'=>'tank/root','destination'=>'backup/root','children'=>'1','transport'=>'local','id'=>'abcdef123456'],
  'revision'=>str_repeat('a',64),'rateLimit'=>'0','snapshotName'=>'snapsync-send-test','occurrence'=>100];
 $plan=zfsas_replication_schedule_plan($parameters,fn()=>$rows);$sequence=1;
+$remote=$parameters;$remote['job']['transport']='ssh';$remote['receiverCapture']=['config'=>['SEND_SSH_HOST'=>'receiver'],'identity'=>['endpoint'=>'ssh:'.str_repeat('a',64)]];
+$remotePlan=zfsas_replication_schedule_plan($remote,fn()=>$rows);
+foreach($remotePlan['tasks'] as $name=>$child) {
+ if($name==='verify-run')continue;
+ check($child['parameters']['receiverCapture']===$remote['receiverCapture'] && $child['parameters']['transport']==='ssh','Frozen child lost receiver identity or transport');
+}
 zfsas_replication_publish_plan($plan,$sequence);
 check($chunks===2&&count($j->state['tasks'])===54,'Bounded schedule graph not sealed completely');
 $j->result($task,$token,['outcome'=>'success'],1,1,true);

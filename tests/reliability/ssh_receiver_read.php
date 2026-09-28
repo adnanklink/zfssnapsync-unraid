@@ -88,6 +88,8 @@ try {
     check((new ZfsasSshReceiverRead($alias,'backup'))->identity()['endpoint']===$identity['endpoint'],'SSH alias created another storage identity');
     check((new ZfsasSshReceiverRead($config,'backup',['789']))->identity()['endpoint']==='local','Locally imported pool lost local identity');
     check((new ZfsasSshReceiverRead($config,'backup',[],$identity))->identity()===$identity,'Unchanged captured identity rejected');
+    $canonical=$identity;ksort($canonical,SORT_STRING);
+    check((new ZfsasSshReceiverRead($config,'backup',[],$canonical))->identity()===$identity,'Journal key ordering invalidated unchanged receiver identity');
     rejected(fn()=>new ZfsasSshReceiverRead($alias,'backup',[],$identity));
     // Exercise the delivered ownership helper over an actual SSH connection,
     // including local-client loss and an independent cancellation connection.

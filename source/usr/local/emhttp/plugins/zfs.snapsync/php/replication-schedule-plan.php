@@ -11,6 +11,9 @@ function zfsas_replication_schedule_plan(array $parameters, ?callable $read=null
         $common=$member+['revision'=>$parameters['revision'],'rateLimit'=>$parameters['rateLimit'],
             'snapshotName'=>$parameters['snapshotName'],'scheduleId'=>$parameters['job']['id'],
             'occurrence'=>(string)$parameters['occurrence'],'cleanupPolicy'=>$parameters['cleanupPolicy'] ?? null,'nativeSchedule'=>true];
+        if (isset($parameters['receiverCapture'])) {
+            $common['receiverCapture']=$parameters['receiverCapture'];$common['transport']='ssh';
+        }
         $tasks[$snapshot]=['kind'=>'auto','dataset'=>$member['source'],'parameters'=>$common+['phase'=>'replication_snapshot']];
         $dependencies=[$snapshot];
         if($member['source']!==$parameters['job']['source']){

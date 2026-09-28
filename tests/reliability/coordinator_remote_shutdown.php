@@ -36,6 +36,12 @@ for($i=0;$i<5;$i++){$executor->tick(hrtime(true)/1e9);}
 check($journal->state['tasks'][$other['runId'].':work']['attempt']===null,'Recovery issued a grant before receiver shutdown');
 $verified=true;drive($executor,fn()=>$journal->state['runs'][$receipt['runId']]['state']==='canceled');
 drive($executor,fn()=>$journal->state['runs'][$other['runId']]['state']==='complete');
+// A recovered remote attempt requires a fresh review even after proven stop.
+$receipt=$journal->submit('remote-interrupted',['tasks'=>['send'=>['kind'=>'send','parameters'=>['remoteOwnership'=>true,'sleep'=>'60']]]],time());
+$id=$receipt['runId'].':send';drive($executor,fn()=>$journal->state['tasks'][$id]['state']==='running');
+unset($executor);$executor=new ZfsasCoordinatorExecutor($journal,$root,$root.'/runtime',$command,$outcome,[],null,$probe);
+drive($executor,fn()=>$journal->state['runs'][$receipt['runId']]['state']==='failed');
+check($journal->state['tasks'][$id]['result']['recoveryRequired']===true && $journal->state['tasks'][$id]['attempt']===null,'Remote interruption was automatically retried after shutdown');
 // An absent remote adapter is not interpreted as a successful shutdown.
 unset($executor);$executor=new ZfsasCoordinatorExecutor($journal,$root,$root.'/runtime',$command,$outcome);
 $receipt=$journal->submit('missing-adapter',['tasks'=>['send'=>['kind'=>'send','parameters'=>['remoteOwnership'=>true]]]],time());

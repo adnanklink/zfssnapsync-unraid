@@ -5,14 +5,15 @@ require_once __DIR__.'/replication-inspection.php';
 function zfsas_replication_membership(array $job, ?callable $read=null): array
 {
     if (!is_string($job['source'] ?? null) || !is_string($job['destination'] ?? null)
-        || !in_array($job['children'] ?? '0',['0','1'],true) || ($job['transport'] ?? 'local') !== 'local') {
-        throw new InvalidArgumentException('Invalid local replication membership request.');
+        || !in_array($job['children'] ?? '0',['0','1'],true) || !in_array($job['transport'] ?? 'local',['local','ssh'],true)) {
+        throw new InvalidArgumentException('Invalid replication membership request.');
     }
     $source=$job['source'];$destination=$job['destination'];$recursive=($job['children'] ?? '0')==='1';
-    ZfsasReplicationInspection::validate(['sourceSnapshot'=>$source.'@probe','sourceGuid'=>'0','destination'=>$destination]);
+    $transport=$job['transport'] ?? 'local';
+    ZfsasReplicationInspection::validate(['sourceSnapshot'=>$source.'@probe','sourceGuid'=>'0','destination'=>$destination,'transport'=>$transport]);
     $read ??= [ZfsasReplicationInspection::class,'command'];
     $query=array_merge(['list','-H','-p','-o','name,guid','-t','filesystem,volume'],$recursive ? ['-r'] : ['-d','0'],['--',$source]);
-    $parse=static function(string $text)use($source,$destination,$recursive):array {
+    $parse=static function(string $text)use($source,$destination,$recursive,$transport):array {
         if (strlen($text)>8*1048576) { throw new RuntimeException('Source membership exceeds the output limit.'); }
         $rows=[];
         foreach (explode("\n",rtrim($text,"\n")) as $line) {
@@ -22,7 +23,7 @@ function zfsas_replication_membership(array $job, ?callable $read=null): array
                 throw new RuntimeException('Incomplete or conflicting replication membership.');
             }
             $target=$destination.substr($fields[0],strlen($source));
-            ZfsasReplicationInspection::validate(['sourceSnapshot'=>$fields[0].'@probe','sourceGuid'=>'0','destination'=>$target]);
+            ZfsasReplicationInspection::validate(['sourceSnapshot'=>$fields[0].'@probe','sourceGuid'=>'0','destination'=>$target,'transport'=>$transport]);
             $rows[$fields[0]]=['source'=>$fields[0],'sourceDatasetGuid'=>$fields[1],'destination'=>$target];
             if (count($rows)>10000) { throw new InvalidArgumentException('Replication membership exceeds 10,000 datasets.'); }
         }
