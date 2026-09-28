@@ -18,5 +18,12 @@ try{
  unlink($root.'/attempts/test/owner.json');
  $journal=new ZfsasCoordinatorState($root);$receipt=$journal->submit('queued',['tasks'=>['send'=>['kind'=>'send']]],time());unset($journal);
  $before=ZfsasCoordinatorState::readCommitted($root);zfsas_lifecycle_idle($root);check(ZfsasCoordinatorState::readCommitted($root)===$before,'Idle inspection changed queued work or receipts');
+ $journal=new ZfsasCoordinatorState($root);
+ $remote=$journal->submit('remote-unverified',['tasks'=>['send'=>['kind'=>'send','parameters'=>['remoteOwnership'=>true]]]],time())['runId'].':send';
+ $token=$journal->claim($remote,1,time(),'fixture');$journal->started($remote,$token,999999999,'1');unset($journal);
+ blocked($root);
+ $before=ZfsasCoordinatorState::readCommitted($root);zfsas_lifecycle_idle($root,false,true);
+ check(ZfsasCoordinatorState::readCommitted($root)===$before,'Recovery startup inspection changed captured ownership');
+ try {zfsas_lifecycle_idle($root,true,true);throw new LogicException('Settled refresh accepted unverified receiver');}catch(RuntimeException $e){}
  echo "PASS: complete process groups, surviving pipeline children, reused identity rejection, no worker signals, queued journal preserved\n";
 }finally{if($proc){proc_terminate($proc,9);proc_close($proc);}if($leader)foreach(ZfsasCoordinatorExecutor::members($leader['pid'],$leader['start'])??[] as $member)posix_kill($member['pid'],9);}

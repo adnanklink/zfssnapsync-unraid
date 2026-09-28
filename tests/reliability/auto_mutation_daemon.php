@@ -115,6 +115,15 @@ try {
     file_put_contents('/tmp/auto-zfs.json',json_encode($initial));file_put_contents('/tmp/block-auto-mutation','1');
     $receipt=rpc(['action'=>'auto','commandId'=>'cancel-individual-auto']);
     until(fn()=>is_file('/tmp/auto-mutation-entered'));
+    if(!empty($crashRecovery)) {
+        proc_terminate($daemon,9);proc_close($daemon);$daemon=null;
+        $restart=proc_open([PHP_BINARY,$plugin.'/coordinator-lifecycle.php','watchdog'],[1=>['file','/tmp/auto-restart.log','a'],2=>['file','/tmp/auto-restart.log','a']],$pipes);
+        check(proc_close($restart)===0,'Watchdog could not recover recorded workers: '.@file_get_contents('/tmp/auto-restart.log'));
+        until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $r)if($r['id']===$receipt['runId'])return $r['state']==='failed';return false;});
+        check(json_decode(file_get_contents('/tmp/auto-zfs.json'),true)['mutations']===[],'Watchdog replayed or released an interrupted automatic mutation');
+        echo "PASS: actual watchdog restarts after coordinator loss, retains operation history, revokes recorded workers and requires fresh review without replay\n";
+        return;
+    }
     rpc(['action'=>'cancel','runId'=>$receipt['runId']]);
     until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $r)if($r['id']===$receipt['runId'])return $r['state']==='canceled';return false;});
     check(json_decode(file_get_contents('/tmp/auto-zfs.json'),true)['mutations']===[],'Canceled Auto child mutated storage');
@@ -136,4 +145,10 @@ try {
     until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $r)if($r['id']===$receipt['runId'])return $r['state']==='failed';return false;});
     check(json_decode(file_get_contents('/tmp/auto-zfs.json'),true)['mutations']===[],'Orphaned policy approval allowed a mutation');
     echo "PASS: actual automatic policy and daemon, individual shared deletion and snapshot tasks, ordering, identities, lifecycle draining, Dry Run, child cancellation and revoked orphan authority\n";
-} finally {proc_terminate($daemon);proc_close($daemon);}
+} finally {
+    if(is_resource($daemon)){proc_terminate($daemon);proc_close($daemon);}
+    elseif(!empty($crashRecovery)) {
+        $owner=json_decode((string)@file_get_contents('/var/run/zfs-snapsync-coordinator/owner.json'),true);
+        if($owner)posix_kill($owner['pid'],15);
+    }
+}

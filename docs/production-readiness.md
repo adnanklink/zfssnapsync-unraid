@@ -14,7 +14,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 6. SSH cleanup parity | Complete in fixtures; real-SSH/coordinator checks and 39-suite regression run passed; host acceptance remains separate |
 | 7. Individual Auto Snapshot mutation tasks | Implemented; policy, actual-daemon, cancellation and lifecycle fixtures pass; full regression run in progress |
 | 8. Safe partial automatic replanning | Implemented; state and actual-daemon continuation/identity regressions pass |
-| 9. Lifecycle and reboot compatibility | Pending |
+| 9. Lifecycle and reboot compatibility | Complete in fixtures; actual watchdog/installer regressions pass; Unraid platform acceptance remains separate |
 | 10. Operational UI feedback | Pending |
 | 11. Fault, flash-write and scale acceptance | Pending |
 | 12. Documentation, screenshots and release preparation | Pending |
@@ -269,3 +269,21 @@ immediately after snapshot creation: the original operation continues and create
 only the newly selected dataset's checkpoint. A changed completed checkpoint GUID
 stops continuation before another mutation. Reliability regressions pass; dedicated
 host acceptance and the final combined verification remain release gates.
+
+## Task 9 lifecycle and recovery startup
+
+Package replacement continues to require idle, verified local and remote ownership.
+An unverified receiver blocks preparation even when its local SSH group has exited.
+When the daemon itself has died, watchdog/activation may restart the coordinator
+with intact recorded ownership so its executor can revoke grants and verify shutdown.
+That exception neither replaces the package nor adopts unknown legacy processes;
+PID/start identity mismatches and unrecorded workers remain blockers. The lifecycle
+inspector itself never signals workers or rewrites journal authority.
+
+An actual watchdog test kills the coordinator while an individual Auto deletion
+is blocked. Restart revokes the recorded driver/child, preserves operation history,
+and requires fresh review without mutation replay. Lifecycle ownership tests cover
+surviving descendants, reused identities, unverified receiver shutdown and unchanged
+queued receipts. Coordinator and installer compatibility suites pass. Existing
+Auto tests cover complete RAM loss and preserved pause/Resume decisions. Real
+Unraid 6.12.0 and stable 7.x installation/reboot verification remains task 13.

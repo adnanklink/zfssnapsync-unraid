@@ -15,6 +15,7 @@ IMAGE = os.environ.get('SNAPSYNC_TEST_IMAGE', 'snapsync-test-runtime:production-
 ISOLATED = [
     'attention_endpoints.php', 'batch_endpoints.php', 'coordinator_auto.php', 'auto_mutation_daemon.php', 'auto_partial_replan_daemon.php',
     'auto_partial_identity_daemon.php',
+    'auto_watchdog_recovery.php',
     'coordinator_batch_cancel_endpoint.php', 'coordinator_batch_recovery.php',
     'coordinator_compatibility.php', 'coordinator_delete_adapter.php',
     'coordinator_replan_daemon.php', 'coordinator_schedule_cancel.php',

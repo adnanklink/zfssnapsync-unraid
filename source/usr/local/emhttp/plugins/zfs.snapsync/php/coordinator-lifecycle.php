@@ -6,23 +6,39 @@ require_once __DIR__.'/coordinator-executor.php';
 require_once __DIR__.'/send-queue-helpers.php';
 
 /** Never signal a worker. Scan recorded groups, including leaders already gone. */
-function zfsas_lifecycle_idle(string $root, bool $settled=false): void
+function zfsas_lifecycle_idle(string $root, bool $settled=false, bool $recoverRecorded=false): void
 {
     $state=ZfsasCoordinatorState::readCommitted($root);
+    $recoveringMembers=[];
     foreach (glob($root.'/attempts/*/owner.json') as $path) {
         $token=basename(dirname($path));
         if (($state['attempts'][$token]['state'] ?? '')==='stopped') continue;
         $owner=json_decode((string)file_get_contents($path),true);
         if (!is_array($owner) || !isset($owner['pid'],$owner['start'])) throw new RuntimeException('Incomplete worker ownership; refresh blocked.');
         $members=ZfsasCoordinatorExecutor::members((int)$owner['pid'],(string)$owner['start']);
+        $attempt=$state['attempts'][$token] ?? null;
+        if($recoverRecorded && !$settled && $attempt && isset($state['tasks'][$attempt['taskId']])
+            && $attempt['pid']===$owner['pid'] && $attempt['start']===$owner['start'] && $members!==null) {
+            foreach($members as $member)$recoveringMembers[$member['pid']]=true;
+            continue;
+        }
         if ($members===null || $members) throw new RuntimeException('A worker process group is active or its ownership changed. Retry after work finishes.');
     }
     // Also check journal evidence when an attempt directory has disappeared.
     foreach ($state['attempts'] ?? [] as $attempt) {
         if (($attempt['state'] ?? '')==='stopped') continue;
         if ($settled) throw new RuntimeException('Waiting for the coordinator to commit attempt completion; retry after work finishes.');
+        $task=$state['tasks'][$attempt['taskId']] ?? null;
+        if($task && !empty($task['parameters']['remoteOwnership']) && !$recoverRecorded) {
+            throw new RuntimeException('Receiver shutdown is unverified; restart the coordinator to recover ownership before replacing the package.');
+        }
+        if($recoverRecorded && $task && empty($attempt['pid']))continue;
         if (empty($attempt['pid'])) throw new RuntimeException('An attempt is starting; retry after work finishes.');
         $members=ZfsasCoordinatorExecutor::members((int)$attempt['pid'],(string)$attempt['start']);
+        if($recoverRecorded && $task && $members!==null) {
+            foreach($members as $member)$recoveringMembers[$member['pid']]=true;
+            continue;
+        }
         if ($members===null || $members) throw new RuntimeException('Recorded workers remain active; refresh pending.');
     }
     foreach(array_merge(glob('/tmp/zfs-snapsync-ops/jobs/*.job'),glob('/boot/config/plugins/zfs.snapsync/ops_queue/jobs/*.job')) as $path){
@@ -35,7 +51,7 @@ function zfsas_lifecycle_idle(string $root, bool $settled=false): void
     }
     // Legacy launchers have no coordinator grants. Fail closed while any exist.
     foreach (glob('/proc/[0-9]*/cmdline') as $path) {
-        $pid=(int)basename(dirname($path)); if($pid===getmypid()) continue;
+        $pid=(int)basename(dirname($path)); if($pid===getmypid() || isset($recoveringMembers[$pid])) continue;
         $args=explode("\0",(string)@file_get_contents($path));
         foreach (array_slice($args,0,3) as $arg) {
             if(preg_match('~^/usr/local/emhttp/plugins/zfs[.]snapsync/(?:php/snapshot-batch-worker[.]php|scripts/coordinator-[a-z-]*attempt[.]sh)$~D',$arg))throw new RuntimeException('A legacy worker is active; retry after work finishes.');
@@ -111,7 +127,10 @@ function zfsas_lifecycle(string $mode): void
             do { usleep(50000);$unowned=flock($ownerLock,LOCK_EX|LOCK_NB); } while(!$unowned && microtime(true)<$deadline);
             if(!$unowned) throw new RuntimeException('Coordinator still owns its lock; refresh blocked.');
         }
-        zfsas_lifecycle_idle($root);
+        // Restarting an unowned service lets its executor revoke recorded grants
+        // and verify complete local/remote shutdown. Package replacement never
+        // takes this exception, and unrecorded legacy workers remain blockers.
+        zfsas_lifecycle_idle($root,false,$mode!=='prepare');
         if($mode==='prepare') return; // Maintenance remains until explicit activation.
         if($mode==='activate' && is_file($maintenance) && !unlink($maintenance)) throw new RuntimeException('Cannot release installation maintenance.');
         flock($ownerLock,LOCK_UN);fclose($ownerLock);
