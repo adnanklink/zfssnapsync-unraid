@@ -24,7 +24,10 @@ Read-only flash suites mount `tests/runtime/boot` at `/boot:ro`. This fixture
 configures one fake Auto Snapshot dataset with scheduling disabled; the tests
 cannot initialize or change flash configuration.
 `zfs` and `all` additionally require an image with compatible ZFS userland,
-`/dev/zfs`, and `ZFSAS_DISPOSABLE_POOL_TEST=1`. Run them only on the dedicated
+`/dev/zfs`, `ZFSAS_DISPOSABLE_POOL_TEST=1`, and an existing absolute
+`ZFSAS_POOL_FIXTURE_ROOT` dedicated to disposable file vdevs. The runner mounts a
+unique subdirectory at the same host/container path for each suite and records
+it in the report. Failed fixtures remain available for GUID-checked cleanup. Run them only on the dedicated
 acceptance host: containers share its ZFS kernel. The fixtures create uniquely
 named file-backed pools and must leave none behind. A missing prerequisite is a
 failure, never a successful skip. Host/SSH and soak acceptance remain separate

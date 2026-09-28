@@ -71,6 +71,12 @@ def main():
         parser.error('No matching suites')
     if any(profile == 'zfs' for profile, _ in jobs) and os.environ.get('ZFSAS_DISPOSABLE_POOL_TEST') != '1':
         parser.error('Real ZFS requires ZFSAS_DISPOSABLE_POOL_TEST=1 on a dedicated disposable-pool host.')
+    pool_root = None
+    if any(profile == 'zfs' for profile, _ in jobs):
+        configured = os.environ.get('ZFSAS_POOL_FIXTURE_ROOT', '')
+        if not configured or not Path(configured).is_absolute() or not Path(configured).is_dir():
+            parser.error('Real ZFS requires an existing absolute ZFSAS_POOL_FIXTURE_ROOT on the dedicated host.')
+        pool_root = Path(configured).resolve()
     image_id = subprocess.check_output(['docker', 'image', 'inspect', IMAGE, '--format', '{{.Id}}'], text=True).strip()
     output = (args.output or Path('/tmp') / ('snapsync-tests-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:6])).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -95,8 +101,13 @@ def main():
             flags += ['-v', str(input_root / 'tests/runtime/boot') + ':/boot:ro']
         if profile in ('mount', 'zfs'):
             flags += ['--cap-add', 'SYS_ADMIN', '--security-opt', 'apparmor=unconfined']
+        fixture_root = None
         if profile == 'zfs':
-            flags += ['--device', '/dev/zfs', '-e', 'ZFSAS_DISPOSABLE_POOL_TEST=1']
+            # ZFS opens file vdev paths in the host kernel's namespace.
+            fixture_root = Path(tempfile.mkdtemp(prefix='snapsync-pools-', dir=pool_root))
+            flags += ['--device', '/dev/zfs', '-e', 'ZFSAS_DISPOSABLE_POOL_TEST=1',
+                      '-e', 'ZFSAS_POOL_FIXTURE_ROOT=' + str(fixture_root),
+                      '-v', str(fixture_root) + ':' + str(fixture_root)]
         log = output / ('%02d-%s.log' % (index + 1, Path(command[-1]).stem))
         started = time.monotonic()
         print('RUN ' + ' '.join(command), flush=True)
@@ -111,7 +122,10 @@ def main():
         finally:
             subprocess.run(['docker', 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         report['results'].append({'command': command, 'profile': profile, 'exitCode': code,
-                                  'seconds': round(time.monotonic() - started, 2), 'log': log.name})
+                                  'seconds': round(time.monotonic() - started, 2), 'log': log.name,
+                                  'poolFixtureRoot': str(fixture_root) if fixture_root else None})
+        if fixture_root and code == 0 and not any(fixture_root.iterdir()):
+            fixture_root.rmdir()
         (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
         print(('PASS' if code == 0 else 'FAIL (%s)' % code) + ' ' + str(log), flush=True)
         if code:
