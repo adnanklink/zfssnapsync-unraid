@@ -1,7 +1,7 @@
 const {chromium}=require('/opt/zfsas-tests/node_modules/playwright-core');const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');
 const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.snapsync');
 (async()=>{const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{for(const width of [1440,390]){
- const page=await browser.newPage({viewport:{width,height:900}});let submitted=0,fail=true,deleted=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:{width,height:900}});let submitted=0,fail=true,deleted=false,inspected=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const session={token:'a'.repeat(32),dataset:'tank/data',auto:true,jobs:[{source:'tank/data',destination:'backup/data',transport:'local'}],targets:[{dataset:'tank/data',role:'source',transport:'local'},{dataset:'backup/data',role:'destination',transport:'local'}],conflicts:[],busy:[]};
  await page.route('http://retire.test/**',async route=>{const url=new URL(route.request().url());let payload={ok:true};
  if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:execFileSync('php',['-r','$_GET["section"]="snapshots";require $argv[1];',plugin+'/php/workspace.php'],{encoding:'utf8'})});
@@ -10,6 +10,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
  if(url.pathname.endsWith('dataset-inventory.php'))payload.datasets=[{dataset:'tank/data',pool:'tank',snapshotCount:0}];
  else if(url.pathname.endsWith('snapshot-manager-dataset.php'))Object.assign(payload,{dataset:'tank/data',snapshots:[],matching:0,total:0,page:1,pages:1});
  else if(url.pathname.endsWith('dataset-retirement.php')){const body=route.request().method()==='GET'?url.searchParams:new URLSearchParams(route.request().postData());const action=body.get('action');payload={ok:true,...session};
+ if(action==='inspect'){inspected++;if(inspected>1)assert.deepEqual(JSON.parse(body.get('destinations')),[{dataset:'backup/data',transport:'local'}]);}
  if(action==='stop'){if(fail){fail=false;payload={ok:false,error:'Settings changed. Inspect retirement again.'};}else Object.assign(payload,{saved:true,schedulerApplied:true,message:'Automation stopped.'});}
  if(action==='status')Object.assign(payload,{run:{state:'complete'},...(deleted?{deleteRun:'run-done'}:{}),total:10000,eligible:9999,selected:9998,tasks:[],rows:[{key:'1'.repeat(64),snapshot:'tank/data@auto-one',role:'source',transport:'local',selected:true,reason:''},{key:'2'.repeat(64),snapshot:'backup/data@send-held',role:'destination',transport:'local',selected:false,reason:'Snapshot is held.'}]});
  if(action==='submit'){submitted++;assert.equal(body.get('confirm'),'1');assert.deepEqual(JSON.parse(body.get('excluded')),['1'.repeat(64)]);deleted=true;Object.assign(payload,{deleteRun:'run-done'});}
