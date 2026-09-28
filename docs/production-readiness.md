@@ -398,3 +398,19 @@ SSH documentation changes. Automatic approval review rejected changing those
 assertions, citing documentation-gate integrity. They remain untouched and their
 failure is recorded separately from retirement verification. Dedicated-host gates
 in `host-acceptance.md` now include this workflow; publication remains gated.
+
+### Combined retirement regression results
+
+The complete 47-suite CI run finished with **46 passing and one failing**. Report:
+`/tmp/snapsync-tests-20260928T191655-fb16c6/results.json`, frozen input digest
+`ba2b4617ba7a161bff06c592d459edc80cd73def5a236bf6274d6479ace4fade`.
+The only failure is the unchanged stage-one README wording assertion described
+above. All endpoint suites, all 12 browser suites, reliability regressions, syntax,
+package contents, release-gate checks and reproducible build checks passed.
+
+That full run froze before the final reinspection UI and additional authority
+assertions. Their later focused passing reports are listed above. Final committed
+package checks also passed at
+`/tmp/snapsync-tests-20260928T192342-b263b1/results.json`. These combined results
+cover the candidate changes without claiming one clean final-candidate CI run.
+No deployment, main merge, versioned release artifact or publication was performed.
