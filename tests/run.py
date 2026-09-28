@@ -16,7 +16,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = os.environ.get('SNAPSYNC_TEST_IMAGE', 'snapsync-test-runtime:production-readiness')
 ISOLATED = [
-    'attention_endpoints.php', 'batch_endpoints.php', 'coordinator_auto.php', 'auto_mutation_daemon.php', 'auto_partial_replan_daemon.php',
+    'retirement_daemon.php', 'retirement_ssh_daemon.php', 'attention_endpoints.php', 'batch_endpoints.php', 'coordinator_auto.php', 'auto_mutation_daemon.php', 'auto_partial_replan_daemon.php',
     'auto_partial_identity_daemon.php',
     'auto_watchdog_recovery.php',
     'coordinator_batch_cancel_endpoint.php', 'coordinator_batch_recovery.php',
