@@ -64,9 +64,15 @@ final class ZfsasReplicationInspection
         return self::boundedCommand('zpool',$arguments);
     }
 
-    private static function boundedCommand(string $program,array $arguments): string
+    public static function autoMutation(string $action,string $snapshot): void
     {
-        $process = proc_open(array_merge(['/usr/bin/timeout','--foreground','--signal=TERM','--kill-after=2','15',$program], $arguments),
+        if(!in_array($action,['snapshot','destroy'],true))throw new InvalidArgumentException('Unsupported Auto mutation.');
+        self::boundedCommand('zfs',[$action,'--',$snapshot],120);
+    }
+
+    private static function boundedCommand(string $program,array $arguments,int $timeout=15): string
+    {
+        $process = proc_open(array_merge(['/usr/bin/timeout','--foreground','--signal=TERM','--kill-after=2',(string)$timeout,$program], $arguments),
             [0=>['file','/dev/null','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes);
         if (!is_resource($process)) { throw new RuntimeException('Unable to start ZFS inspection.'); }
         foreach ($pipes as $pipe) { stream_set_blocking($pipe, false); }

@@ -39,6 +39,12 @@ function zfsas_coordinator_prune_artifacts(ZfsasCoordinatorState $journal, strin
         $id=basename($path,'.remote-delete.json');
         if (preg_match('/^[a-f0-9]{64}$/D',$id) && !isset($inputs[$id])) { @unlink($path); }
     }
+    $autoInputs=[];
+    foreach($journal->state['tasks'] as $task)if(isset($task['parameters']['autoMutation']))$autoInputs[hash('sha256',$task['id'])]=true;
+    foreach(glob($root.'/attempt-inputs/*.auto.json') ?: [] as $path) {
+        $id=basename($path,'.auto.json');
+        if(preg_match('/^[a-f0-9]{64}$/D',$id) && !isset($autoInputs[$id]))@unlink($path);
+    }
     foreach (glob($root . '/attempt-inputs/*.job.pressure.json') ?: [] as $path) {
         $id = basename($path, '.job.pressure.json');
         if (preg_match('/^[a-f0-9]{64}$/D', $id) && !isset($inputs[$id])) { @unlink($path); }

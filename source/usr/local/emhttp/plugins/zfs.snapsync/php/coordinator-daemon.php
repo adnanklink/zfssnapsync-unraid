@@ -56,7 +56,11 @@ $submitAuto = static function (string $commandId, bool $manual, ?int $occurrence
 };
 $command = static function (array $task) use ($root, $configDir, $journal, $deletion): ?array {
     clearstatcache();
-    if (is_file($configDir . '/maintenance') || is_file('/var/run/zfs-snapsync-coordinator/refresh.json')) { return null; }
+    // A draining policy driver must finish its already-owned child handoff.
+    // No unrelated work gains admission through the lifecycle barrier.
+    $autoChild=isset($task['parameters']['autoMutation']) && $journal->autoMutationParentLive($task);
+    if (!$autoChild && (is_file($configDir . '/maintenance') || is_file('/var/run/zfs-snapsync-coordinator/refresh.json'))) { return null; }
+    if(isset($task['parameters']['autoMutation']) && $task['kind']!=='delete') {return zfsas_coordinator_auto_mutation_command($task,$journal,$root,zfsas_config_revision($configDir));}
     if (str_starts_with($task['parameters']['phase'] ?? '', 'recovery_')) { return zfsas_recovery_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (in_array($task['parameters']['phase'] ?? '',['replication_schedule','replication_snapshot','replication_member','replication_run_verify'],true)) { return zfsas_coordinator_schedule_command($task,$journal,$root,zfsas_config_revision($configDir)); }
     if (str_starts_with($task['parameters']['phase'] ?? '', 'source_retention_')) { return zfsas_coordinator_source_command($task,$journal,$root,zfsas_config_revision($configDir)); }
@@ -89,6 +93,8 @@ $command = static function (array $task) use ($root, $configDir, $journal, $dele
     return zfsas_coordinator_auto_command($journal, $task, $pair, $root);
 };
 $outcome = static function ($task, $code) use ($configDir, $journal): array {
+    if(isset($task['parameters']['autoMutation'])) {return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Automatic mutation stopped without a verified result. Review before another run.'];}
+    if(!empty($task['parameters']['individualMutations']) && $code!==0) {return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Automatic policy run stopped. Completed mutations are preserved; review the remaining work.'];}
     if (!empty($task['parameters']['nativeSchedule'])) { return ['outcome'=>'transient_failure','message'=>'Scheduled task stopped without an explicit outcome.']; }
     if (in_array($task['kind'], ['send','finalize'],true)) { return ['outcome'=>'transient_failure','recoveryRequired'=>true,'message'=>'Native replication stopped without an explicit result.']; }
     if ($task['kind'] === 'prepare') { return ['outcome'=>'transient_failure','message'=>'Inspection stopped without an explicit result.']; }
@@ -115,6 +121,7 @@ foreach ($journal->state['runs'] as $run) {
 $handler = static function (array $request) use ($journal, $executor, $submitAuto, $loadConfig, $deletion, $service, &$config): array {
     $action = $request['action'] ?? '';
     if ($action === 'handshake') { return $service; }
+    if ($action === 'auto_mutation_status') {return $executor->autoMutationStatus($request);}
     if ($action==='recovery_status') return zfsas_recovery_status($journal,(string)($request['reviewId'] ?? ''),(int)($request['offset'] ?? 0));
     if (in_array($action,['review_recovery','retry_reviewed'],true)) {
         if(!$loadConfig())throw new InvalidArgumentException('Configuration save is in progress. Retry the same request.');

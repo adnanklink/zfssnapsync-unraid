@@ -90,6 +90,11 @@ final class ZfsasCoordinatorExecutor
         return $this->journal->workerReport($request, $this->generation, time());
     }
 
+    public function autoMutationStatus(array $request): array
+    {
+        return $this->journal->autoMutationStatus($request,$this->generation);
+    }
+
     private function receiverShutdownVerified(array $task, array $attempt): bool
     {
         if (empty($task['parameters']['remoteOwnership'])) { return true; }
@@ -137,6 +142,12 @@ final class ZfsasCoordinatorExecutor
             if ($attempt['state'] === 'stopped') { continue; }
             $taskId = $attempt['taskId']; $task = $this->journal->state['tasks'][$taskId];
             if ($task['attempt'] !== $token) { continue; }
+            if(isset($task['parameters']['autoMutation']) && empty($task['parameters']['sharedCleanup'])
+                && !$this->journal->autoMutationParentLive($task) && !isset($this->stopping[$token])) {
+                $this->journal->state['tasks'][$taskId]['state']='stopping';
+                $this->stopping[$token]=['since'=>$now,'recovery'=>false];
+                $this->journal->commit();
+            }
             $dir = $this->root . '/attempts/' . $token;
             $owner = json_decode((string) @file_get_contents($dir . '/owner.json'), true);
             if ($attempt['pid'] === null && is_array($owner) && ($owner['token'] ?? '') === $token) {

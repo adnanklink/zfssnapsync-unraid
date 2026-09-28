@@ -7,6 +7,9 @@ trait ZfsasCoordinatorDeleteAuthority
         $task = $this->cleanupExecutionTask($this->state['tasks'][$taskId]);
         if ($task===null) { throw new InvalidArgumentException('Selected cleanup owner no longer authorizes this attempt.'); }
         $parameters = $task['parameters'];
+        if(isset($parameters['autoMutation']) && !$this->autoMutationParentLive($task)) {
+            throw new InvalidArgumentException('Auto policy attempt no longer authorizes deletion.');
+        }
         $job = $parameters['deleteJob'] ?? null;
         if ($task['kind'] !== 'delete' || !$job
             || !is_string($payload['jobId'] ?? null) || $payload['jobId'] === ''

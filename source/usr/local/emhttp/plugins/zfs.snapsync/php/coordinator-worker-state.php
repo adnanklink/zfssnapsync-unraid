@@ -37,7 +37,7 @@ trait ZfsasCoordinatorWorkerState
         $type = $request['type'] ?? '';
         $payload = $request['payload'] ?? null;
         if (!is_int($sequence) || $sequence < 1 || !is_array($payload)
-            || !in_array($type, ['delete_authorize', 'source_item', 'progress', 'result', 'plan', 'plan_chunk', 'plan_seal', 'item_chunk', 'item_start', 'item_result', 'pressure_chunk', 'pressure_seal', 'pressure_authorize'], true)) {
+            || !in_array($type, ['auto_mutation', 'auto_authorize', 'delete_authorize', 'source_item', 'progress', 'result', 'plan', 'plan_chunk', 'plan_seal', 'item_chunk', 'item_start', 'item_result', 'pressure_chunk', 'pressure_seal', 'pressure_authorize'], true)) {
             throw new InvalidArgumentException('Invalid worker publication.');
         }
         $fingerprint = hash('sha256', json_encode(self::canonical(['type' => $type, 'payload' => $payload]), JSON_THROW_ON_ERROR));
@@ -45,13 +45,18 @@ trait ZfsasCoordinatorWorkerState
         $last = $attempt['publication'] ?? ['sequence' => 0];
         if ($sequence === $last['sequence'] && ($last['fingerprint'] ?? '') === $fingerprint) {
             if ($type === 'delete_authorize') { $this->authorizeDeletion($taskId, $payload); }
+            if ($type === 'auto_authorize') { $this->authorizeAutoMutation($taskId,$payload); }
             return $last['response'] ?? ['accepted' => true, 'sequence' => $sequence];
         }
         if ($sequence !== $last['sequence'] + 1 || isset($attempt['reportedResult'])) {
             throw new InvalidArgumentException('Out-of-order or conflicting worker publication.');
         }
         $response = ['accepted'=>true, 'sequence'=>$sequence];
-        if ($type === 'delete_authorize') {
+        if ($type === 'auto_mutation') {
+            $response += $this->proposeAutoMutation($taskId,$token,$payload,$now);
+        } elseif ($type === 'auto_authorize') {
+            $response += $this->authorizeAutoMutation($taskId,$payload);
+        } elseif ($type === 'delete_authorize') {
             $response += $this->authorizeDeletion($taskId, $payload);
         } elseif ($type==='source_item') {
             $sourceTask=&$this->state['tasks'][$taskId];$candidate=null;

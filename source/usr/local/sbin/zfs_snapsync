@@ -473,7 +473,11 @@ do_destroy() {
 		log "[DRY_RUN] zfs destroy '$snap'"
 		increment_delete_counter "$reason"
 	else
-		destroy_with_watchdog "$snap"
+		if [[ "${ZFSAS_INDIVIDUAL_AUTO:-0}" == 1 ]]; then
+			coordinated_auto_mutation delete "$snap" "$reason"
+		else
+			destroy_with_watchdog "$snap"
+		fi
 		increment_delete_counter "$reason"
 	fi
 }
@@ -539,7 +543,9 @@ do_snapshot() {
 		log "[DRY_RUN] zfs snapshot '$snap'"
 		COUNT_CREATED=$((COUNT_CREATED + 1))
 	else
-		if ! zfs snapshot "$snap"; then
+		if [[ "${ZFSAS_INDIVIDUAL_AUTO:-0}" == 1 ]]; then
+			coordinated_auto_mutation snapshot "$snap"
+		elif ! zfs snapshot "$snap"; then
 			RUN_ERROR_CONTEXT="zfs snapshot failed for '$snap'"
 			set_user_failure \
 				"Snapshot creation failed for '$snap'." \
@@ -548,6 +554,27 @@ do_snapshot() {
 		fi
 		COUNT_CREATED=$((COUNT_CREATED + 1))
 	fi
+}
+
+# The policy driver retains its established ordering and gives each mutation a
+# separate coordinator-owned worker. Capture while the policy gate is held;
+# release it only while that child acquires and verifies its own mutation gate.
+AUTO_MUTATION_SEQUENCE=0
+coordinated_auto_mutation() {
+    local action="$1" snap="$2" reason="${3:-}" scope="${ds:-${2%@*}}"
+    local client=/usr/local/emhttp/plugins/zfs.snapsync/php/auto-mutation-client.php
+    local had_cleanup_gate="${AUTOSNAPSHOT_CLEANUP_LOCKED:-0}"
+    if [[ "$reason" == space_pressure ]]; then scope="$oldest_snap_dataset"; fi
+    php "$client" capture "$action" "$snap" "$scope" "$reason" "${low_dataset:-}" "${low_dataset_threshold:-}"
+    if [[ "$had_cleanup_gate" == 1 ]]; then flock -u 199; AUTOSNAPSHOT_CLEANUP_LOCKED=0; fi
+    AUTO_MUTATION_SEQUENCE=$((AUTO_MUTATION_SEQUENCE + 1))
+    if ! php "$client" submit "$AUTO_MUTATION_SEQUENCE"; then
+        die "Individual automatic mutation stopped; completed work remains recorded: $snap"
+    fi
+    if [[ "$had_cleanup_gate" == 1 ]]; then
+        if ! flock -n -x 199; then die "Automatic policy resources changed after mutation; remaining work stopped."; fi
+        AUTOSNAPSHOT_CLEANUP_LOCKED=1
+    fi
 }
 
 # Convert "100G", "500MB", "2T", etc. into bytes (1024-based).

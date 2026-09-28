@@ -31,6 +31,26 @@ function zfsas_coordinator_auto_command(ZfsasCoordinatorState $journal, array $t
         if (file_put_contents($path . '.pending', $parameters[$key]) !== strlen($parameters[$key])
             || !rename($path . '.pending', $path)) { throw new RuntimeException('Cannot publish captured configuration.'); }
     }
-    return ['/usr/bin/env', 'ZFSAS_COORDINATED=1', 'CONFIG_FILE=' . $capture . '/zfs_snapsync.conf',
+    if(empty($parameters['individualMutations'])) {
+        $parameters['individualMutations']=true;
+        $parameters['mutationDatasets']=array_values(array_unique(array_map(static fn($entry)=>trim(substr($entry,0,strrpos($entry,':'))),explode(',',$config['auto']['DATASETS']))));
+        $parameters['mutationPrefix']=$config['auto']['PREFIX'];
+        $journal->state['tasks'][$task['id']]['parameters']=$parameters;
+        $journal->commit();
+    }
+    return ['/usr/bin/env', 'ZFSAS_COORDINATED=1', 'ZFSAS_INDIVIDUAL_AUTO=1', 'CONFIG_FILE=' . $capture . '/zfs_snapsync.conf',
         'ZFSAS_CONFIG_REVISION=' . $parameters['revision'], '/bin/bash', __DIR__.'/../scripts/coordinator-auto-attempt.sh'];
+}
+
+function zfsas_coordinator_auto_mutation_command(array $task,ZfsasCoordinatorState $journal,string $root,string $revision): array
+{
+    if(!$journal->autoMutationParentLive($task) || $task['parameters']['revision']!==$revision) {
+        return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Auto policy ownership or configuration changed before mutation.'];
+    }
+    $path=$root.'/attempt-inputs/'.hash('sha256',$task['id']).'.auto.json';
+    if(!is_dir(dirname($path)) && !mkdir(dirname($path),0700,true))throw new RuntimeException('Cannot create Auto capture directory.');
+    $text=json_encode(['taskId'=>$task['id'],'parameters'=>$task['parameters']],JSON_THROW_ON_ERROR);
+    if(file_put_contents($path.'.pending',$text)!==strlen($text) || !rename($path.'.pending',$path))throw new RuntimeException('Cannot publish Auto mutation capture.');
+    $proposal=$task['parameters']['autoMutation']['proposal'];
+    return ['/bin/bash',__DIR__.'/../scripts/coordinator-auto-mutation-attempt.sh',$path,$proposal['action'],explode('@',$proposal['snapshot'])[0]];
 }

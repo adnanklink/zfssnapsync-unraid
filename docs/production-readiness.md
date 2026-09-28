@@ -12,7 +12,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
 | 5. Native SSH execution and recovery | Complete in fixtures; native admission enabled; 39-suite regression run passed; host acceptance remains separate |
 | 6. SSH cleanup parity | Complete in fixtures; real-SSH/coordinator checks and 39-suite regression run passed; host acceptance remains separate |
-| 7. Individual Auto Snapshot mutation tasks | Pending |
+| 7. Individual Auto Snapshot mutation tasks | Implemented; policy, actual-daemon, cancellation and lifecycle fixtures pass; full regression run in progress |
 | 8. Safe partial automatic replanning | Pending |
 | 9. Lifecycle and reboot compatibility | Pending |
 | 10. Operational UI feedback | Pending |
@@ -218,3 +218,29 @@ All three read-only-flash suites also passed, including actual source cleanup.
 Reports: `/tmp/snapsync-tests-20260928T134206-331437/results.json` and
 `/tmp/snapsync-tests-20260928T134631-00f1bc/results.json`. These local reports are
 development evidence; they do not replace the versioned release acceptance record.
+
+## Task 7 individual automatic mutations
+
+The established Bash policy driver retains retention, zero-change, recursive
+inventory, pressure-constraint ordering and Dry Run behavior. Live mutations are
+proposed individually through its current grant. Each deletion receives independent
+shared-cleanup ownership; each creation receives its own worker and result. The
+driver waits for verified child completion before continuing and does not perform
+ZFS mutations itself. Idle result reads do not append journal events.
+
+Capture and execution bind dataset GUID, snapshot GUID/TXG, inventory, prefix,
+configuration revision and the live policy attempt. Workers recheck retention,
+leases, holds, clones, registered references, historical replication prefixes and
+current pressure constraints under their own gates. Pending freeing counts toward
+effective space as before; a refquota-only constraint cannot authorize deletion.
+Changed inventory or policy stops remaining work. Interrupted or unverified mutation
+results are not automatically replayed. Cancellation and policy-driver loss revoke
+child authority and wait for verified process-group shutdown. Lifecycle draining
+allows an already-owned child handoff to finish while unrelated admission stays
+blocked. Journal format 7 prevents older executors from recovering this ownership.
+
+Policy and state regressions, the existing Auto endpoint/replan fixtures, syntax,
+and an actual daemon using the unmodified production policy path pass. The latter
+checks deletion-before-creation ordering, distinct task identities, preserved newest
+checkpoints, Dry Run, update draining, cancellation and injected policy-driver loss.
+Full CI and real-host acceptance remain separate verification steps.

@@ -245,6 +245,9 @@ final class ZfsasCoordinatorDeletion
         if ($this->journal->delegateCleanup($task['id'],time())!==null) {
             $this->changed($task['id']);return null;
         }
+        if(isset($task['parameters']['autoMutation'])) {
+            return zfsas_coordinator_auto_mutation_command($task,$this->journal,$this->root,zfsas_config_revision('/boot/config/plugins/zfs.snapsync'));
+        }
         if (($task['parameters']['endpoint'] ?? 'local')!=='local') {
             if (empty($task['parameters']['remoteOwnership']) || empty($task['parameters']['receiverCapture'])) {
                 return ['outcome'=>'validation_failure','message'=>'Remote cleanup lacks captured receiver ownership.'];

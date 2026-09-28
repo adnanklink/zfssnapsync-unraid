@@ -31,6 +31,7 @@ trait ZfsasCoordinatorSharedCleanup
             || ($task['parameters']['cleanupTaskId'] ?? '')!==$physicalId) { return false; }
         $parameters=$task['parameters'];unset($parameters['cleanupTaskId']);
         if ($parameters!==$capture['parameters']) { return false; }
+        if(isset($parameters['autoMutation']) && !$this->autoMutationParentLive($task)) {return false;}
         foreach (array_unique([$task['runId'],$parameters['ownerRunId'] ?? $task['runId']]) as $runId) {
             $run=$this->state['runs'][$runId] ?? null;
             if (!$run || self::terminal($run['state']) || $run['state']==='canceling' || !empty($run['upgradeReviewRequired'])) { return false; }

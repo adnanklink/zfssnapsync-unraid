@@ -7,10 +7,11 @@ require_once __DIR__ . "/coordinator-items.php";
 require_once __DIR__ . "/coordinator-references.php";
 require_once __DIR__ . "/coordinator-delete-authority.php";
 require_once __DIR__ . "/coordinator-shared-cleanup.php";
+require_once __DIR__ . "/coordinator-auto-mutations.php";
 /** Single-writer, boot-local coordinator state. Never place this under /boot. */
 final class ZfsasCoordinatorState
 {
-    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences, ZfsasCoordinatorDeleteAuthority, ZfsasCoordinatorSharedCleanup;
+    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences, ZfsasCoordinatorDeleteAuthority, ZfsasCoordinatorSharedCleanup, ZfsasCoordinatorAutoMutations;
     private string $root;
     private $lock;
     public array $state;
@@ -379,6 +380,11 @@ final class ZfsasCoordinatorState
         if ($run['state'] === 'canceling') {
             $task['state'] = 'canceled';
             $this->finishCancellation($run['id'], $now);
+        } elseif (!empty($task['parameters']['individualMutations']) || isset($task['parameters']['autoMutation'])) {
+            $task['state']='failed';$task['blocked']='recovery_required';
+            $task['result']=['outcome'=>'validation_failure','recoveryRequired'=>true,
+                'message'=>'Automatic work stopped after interruption. Completed mutations are retained; review the remaining work before another run.'];
+            $this->settle($run['id'],$now);
         } elseif (!empty($task['parameters']['remoteOwnership'])) {
             $task['state']='failed';$task['blocked']='recovery_required';
             $task['result']=['outcome'=>'validation_failure','recoveryRequired'=>true,
