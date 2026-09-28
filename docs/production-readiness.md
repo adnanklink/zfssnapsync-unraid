@@ -393,10 +393,10 @@ implementation revision are in `screenshots/retirement-capture.json`.
 The 10,000-count browser fixture tests global captured selection; these images do
 not establish live ZFS scale performance.
 
-The existing stage-1 README assertions still require wording superseded by earlier
-SSH documentation changes. Automatic approval review rejected changing those
-assertions, citing documentation-gate integrity. They remain untouched and their
-failure is recorded separately from retirement verification. Dedicated-host gates
+At the time of that run, the stage-1 README assertions required wording superseded
+by earlier SSH documentation changes. Automatic approval review rejected changing those
+assertions, citing documentation-gate integrity. They were left untouched and their
+failure was recorded separately from retirement verification. Dedicated-host gates
 in `host-acceptance.md` now include this workflow; publication remains gated.
 
 ### Combined retirement regression results
@@ -421,5 +421,18 @@ The snapshot-browser layout assertion was updated to verify all three dataset
 actions (including retirement), keeping the alignment check. Its full 10,000-row
 selection, pagination, filter, keyboard and transfer-dialog suite then passed at
 `/tmp/snapsync-tests-20260928T193305-cea240/results.json`. The documentation capture
-also passed. This resolves the second failure; the README wording assertion remains
-unmodified. Browsing and selected-state README images now include retirement.
+also passed. This resolved the second failure; the README wording assertion was
+still unmodified at that point. Browsing and selected-state README images now include retirement.
+
+### Approved README assertion correction
+
+The user approved the prepared correction. Stage-one assertions now require the
+current README claims: local and SSH coordinator ownership, hidden incomplete
+spiped support, and opt-in cleanup for configured local/SSH jobs while excluding
+Snapshot Manager manual sends. The assertions remain enforced.
+
+The complete stage-one suite passed at
+`/tmp/snapsync-tests-20260928T202733-b57989/results.json`. Both failures from the
+earlier combined retirement run now have passing focused reruns. This does not
+replace a clean final-candidate CI run or the outstanding dedicated-host release
+gates. The obsolete current-failure notice was removed from README.

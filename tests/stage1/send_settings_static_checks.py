@@ -205,18 +205,18 @@ def main() -> int:
         raise AssertionError("example send config must not incorrectly describe all network transports as fail-closed after SSH support is active")
     assert_contains(
         readme,
-        "SSH jobs currently use the existing network execution path",
+        "Local and SSH scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification.",
         "README ZFS Send section must document SSH as an active network transport",
     )
     assert_contains(
         readme,
-        "The incomplete spiped transport is hidden from the WebGUI",
+        "The incomplete spiped transport remains hidden from the WebGUI",
         "README ZFS Send section must document spiped's incomplete hidden status",
     )
     assert_contains(
         readme,
-        "The local low-space policy below does not apply to network jobs.",
-        "README must distinguish local low-space cleanup from network jobs",
+        "The opt-in applies to local and SSH scheduled jobs and configured-job Run Now. It grants no cleanup authority to Snapshot Manager manual sends.",
+        "README must document local/SSH configured-job cleanup and exclude manual sends",
     )
     if "network transports are stored for future plumbing" in readme.lower():
         raise AssertionError("README must not describe all network transports as future-only after SSH support is active")
