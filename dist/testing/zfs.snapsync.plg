@@ -1,0 +1,188 @@
+<?xml version='1.0' standalone='yes'?>
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.28.01" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/testing/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+  <CHANGES>
+### 2026.09.28.01 (2026-09-28)
+- Testing candidate: dedicated-host acceptance and 48-hour soak are pending.
+- Add explicit dataset retirement with reviewed destination-first cleanup, including removed jobs.
+- Use native SSH ownership, shared cleanup authorization, and individually owned Auto mutations.
+- Show automatic snapshot section fields directly, without redundant dropdowns.
+- Align snapshot actions and pagination, and remove empty space above the snapshot list.
+- Separate Automatic snapshots, Snapshots and Backup copies, with utilities in Settings and compatible legacy links.
+- Guide setup through focused steps and edit saved configuration by section; return from shared connection settings to the preserved job draft.
+- Compact snapshot browsing, centered dialogs and task-based Overview summaries retain cleanup and recovery safeguards.
+- Improve laptop/mobile layouts and preserve saved configuration when scheduler application fails.
+- Save replication jobs directly; save shared settings independently without applying unrelated drafts.
+- Compact Automation setup with a runtime summary, shown-dataset selection and persistent save controls.
+- Contextual snapshot actions and consistent Send/Restore dialogs preserve existing cleanup reviews and safety checks.
+- Keep the WebGUI and installer connection running while completing activation.
+- Activate explicitly after package replacement, even when the package manager skips its hook.
+- Avoid duplicate activation and verify the running coordinator before reporting success.
+- Safely retry installations left in maintenance after a failed hook.
+- Display preflight and activation errors in Unraid, and retain the original failure reason.
+- Detect coordinator compatibility and explain unavailable recovery and job logs.
+- Refresh only when attempts finish; refuse busy updates before package replacement and verify activation.
+- Show expandable replication stages and dataset pages, with explicit loading errors and retry.
+- Show job-specific logs and retain original ZFS errors with clear failure explanations and next actions.
+- Add reviewed recovery for interrupted local replication, resuming original snapshots without creating fresh ones.
+- Direct repeated Run Now to recovery and check interrupted receivers before creating source snapshots.
+- Keep recovery reviews and diagnostic history in RAM; label shared logs separately.
+- Add source retention for native local replication: new jobs default to three checkpoints; existing jobs require review before enabling cleanup.
+- Run source cleanup only after verified replication, preserving receiver bases, recovery references, holds, clones and foreign snapshots.
+- Add reversible Needs attention dismissal without releasing recovery protections or deleting history.
+- Keep waiting transfers steady during resource checks and prevent operation status updates from shifting the page.
+- Reduce snapshot inventory rescans and improve bounded loading for larger datasets.
+- Correct workflow navigation and add persistent replication schedule Pause/Resume controls.
+- Refresh cached Activity scripts and stabilize Details log scrolling.
+- Strengthen long-text containment and refresh cached workspace styles after updates.
+- Fix overflowing dataset text and preserve log drawer scrolling during refresh.
+- Saved replication jobs update immediately; Activity shows native transfer progress, speed and phases.
+- Fix overlapping fields and help text in the replication job editor.
+- Install, update, and support URLs now use the renamed zfssnapsync-unraid repository.
+- Align Activity and Automation controls; shorten the optional tab to SnapSync.
+- Install and updates now track main; existing SnapSync clients can update normally.
+- New SnapSync logo and plugin icons; optional Unraid navigation tab under Tools → Interface.
+- Update SnapSync author attribution and add an optional developer support link.
+- Fix indefinite Browse loading and add prominent dataset discovery status with retry.
+- Align Refresh datasets and move tuning defaults to compact bottom controls.
+- Standalone ZFS SnapSync identity, configuration, runtime paths and update manifest.
+- Independent default snapshot prefixes and manual hold tag; no automatic import of original plugin work.
+- Coordinator-owned deletion and batch journals with verified cancellation and RAM-only runtime history.
+- Native local scheduled replication and Run Now with measured space approval and verified completion.
+- Opt-in per-job retention anchor cleanup preserves the keep-all window and protected checkpoints.
+- Testing build: platform, real-pool fault/scale and soak acceptance remain required.
+- Stop original-plugin work and disable its schedules before using the same datasets; configuration is not imported.
+
+  </CHANGES>
+
+  <DESCRIPTION>
+ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle management for Unraid. It keeps recent snapshots, consolidates older ones by day/week, and cleans up for low-space pressure using your configured prefix safeguards.
+  </DESCRIPTION>
+
+  <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
+
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.28.01-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/testing/zfs-snapsync-2026.09.28.01-noarch-1.txz</URL>
+    <MD5>b650d66e490eee60aeeb3aa4fb27cea5</MD5>
+  </FILE>
+
+  <FILE Run="/bin/bash">
+    <INLINE><![CDATA[
+# Unraid forwards stdout from inline scripts to the WebGUI, not stderr.
+exec 2>&1
+set -Eeuo pipefail
+INSTALL_STAGE='initializing installation'
+install_failed() {
+  local status="$?"
+  trap - ERR
+  echo "ERROR: ZFS SnapSync installation failed while ${INSTALL_STAGE} (exit ${status})."
+  echo 'The preceding message gives the blocker. Existing work must finish before installation can continue.'
+  exit "$status"
+}
+trap install_failed ERR
+
+PKG_DIR="/boot/config/plugins/zfs.snapsync"
+PKG_FILE="zfs-snapsync-2026.09.28.01-noarch-1.txz"
+PKG_PATH="${PKG_DIR}/${PKG_FILE}"
+PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/testing/${PKG_FILE}"
+PKG_MD5="b650d66e490eee60aeeb3aa4fb27cea5"
+PKG_NAME="zfs-snapsync"
+
+if command -v upgradepkg >/dev/null 2>&1; then
+  UPGRADEPKG="$(command -v upgradepkg)"
+elif [[ -x /sbin/upgradepkg ]]; then
+  UPGRADEPKG="/sbin/upgradepkg"
+elif [[ -x /usr/sbin/upgradepkg ]]; then
+  UPGRADEPKG="/usr/sbin/upgradepkg"
+else
+  echo "ERROR: upgradepkg not found on system." >&2
+  exit 1
+fi
+
+mkdir -p "${PKG_DIR}"
+
+download_pkg() {
+  if command -v wget >/dev/null 2>&1; then
+    wget --no-cache -O "${PKG_PATH}" "${PKG_URL}"
+  else
+    curl -fsSL "${PKG_URL}" -o "${PKG_PATH}"
+  fi
+}
+
+verify_md5() {
+  if command -v md5sum >/dev/null 2>&1; then
+    echo "${PKG_MD5}  ${PKG_PATH}" | md5sum -c -
+  else
+    [[ "$(md5 -q "${PKG_PATH}")" == "${PKG_MD5}" ]]
+  fi
+}
+
+INSTALL_STAGE='downloading the package'
+if [[ ! -f "${PKG_PATH}" ]]; then
+  download_pkg
+fi
+
+INSTALL_STAGE='verifying the package checksum'
+if ! verify_md5; then
+  rm -f "${PKG_PATH}"
+  download_pkg
+  verify_md5
+fi
+
+INSTALL_STAGE='acquiring the installation lock'
+echo 'Checking installation ownership…'
+# Serialize installers and extract the incoming lifecycle code before replacement.
+mkdir -p /var/run/zfs-snapsync-coordinator
+exec 9>/var/run/zfs-snapsync-coordinator/install.lock
+flock -n 9 || { echo 'Another installation is running.' >&2; exit 1; }
+INSTALL_STAGE='staging the incoming package in RAM'
+STAGED="$(mktemp -d /tmp/zfs-snapsync-install.XXXXXX)"
+trap 'rm -rf "$STAGED"' EXIT
+tar -xJf "$PKG_PATH" -C "$STAGED"
+INSTALL_STAGE='checking coordinator and worker ownership before replacement'
+echo 'Checking whether existing work has finished…'
+php "$STAGED/usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php" prepare
+
+INSTALL_STAGE='installing the package and running its activation hook'
+echo 'Idle preflight passed; installing the package…'
+ZFSAS_DEFER_ACTIVATION=1 "${UPGRADEPKG}" --install-new "${PKG_PATH}"
+
+INSTALL_STAGE='verifying package registration'
+if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
+  echo "Package registration missing after install; retrying with --reinstall." >&2
+  ZFSAS_DEFER_ACTIVATION=1 "${UPGRADEPKG}" --install-new --reinstall "${PKG_PATH}"
+fi
+
+if ! ls -1 /var/log/packages 2>/dev/null | grep -q "^${PKG_NAME}"; then
+  echo "ERROR: ${PKG_NAME} is still missing from /var/log/packages after install." >&2
+  exit 1
+fi
+
+INSTALL_STAGE='running package activation explicitly'
+echo 'Activating the installed package…'
+/bin/bash /usr/local/emhttp/plugins/zfs.snapsync/scripts/post-install.sh
+INSTALL_STAGE='verifying coordinator activation'
+# Some package managers ignore doinst.sh failures. Verify activation explicitly.
+php /usr/local/emhttp/plugins/zfs.snapsync/php/coordinator-lifecycle.php verify
+    ]]></INLINE>
+  </FILE>
+
+  <FILE Run="/bin/bash" Method="remove">
+    <INLINE><![CDATA[
+set -euo pipefail
+
+if [ -x /usr/local/emhttp/plugins/zfs.snapsync/scripts/pre-remove.sh ]; then
+  /usr/local/emhttp/plugins/zfs.snapsync/scripts/pre-remove.sh || true
+fi
+
+removepkg zfs-snapsync >/dev/null 2>&1 || true
+
+# Fallback cleanup for installs that missed package DB registration.
+rm -f /usr/local/sbin/zfs_snapsync
+rm -rf /usr/local/emhttp/plugins/zfs.snapsync
+
+rm -f /boot/config/plugins/zfs.snapsync/zfs-snapsync-*-noarch-1.txz
+rm -f /boot/config/plugins/zfs.snapsync/zfs-snapsync-*-noarch-1.txz.md5
+rmdir /boot/config/plugins/zfs.snapsync 2>/dev/null || true
+    ]]></INLINE>
+  </FILE>
+</PLUGIN>

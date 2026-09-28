@@ -1,0 +1,8 @@
+{
+  "status": "testing-not-production-accepted",
+  "version": "2026.09.28.01",
+  "sourceCommit": "2a83f529bfcec35ce4049e7381b3a578ebba5e5a",
+  "packageSha256": "bffb71cfb032cc6a1c007e6b8a39018e4c08911aa8835f4bd69631da4757243b",
+  "inputDigest": "dc861092e64bd4bd6cee6db8388507432102b4e53a7463abffe9fdda22e1b987",
+  "normalUpdateVersion": "2026.09.26.02"
+}
