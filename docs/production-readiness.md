@@ -401,11 +401,13 @@ in `host-acceptance.md` now include this workflow; publication remains gated.
 
 ### Combined retirement regression results
 
-The complete 47-suite CI run finished with **46 passing and one failing**. Report:
+The complete 47-suite CI run finished with **45 passing and two failing**. Report:
 `/tmp/snapsync-tests-20260928T191655-fb16c6/results.json`, frozen input digest
 `ba2b4617ba7a161bff06c592d459edc80cd73def5a236bf6274d6479ace4fade`.
-The only failure is the unchanged stage-one README wording assertion described
-above. All endpoint suites, all 12 browser suites, reliability regressions, syntax,
+Failures were the unchanged stage-one README wording assertion described
+above and the snapshot-browser assertion expecting two dataset actions before the
+new retirement action was added. All endpoint suites, the other 11 browser suites,
+reliability regressions, syntax,
 package contents, release-gate checks and reproducible build checks passed.
 
 That full run froze before the final reinspection UI and additional authority
@@ -414,3 +416,10 @@ package checks also passed at
 `/tmp/snapsync-tests-20260928T192342-b263b1/results.json`. These combined results
 cover the candidate changes without claiming one clean final-candidate CI run.
 No deployment, main merge, versioned release artifact or publication was performed.
+
+The snapshot-browser layout assertion was updated to verify all three dataset
+actions (including retirement), keeping the alignment check. Its full 10,000-row
+selection, pagination, filter, keyboard and transfer-dialog suite then passed at
+`/tmp/snapsync-tests-20260928T193305-cea240/results.json`. The documentation capture
+also passed. This resolves the second failure; the README wording assertion remains
+unmodified. Browsing and selected-state README images now include retirement.
