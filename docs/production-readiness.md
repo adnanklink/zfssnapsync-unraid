@@ -10,8 +10,8 @@ remain separate from source. This record is not a release acceptance certificate
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
-| 5. Native SSH execution and recovery | In progress; owned phase execution and shutdown verified in fixtures; scheduled cutover awaits cleanup parity |
-| 6. SSH cleanup parity | Implemented; focused real-SSH/coordinator fixtures pass; full regression run in progress |
+| 5. Native SSH execution and recovery | Complete in fixtures; native admission enabled; 39-suite regression run passed; host acceptance remains separate |
+| 6. SSH cleanup parity | Complete in fixtures; real-SSH/coordinator checks and 39-suite regression run passed; host acceptance remains separate |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
 | 8. Safe partial automatic replanning | Pending |
 | 9. Lifecycle and reboot compatibility | Pending |
@@ -133,7 +133,7 @@ The final full CI inventory passed all 33 suites against the completed implement
 Dedicated-host acceptance, all-path flash tracing and the soak remain release
 gates; these focused results are not a production acceptance certificate.
 
-## Task 5 work in progress
+## Task 5 native SSH execution and recovery
 
 The read-only SSH receiver adapter uses saved connection settings, strict existing
 host trust, noninteractive authentication and fresh nonmultiplexed connections.
@@ -171,8 +171,13 @@ launches, PID identity changes, orphaned descendants, duplicate execution,
 compatible locks and coordinator restart barriers. Reliability regressions pass.
 The completed owned-phase checkpoint passed all 36 isolated CI suites.
 These are transport and execution fixtures, not real OpenZFS or host acceptance.
-Scheduled SSH admission and its public recovery flow remain on their existing
-path until remote cleanup and source-retention parity can be enabled together.
+Scheduled SSH admission, Run all jobs now and public recovery now use the native
+coordinator together with the cleanup parity below. Immutable schedule captures
+include only saved connection fields. Run All keeps stable command receipts and
+does not shift schedule anchors. Legacy local/SSH admission is disabled; unstarted
+queue entries are retired while active workers retain their existing ownership.
+Old cleanup inbox entries cannot become new native cleanup authority. The existing
+network-only wrapper flag remains accepted for compatibility.
 
 ## Task 6 SSH cleanup parity
 
@@ -205,3 +210,11 @@ physical remote deletion for two independent requests, result fanout, remote sou
 cleanup and accounting, and verified receiver shutdown. The reliability suite and
 local/SSH Run All endpoint pass. These use deterministic ZFS fixtures over real SSH;
 real OpenZFS, separate hosts, flash tracing and soak acceptance remain release gates.
+
+The combined cutover regression run passed all 39 CI suites, including real SSH
+transport with deterministic ZFS commands, actual coordinator cleanup, scheduling,
+retention, endpoint and browser regressions, syntax and package verification.
+All three read-only-flash suites also passed, including actual source cleanup.
+Reports: `/tmp/snapsync-tests-20260928T134206-331437/results.json` and
+`/tmp/snapsync-tests-20260928T134631-00f1bc/results.json`. These local reports are
+development evidence; they do not replace the versioned release acceptance record.

@@ -25,5 +25,14 @@ try {
  zfsas_coordinator_send_tick($j,$config,100000,$cache);
  check(count($j->state['runs'])===3 && $j->state['schedules'][$id]['accepted']===87400,'Missed occurrences were not coalesced');
  check($cache['jobs'][$id]['next']===109000,'Run Now shifted cadence');
+ $remoteId='fedcba654321';$send['SEND_JOBS']="$remoteId|tank/data|backup/data|6h|0G|0|ssh";
+ $send['SEND_SSH_HOST']='receiver.example';$send['SEND_SCHEDULE_SPECS']=json_encode([$remoteId=>['version'=>1,'kind'=>'interval','seconds'=>21600,'anchor'=>1000]]);
+ $remoteConfig=array_replace($config,['send'=>$send,'revision'=>str_repeat('b',64)]);$remoteCache=[];$count=count($j->state['runs']);
+ check(zfsas_coordinator_send_tick($j,$remoteConfig,1000,$remoteCache)===22600 && count($j->state['runs'])===$count,'SSH job ran on Save');
+ zfsas_coordinator_send_tick($j,$remoteConfig,22600,$remoteCache);
+ check(count($j->state['runs'])===$count+1 && $j->state['schedules'][$remoteId]['accepted']===22600,'Native SSH occurrence was not admitted');
+ $remoteRun=$j->state['schedules'][$remoteId]['runId'];$capture=$j->state['tasks'][$remoteRun.':prepare']['parameters'];
+ check($capture['job']['transport']==='ssh' && $capture['receiverConfig']['SEND_SSH_HOST']==='receiver.example','SSH occurrence lost saved connection capture');
+ zfsas_coordinator_send_tick($j,$remoteConfig,22601,$remoteCache);check(count($j->state['runs'])===$count+1,'SSH occurrence duplicated');
  echo "PASS: native local first-run timing, stable manual receipts, shared overlap exclusion, accepted failures and coalesced catch-up\n";
 } finally {unset($j);foreach(glob($root.'/*')?:[] as $path)unlink($path);@rmdir($root);}

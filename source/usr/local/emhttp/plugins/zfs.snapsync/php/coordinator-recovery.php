@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/replication-recovery.php';
+require_once __DIR__.'/replication-receiver-context.php';
 
 function zfsas_recovery_begin(ZfsasCoordinatorState $j,array $request,array $config): array
 {
@@ -22,8 +23,8 @@ function zfsas_recovery_begin(ZfsasCoordinatorState $j,array $request,array $con
     $old=$origin?$j->state['tasks'][$origin['id'].':prepare']['parameters'] ?? []:[];
     $schedule=$old['job']['id'] ?? $request['scheduleId'] ?? '';
     $job=null;foreach(zfsas_send_parse_jobs($config['send']['SEND_JOBS'] ?? '') as $row)if($row['id']===$schedule)$job=$row;
-    if(!$job||$job['transport']!=='local')throw new InvalidArgumentException('Choose an existing local replication configuration for recovery.');
-    if(isset($old['job']) && array_intersect_key($old['job'],array_flip(['source','destination','children']))!==array_intersect_key($job,array_flip(['source','destination','children']))){
+    if(!$job||!in_array($job['transport'],['local','ssh'],true))throw new InvalidArgumentException('Choose an existing local or SSH replication configuration for recovery.');
+    if(isset($old['job']) && array_intersect_key($old['job'],array_flip(['source','destination','children','transport']))!==array_intersect_key($job,array_flip(['source','destination','children','transport']))){
         if(!empty($request['runId']))throw new InvalidArgumentException('Replication membership changed. Review recovery from the current configuration instead.');
         $origin=null; // A fresh configuration review must not adopt old membership.
     }
@@ -39,7 +40,8 @@ function zfsas_recovery_begin(ZfsasCoordinatorState $j,array $request,array $con
     }
     return $j->submit($command,['receiptData'=>$scope,'manual'=>true,'coordinationKey'=>$job['id'],'revision'=>$config['revision'],'tasks'=>['prepare'=>[
         'kind'=>'prepare','dataset'=>$job['source'],'parameters'=>['phase'=>'recovery_scan','nativePlan'=>true,'allowDynamicPlan'=>true,
-            'job'=>$job,'members'=>array_values($members),'originRunId'=>$origin['id'] ?? '', 'revision'=>$config['revision']]]]],time());
+            'job'=>$job,'members'=>array_values($members),'originRunId'=>$origin['id'] ?? '', 'revision'=>$config['revision'],
+            'receiverConfig'=>$job['transport']==='ssh'?zfsas_receiver_connection_capture($config['send']):[]]]]],time());
 }
 function zfsas_recovery_status(ZfsasCoordinatorState $j,string $id,int $offset=0): array
 {

@@ -2,6 +2,7 @@
 require_once __DIR__.'/replication-schedule-plan.php';
 require_once __DIR__.'/send-cleanup-policy.php';
 require_once __DIR__.'/source-retention-policy.php';
+require_once __DIR__.'/replication-receiver-context.php';
 
 function zfsas_coordinator_schedule_command(array $task, ZfsasCoordinatorState $journal, string $root, string $revision): array
 {
@@ -34,7 +35,7 @@ function zfsas_coordinator_schedule_command(array $task, ZfsasCoordinatorState $
 
 function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array $job, array $config, int $occurrence, bool $manual=false, ?string $command=null): array
 {
-    if(($job['transport']??'')!=='local'||!preg_match('/^[a-f0-9]{12}$/D',$job['id']??'')||$occurrence<0){throw new InvalidArgumentException('Invalid native schedule admission.');}
+    if(!in_array($job['transport']??'',['local','ssh'],true)||!preg_match('/^[a-f0-9]{12}$/D',$job['id']??'')||$occurrence<0){throw new InvalidArgumentException('Invalid native schedule admission.');}
     if(!str_contains($job['destination'],'/')){throw new InvalidArgumentException('Scheduled receiver requires an existing parent dataset.');}
     if ($command!==null && isset($journal->state['commands'][$command])) {
         $receipt=$journal->state['commands'][$command];
@@ -53,7 +54,8 @@ function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array
     $prefix=$config['send']['SEND_SNAPSHOT_PREFIX'];
     $name=$prefix.$job['id'].'-'.$occurrence;
     if ($manual && $command!==null && str_starts_with($command,'manual-send-')) { $name.='-'.substr(hash('sha256',$command),0,12); }
-    ZfsasReplicationInspection::validate(['sourceSnapshot'=>$job['source'].'@'.$name,'sourceGuid'=>'0','destination'=>$job['destination']]);
+    ZfsasReplicationInspection::validate(['sourceSnapshot'=>$job['source'].'@'.$name,'sourceGuid'=>'0','destination'=>$job['destination'],'transport'=>$job['transport']]);
+    $receiverConfig=$job['transport']==='ssh'?zfsas_receiver_connection_capture($config['send']):[];
     $command??='send-occurrence-'.$job['id'].'-'.$occurrence;
     return $journal->submit($command,['receiptData'=>['scheduleId'=>$job['id']],'coordinationKey'=>$job['id'],'manual'=>$manual,'schedule'=>$manual?'':$job['id'],'occurrence'=>$occurrence,
         'revision'=>$config['revision'],'tasks'=>['prepare'=>['kind'=>'prepare','dataset'=>$job['source'],'parameters'=>[
@@ -61,6 +63,6 @@ function zfsas_coordinator_submit_schedule(ZfsasCoordinatorState $journal, array
             'cleanupPolicy'=>['mode'=>zfsas_send_cleanup_mode($config['send'],$job),'freeSpaceFloor'=>$job['threshold'],'scheduleId'=>$job['id'],'prefix'=>$prefix,'sendConfigHash'=>hash('sha256',$config['rawSend']),
                 'keepAll'=>(int)$config['send']['SEND_KEEP_ALL_FOR_DAYS'],'keepDaily'=>(int)$config['send']['SEND_KEEP_DAILY_UNTIL_DAYS'],
                 'keepWeekly'=>(int)$config['send']['SEND_KEEP_WEEKLY_UNTIL_DAYS']],
-            'sourcePolicy'=>zfsas_source_policy($config['send'],$job),'job'=>$job,'revision'=>$config['revision'],'snapshotName'=>$name,'occurrence'=>$occurrence,
+            'sourcePolicy'=>zfsas_source_policy($config['send'],$job),'job'=>$job,'revision'=>$config['revision'],'snapshotName'=>$name,'occurrence'=>$occurrence,'receiverConfig'=>$receiverConfig,
             'rateLimit'=>$config['send']['SEND_RATE_LIMIT']]]]],time());
 }

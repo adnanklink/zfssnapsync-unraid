@@ -27,12 +27,11 @@ failed[STATE]=failed; job_write "$OPS_JOBS_DIR/running.job" failed
 mkdir -p "$CONFIG_DIR/send-control/paused"; touch "$CONFIG_DIR/send-control/paused/$schedule"
 schedule_job_blocked "$schedule"
 echo 'PASS: exhausted send occurrence stays accepted after history clearing; next occurrence is allowed; active runs and persistent pauses block admission'
-# Production admission consumes the shared calculator, including its first-run
-# boundary. Readiness must not probe a receiver before the saved interval is due.
+# Legacy admission must not probe or recreate SSH jobs after native cutover.
 rm "$CONFIG_DIR/send-control/paused/$schedule" "$OPS_JOBS_DIR/running.job"
 SCHEDULE_JOB_IDS=("$schedule")
 SCHEDULE_FREQUENCY["$schedule"]=6h
-# Network admission retains this legacy path; local timing is tested in PHP.
+# Both native transports' timing is tested through the coordinator in PHP.
 SCHEDULE_TRANSPORT["$schedule"]=ssh
 SEND_SCHEDULE_SPECS='{"abcdef123456":{"version":1,"kind":"interval","seconds":21600,"anchor":1000}}'
 scheduled_send_job_zfs_actionable() { printf -v "$2" unavailable; printf 'probe\n' >> "$fixture/readiness"; return 1; }
@@ -43,5 +42,5 @@ enqueue_scheduled_send_jobs_due 1000
 enqueue_scheduled_send_jobs_due 22599
 [[ ! -e "$fixture/readiness" ]]
 enqueue_scheduled_send_jobs_due 22600
-[[ "$(cat "$fixture/readiness")" == probe ]]
-echo 'PASS: production send admission waits a full interval after Save before receiver inspection'
+[[ ! -e "$fixture/readiness" ]]
+echo 'PASS: retired SSH admission never probes or recreates a native occurrence'

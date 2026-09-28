@@ -7,7 +7,7 @@ function zfsas_coordinator_send_tick(ZfsasCoordinatorState $journal, array $conf
     $key=$config['revision'].'|'.$config['timezone']->getName();$next=null;
     if (($calendars['key'] ?? '')!==$key) { $calendars=['key'=>$key,'jobs'=>[]]; }
     foreach (zfsas_send_parse_jobs($config['send']['SEND_JOBS'] ?? '') as $job) {
-        if (($job['transport'] ?? 'local')!=='local') { continue; }
+        if (!in_array($job['transport'] ?? 'local',['local','ssh'],true)) { continue; }
         $id=$job['id'];$calendar=$calendars['jobs'][$id] ?? [];
         if (!$calendar || $wall<($calendar['lastWall'] ?? 0) || $wall>=($calendar['next'] ?? PHP_INT_MAX)) {
             $spec=zfsas_send_schedule_spec($config['send'],$job);

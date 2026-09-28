@@ -5,8 +5,8 @@ require $plugin.'/coordinator-socket.php';
 function check($ok,$message){if(!$ok)throw new RuntimeException($message);}
 $config='/boot/config/plugins/zfs.snapsync';@mkdir($config,0770,true);
 file_put_contents($config.'/zfs_snapsync.conf',"PREFIX=snapsync-auto-\nDATASETS=''\n");
-$spec=json_encode(['abcdef123456'=>['version'=>1,'kind'=>'interval','seconds'=>21600,'anchor'=>time()]]);
-file_put_contents($config.'/zfs_send.conf',"SEND_JOBS='abcdef123456|tank/data|backup/data|6h|0G|0|local'\nSEND_SCHEDULE_SPECS='$spec'\n");
+$spec=json_encode(['abcdef123456'=>['version'=>1,'kind'=>'interval','seconds'=>21600,'anchor'=>time()],'fedcba654321'=>['version'=>1,'kind'=>'interval','seconds'=>21600,'anchor'=>time()]]);
+file_put_contents($config.'/zfs_send.conf',"SEND_JOBS='abcdef123456|tank/data|backup/data|6h|0G|0|local;fedcba654321|tank/data|backup/data|6h|0G|0|ssh'\nSEND_SSH_HOST='receiver.example'\nSEND_SCHEDULE_SPECS='$spec'\n");
 @mkdir('/var/local/emhttp',0770,true);file_put_contents('/var/local/emhttp/var.ini','mdState="STOPPED"');
 $runner=tempnam('/tmp','snapsync-now-');
 file_put_contents($runner,'<?php $GLOBALS["csrf_token"]="fixture"; $_SERVER["REQUEST_METHOD"]="POST"; $_POST=["csrf_token"=>"fixture","command_id"=>$argv[2]]; require $argv[1];');
@@ -23,6 +23,7 @@ try {
  $second=$invoke('manual-send-endpoint');check($second['runs']===$first['runs'],'Retry duplicated operation');
  $other=$invoke('manual-send-overlap');check($other['ok'] && $other['runs']['abcdef123456']['runId']===$first['runs']['abcdef123456']['runId'],'Run Now overlapped active job');
  $state=ZfsasCoordinatorState::readCommitted('/tmp/zfs-snapsync-coordinator');
- check(count($state['runs'])===1 && !$state['schedules'],'Run Now consumed cadence');
+ check(count($state['runs'])===2 && !$state['schedules'],'Run Now consumed cadence or omitted a transport');
+ check(count($first['runs'])===2 && $first['networkQueued']===true,'SSH Run Now did not use stable native receipts');
  echo "PASS: actual Run Now endpoint, stable receipts, overlap coalescing and preserved cadence\n";
 } finally {proc_terminate($daemon,15);proc_close($daemon);unlink($runner);}

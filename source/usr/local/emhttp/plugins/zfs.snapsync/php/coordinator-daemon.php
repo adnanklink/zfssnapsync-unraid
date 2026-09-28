@@ -181,12 +181,13 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
     if ($action === 'source_retention_review') {
         if (!$loadConfig() || $config['revision']!==($request['revision'] ?? '')) { throw new InvalidArgumentException('Configuration changed. Reload before reviewing source retention.'); }
         $job=$request['job'];
-        ZfsasReplicationInspection::validate(['sourceSnapshot'=>$job['source'].'@probe','sourceGuid'=>'0','destination'=>$job['destination']]);
+        ZfsasReplicationInspection::validate(['sourceSnapshot'=>$job['source'].'@probe','sourceGuid'=>'0','destination'=>$job['destination'],'transport'=>$job['transport'] ?? 'local']);
         zfsas_source_review_path($request['token']);
-        if (($job['transport'] ?? '')!=='local' || !is_int($request['keep']) || $request['keep']<1 || $request['keep']>1000) { throw new InvalidArgumentException('Invalid local source retention review.'); }
+        if (!in_array($job['transport'] ?? '',['local','ssh'],true) || !is_int($request['keep']) || $request['keep']<1 || $request['keep']>1000) { throw new InvalidArgumentException('Invalid source retention review.'); }
+        $receiverConfig=($job['transport'] ?? '')==='ssh'?zfsas_receiver_connection_capture($config['send']):[];
         return $journal->submit('source-review-'.$request['token'],['manual'=>true,'revision'=>$config['revision'],'tasks'=>['review'=>[
             'kind'=>'prepare','dataset'=>$job['source'],'parameters'=>['phase'=>'source_retention_review','job'=>$job,'keep'=>$request['keep'],
-                'reviewToken'=>$request['token'],'revision'=>$config['revision']]]]],time());
+                'reviewToken'=>$request['token'],'revision'=>$config['revision'],'receiverConfig'=>$receiverConfig]]]],time());
     }
     if ($action === 'reload') { if (!$loadConfig()) { throw new InvalidArgumentException('Configuration save is in progress. Retry.'); } return ['revision' => $config['revision']]; }
     if ($action === 'auto') {
@@ -205,7 +206,7 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
         if (!is_string($command) || !preg_match('/^[A-Za-z0-9_.:-]{1,100}$/D',$command)) { throw new InvalidArgumentException('Stable command ID required.'); }
         $receipts=[];
         foreach (zfsas_send_parse_jobs($config['send']['SEND_JOBS'] ?? '') as $job) {
-            if (($job['transport'] ?? 'local')!=='local') { continue; }
+            if (!in_array($job['transport'] ?? 'local',['local','ssh'],true)) { continue; }
             if (is_file(zfsas_ops_control_path('paused',$job['id']))) { $receipts[$job['id']]=['blocked'=>'paused']; continue; }
             $receipts[$job['id']]=zfsas_coordinator_submit_schedule($journal,$job,$config,time(),true,$command.':'.$job['id']);
         }

@@ -1,6 +1,6 @@
 <?php
 $plugin=__DIR__.'/../../source/usr/local/emhttp/plugins/zfs.snapsync/php';
-require $plugin.'/coordinator-state.php';require $plugin.'/coordinator-recovery.php';require $plugin.'/send-helpers.php';
+require $plugin.'/coordinator-state.php';require $plugin.'/coordinator-recovery.php';require_once $plugin.'/send-helpers.php';
 function check($ok,$why){if(!$ok)throw new RuntimeException($why);}
 function reject($fn){try{$fn();}catch(InvalidArgumentException $e){return;}throw new RuntimeException('Unsafe recovery accepted');}
 $token='private-token';$target='tank/source@A';$sourceGuid='10';$receiverGuid='20';$calls=[];
