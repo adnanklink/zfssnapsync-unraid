@@ -1,7 +1,10 @@
 <?xml version='1.0' standalone='yes'?>
-<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.26.02" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.09.28.01" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
-### 2026.09.26.02 (2026-09-26)
+### 2026.09.28.01 (2026-09-28)
+- Experimental main release: dedicated-host acceptance and 48-hour soak are pending.
+- Add explicit dataset retirement with reviewed destination-first cleanup, including removed jobs.
+- Use native SSH ownership, shared cleanup authorization, and individually owned Auto mutations.
 - Show automatic snapshot section fields directly, without redundant dropdowns.
 - Align snapshot actions and pagination, and remove empty space above the snapshot list.
 - Separate Automatic snapshots, Snapshots and Backup copies, with utilities in Settings and compatible legacy links.
@@ -46,7 +49,7 @@
 - Coordinator-owned deletion and batch journals with verified cancellation and RAM-only runtime history.
 - Native local scheduled replication and Run Now with measured space approval and verified completion.
 - Opt-in per-job retention anchor cleanup preserves the keep-all window and protected checkpoints.
-- Testing build: native SSH, shared cleanup ownership and broader release gates remain unfinished.
+- Testing build: platform, real-pool fault/scale and soak acceptance remain required.
 - Stop original-plugin work and disable its schedules before using the same datasets; configuration is not imported.
 
   </CHANGES>
@@ -57,9 +60,9 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
 
-  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.26.02-noarch-1.txz" Min="6.12.0">
-    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.26.02-noarch-1.txz</URL>
-    <MD5>69f123bd3ad3ec736eb83bb6b13b1d96</MD5>
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.09.28.01-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.09.28.01-noarch-1.txz</URL>
+    <MD5>b650d66e490eee60aeeb3aa4fb27cea5</MD5>
   </FILE>
 
   <FILE Run="/bin/bash">
@@ -78,10 +81,10 @@ install_failed() {
 trap install_failed ERR
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
-PKG_FILE="zfs-snapsync-2026.09.26.02-noarch-1.txz"
+PKG_FILE="zfs-snapsync-2026.09.28.01-noarch-1.txz"
 PKG_PATH="${PKG_DIR}/${PKG_FILE}"
 PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/${PKG_FILE}"
-PKG_MD5="69f123bd3ad3ec736eb83bb6b13b1d96"
+PKG_MD5="b650d66e490eee60aeeb3aa4fb27cea5"
 PKG_NAME="zfs-snapsync"
 
 if command -v upgradepkg >/dev/null 2>&1; then

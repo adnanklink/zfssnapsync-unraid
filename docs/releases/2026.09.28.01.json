@@ -1,0 +1,10 @@
+{
+  "version": "2026.09.28.01",
+  "status": "experimental",
+  "hostAcceptance": "pending",
+  "releasePolicy": "Maintainer-approved experimental main distribution; gather normal-use feedback. No production-readiness claim.",
+  "sourceCommit": "428db660d5509be3c9b58f4bc559e3694a4307f4",
+  "inputDigest": "b3d277d2d5e1ec5c6958545026fc8d51c453f70189b2a26de29ce98722a32236",
+  "packageSha256": "bffb71cfb032cc6a1c007e6b8a39018e4c08911aa8835f4bd69631da4757243b",
+  "notes": "Exact opt-in candidate bytes promoted without rebuilding; host and soak evidence remains outstanding."
+}
