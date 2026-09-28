@@ -19,6 +19,7 @@ ISOLATED = [
     'coordinator_replan_daemon.php', 'coordinator_schedule_cancel.php',
     'deletion_approval.php', 'replication_inspection_worker.php',
     'shared_cleanup_adapter.php',
+    'ssh_receiver_read.php',
     'replication_now_endpoint.php', 'source_retention_endpoints.php',
     'workspace_endpoints.php', 'installation_compatibility.sh', 'auto_log.sh',
 ]

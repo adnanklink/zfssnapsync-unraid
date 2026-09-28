@@ -10,7 +10,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
-| 5. Native SSH execution and recovery | Pending |
+| 5. Native SSH execution and recovery | In progress; verified read-only receiver transport, execution not enabled |
 | 6. SSH cleanup parity | Pending |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
 | 8. Safe partial automatic replanning | Pending |
@@ -132,3 +132,18 @@ delays; cancellation, recovery, approval, reliability and syntax suites pass.
 The final full CI inventory passed all 33 suites against the completed implementation.
 Dedicated-host acceptance, all-path flash tracing and the soak remain release
 gates; these focused results are not a production acceptance certificate.
+
+## Task 5 work in progress
+
+The read-only SSH receiver adapter uses saved connection settings, strict existing
+host trust, noninteractive authentication and fresh nonmultiplexed connections.
+It captures the authenticated server key and receiver pool GUID together, checks
+that identity on subsequent reads, and preserves endpoint identity across aliases.
+Only bounded ZFS/ZPOOL metadata reads are allowed; no receiver plugin is installed.
+A real isolated OpenSSH fixture verifies unknown/changed host-key rejection, pool
+identity changes, connection binding, local-pool identity, shell argument isolation
+and refusal of mutation commands. Oversized output, remote command failures and
+stalled connections are rejected within bounded reads and timeouts; private SSH
+diagnostic files are removed after success and failure. The SSH fixture and
+repository syntax suite pass. Native SSH execution remains disabled until
+remote ownership, cancellation, shutdown verification and recovery are integrated.
