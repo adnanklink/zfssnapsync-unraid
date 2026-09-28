@@ -6,7 +6,7 @@ Manage snapshots, replicate datasets, and follow storage operations from one Unr
 
 **Current testing release: `2026.09.26.02` · Requires Unraid 6.12.0 or newer**
 
-This branch documents the **unreleased production-readiness candidate**. The installation URL still serves `2026.09.26.02`; it does not include these candidate changes. Local and SSH jobs now use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Dedicated-host acceptance and a 48-hour soak must pass before publication. See [readiness progress](docs/production-readiness.md).
+This branch documents the **unreleased production-readiness candidate**. The normal installation URL still serves `2026.09.26.02`; it does not include these candidate changes. An opt-in `2026.09.28.01` testing package and targeted checklist are available in [personal Unraid testing](docs/personal-unraid-checklist.md). Local and SSH jobs now use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Dedicated-host acceptance and a 48-hour soak must pass before publication. See [readiness progress](docs/production-readiness.md).
 
 ## Install and update
 
