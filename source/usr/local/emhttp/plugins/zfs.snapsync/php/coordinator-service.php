@@ -9,7 +9,7 @@ function zfsas_service_build(): string
 }
 function zfsas_service_handshake(): array
 {
-    return ['build'=>zfsas_service_build(), 'protocol'=>1, 'capabilities'=>['endpointIdentity'=>1], 'actions'=>[
+    return ['build'=>zfsas_service_build(), 'protocol'=>1, 'capabilities'=>['endpointIdentity'=>1,'independentCleanupOwners'=>1], 'actions'=>[
         'status','watchdog','handshake','operation_detail','recovery_status','review_recovery','retry_reviewed',
         'worker_report','reload','auto','retry','replication_now','scheduled_replication','replication_receipt',
         'replication','delete','batch','cancel','resume','source_retention_review']];

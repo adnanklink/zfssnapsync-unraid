@@ -4,7 +4,8 @@ trait ZfsasCoordinatorDeleteAuthority
 {
     private function authorizeDeletion(string $taskId, array $payload): array
     {
-        $task = $this->state['tasks'][$taskId];
+        $task = $this->cleanupExecutionTask($this->state['tasks'][$taskId]);
+        if ($task===null) { throw new InvalidArgumentException('Selected cleanup owner no longer authorizes this attempt.'); }
         $parameters = $task['parameters'];
         $job = $parameters['deleteJob'] ?? null;
         if ($task['kind'] !== 'delete' || !$job
@@ -30,7 +31,7 @@ trait ZfsasCoordinatorDeleteAuthority
             if (!$parent || $parent['runId'] !== $ownerId
                 || ($parent['parameters']['batch']['action'] ?? '') !== 'delete'
                 || empty($parent['parameters']['batch']['approvedAt'])
-                || ($item['deletionTaskId'] ?? '') !== $taskId || $item['state'] !== 'deleting'
+                || ($item['deletionTaskId'] ?? '') !== ($parameters['cleanupOriginTaskId'] ?? $taskId) || $item['state'] !== 'deleting'
                 || empty($item['spec']['candidate']) || $item['spec']['snapshot'] !== $job['SNAPSHOT']
                 || $item['spec']['guid'] !== $job['SNAPSHOT_GUID']) {
                 throw new InvalidArgumentException('Deletion item approval is no longer current.');

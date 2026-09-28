@@ -30,7 +30,7 @@ try {
     });
     $receipt = zfsas_coordinator_request(['action'=>'batch', 'dataset'=>'tank/data', 'token'=>$batch['token']]);
     check($receipt['ok'], 'Batch submission failed'); $runId = $receipt['result']['runId'];
-    waitFor(static function() { return count(ZfsasCoordinatorState::readCommitted('/tmp/zfs-snapsync-coordinator')['runs']) === 51; });
+    waitFor(static function() { return count(ZfsasCoordinatorState::readCommitted('/tmp/zfs-snapsync-coordinator')['runs']) === 101; });
     require $plugin . '/workspace-summary.php';
     $operations = array_column(zfsas_workspace_summary()['operations'], null, 'nativeId');
     check(in_array('cancel', $operations[$runId]['actions'], true), 'Activity omitted batch cancellation');
@@ -59,6 +59,6 @@ try {
         try { return zfsas_coordinator_request(['action'=>'status'])['ok']; } catch (Throwable $error) { return false; }
     });
     $s = ZfsasCoordinatorState::readCommitted('/tmp/zfs-snapsync-coordinator');
-    check(count($s['runs']) === 51 && !array_filter($s['runs'], fn($run) => $run['state'] !== 'canceled'), 'Restart recreated canceled batch work');
+    check(count($s['runs']) === 101 && !array_filter($s['runs'], fn($run) => $run['state'] !== 'canceled'), 'Restart recreated canceled batch work');
     echo "PASS: actual batch cancellation endpoint, persistent decision, no unrelated pause, verified child shutdown and restart\n";
 } finally { if ($daemon) { proc_terminate($daemon, 9); proc_close($daemon); } }

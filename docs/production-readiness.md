@@ -9,7 +9,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 1. Reproducible verification and repaired fixtures | Complete |
 | 2. Release gates and content verification | Complete (repository checks; promotion still gated) |
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
-| 4. Independent shared cleanup owners | In progress; final mutation authority check implemented, sharing not enabled |
+| 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
 | 5. Native SSH execution and recovery | Pending |
 | 6. SSH cleanup parity | Pending |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
@@ -88,34 +88,47 @@ Regressions cover identical snapshot names/GUIDs on distinct endpoints, alias
 identity, local pool collapse, lock rollback, receiver-only reads, resume tokens,
 and changed-identity rejection. This introduces the coordination primitives,
 not native SSH execution or real-host acceptance. The handshake advertises an
-additive endpointIdentity capability; protocol 1 and journal format 3 remain
-compatible because captured parameters and reference records already support
-these fields. Existing build-identity checks still reject mixed running builds.
+additive endpointIdentity capability. This step retained protocol 1 and journal
+format 3; task 4 below adds a versioned boundary for shared execution authority.
+Existing build-identity checks still reject mixed running builds.
 
-## Task 4 work in progress
+## Task 4 independent cleanup ownership
 
-The deletion adapter now requests a live, identity-bound coordinator grant
-immediately before local or legacy SSH destruction. This rechecks the exact
-captured job, owner state, manual item approval where applicable, and protected
-replication references. Replayed requests revalidate current authority. Existing
-worker metadata, configuration, hold/clone and cleanup-policy checks still apply.
-The reliability suite, syntax checks, actual deletion adapter, cancellation
-endpoint and captured-approval tests pass. Expanded focused tests cover manual
-approval revocation, protected references, and a worker capture that disagrees
-with the coordinator grant. Full batch integration passes, including the 601-item
-manifest, real retry delays, failed-only retry and daemon restart. The read-only
-flash runner initially failed because it mounted an empty configuration; a
-separate fixture repair supplies the documented disabled schedule and fake
-dataset. Both read-only runtime suites pass with that corrected setup. These are
-scoped checks, not all-path flash tracing or dedicated-host acceptance.
+Native coordinator deletion tasks and approved manual deletion items now retain
+separate immutable owner records while one physical worker deletes an exact
+endpoint/dataset/snapshot/GUID identity. Legacy inbox records and protected
+replication references cannot supply shared deletion authority. Joining an active
+operation does not replace its selected worker approval.
 
-This is a prerequisite, not completed shared cleanup. The remaining implementation
-must give each authorizing run its own immutable policy/review binding and result
-projection, with physical deletion lifetime independent of the first owner.
-Canceling one owner may retain execution only when another independently valid
-owner still authorizes that exact mutation. Losing the last owner must stop the
-worker and verify shutdown before cancellation finishes. Different conditional
-cleanup policies must never be combined into broader deletion authority.
-Legacy queue identity or a protected-reference owner cannot grant cleanup rights.
-Restart, pruning, duplicate admission and all-owner cancellation need regression
-coverage before this task is committed or marked complete.
+Each attempt selects one intact owner and rechecks that owner's configuration,
+review, metadata, holds/clones, references and conditional cleanup policy before
+mutation. Canceling an unselected owner detaches only its request. Canceling the
+selected owner stops and verifies its worker process group before a surviving
+owner can launch a fresh attempt. Last-owner cancellation stops physical work;
+explicit cancellation of the shared operation also resolves its dependent
+requests instead of leaving them waiting forever.
+
+A policy rejection is reported only to that owner. A proven deletion is projected
+to the remaining unchanged requests with the physical task and authorizing owner
+recorded in each result; that observed result does not renew any approval.
+Canceled or changed owners are never resurrected. Retry/space-progress state is
+reset on owner handoff. Pruning retains the owner/review records while the
+physical task needs them. Manual pending-action exclusions are limited to the
+same captured snapshot and its registered owners; other exclusions remain.
+
+Before the first shared delegation, the coordinator atomically publishes RAM
+journal format 4. New code reads formats 1–4 with existing legacy review rules;
+the previous reader rejects format 4, as confirmed by a direct compatibility
+probe. The on-disk configuration format is unchanged. Socket protocol 1 adds the
+independentCleanupOwners capability and build fingerprint checks remain in force.
+No execution authority is reconstructed after reboot.
+
+Focused state and actual-worker tests pass for duplicate admission, distinct
+endpoint/GUID identities, late owners, selected/unselected/all-owner cancellation,
+verified process shutdown, stale-policy isolation, overlapping reviewed manual
+batches, immutable review bindings, result fanout, restart, pruning and journal
+downgrade rejection. The full 601-item batch regression passes with real retry
+delays; cancellation, recovery, approval, reliability and syntax suites pass.
+The final full CI inventory passed all 33 suites against the completed implementation.
+Dedicated-host acceptance, all-path flash tracing and the soak remain release
+gates; these focused results are not a production acceptance certificate.

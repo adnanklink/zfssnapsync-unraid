@@ -30,6 +30,9 @@ foreach ($journal->state['tasks'][$parent]['items'] as $index => $id) {
 // Worker approval comes from captured journal items, never the status manifest.
 $firstItem = $journal->state['items'][$journal->state['tasks'][$parent]['items'][0]];
 $firstTask = $journal->state['tasks'][$firstItem['deletionTaskId']];
+check($deletion->command($firstTask) === null, 'Owner launched instead of delegating');
+$physical = $journal->state['tasks'][$firstTask['id']]['parameters']['cleanupTaskId'];
+$firstTask = $journal->state['tasks'][$physical];
 $command = $deletion->command($firstTask);
 $approvalPath = $command[2] . '.approval.json';
 $approval = json_decode(file_get_contents($approvalPath), true);
@@ -44,7 +47,7 @@ $unapproved = $firstChild['parameters']['deleteJob'];
 $unapproved['JOB_ID'] .= '-extra';
 zfsas_ops_append_delete_queue_inbox(zfsas_ops_delete_queue_command_line($unapproved));
 $deletion->tick(hrtime(true)/1e9);
-check(count($journal->state['runs']) === 51 && is_file($root . '/deletion-review-required.log'), 'Inbox bypassed item authority');
+check(count($journal->state['runs']) === 52 && is_file($root . '/deletion-review-required.log'), 'Inbox bypassed item authority');
 // Compatibility result files cannot complete a still-active journal item.
 $staleResult = zfsas_ops_status_dir() . '/delete-results/' . $firstItem['deleteJobId'] . '.result';
 zfsas_sm_ensure_dir(dirname($staleResult)); file_put_contents($staleResult, "completed\tStale projection\n");
@@ -65,8 +68,8 @@ $journal->commit();
 unset($deletion, $journal);
 $journal = new ZfsasCoordinatorState($root); $deletion = new ZfsasCoordinatorDeletion($journal, $root);
 $deletion->dispatchBatch($journal->state['tasks'][$parent]);
-check(count($journal->state['runs']) === 51, 'Restart recreated or exceeded bounded delegation');
-$children = array_filter($journal->state['tasks'], fn($task) => $task['kind'] === 'delete');
+check(count($journal->state['runs']) === 52, 'Restart recreated or exceeded bounded delegation');
+$children = array_filter($journal->state['tasks'], fn($task) => $task['kind'] === 'delete' && !isset($task['parameters']['cleanupTaskId']));
 foreach ($children as $index => $task) {
     $token = $journal->claim($task['id'], hrtime(true)/1e9, time());
     $journal->started($task['id'], $token, 123, '123');
@@ -78,7 +81,7 @@ foreach ($children as $index => $task) {
 check(in_array($parent, $journal->runnable(hrtime(true)/1e9), true), 'Finished chunk did not wake parent');
 check($journal->state['runs'][$receipt['runId']]['state'] !== 'failed', 'Partial failure canceled untouched items');
 $deletion->dispatchBatch($journal->state['tasks'][$parent]);
-check(count($journal->state['runs']) === 52, 'Second chunk lost or repeated items');
+check(count($journal->state['runs']) === 53, 'Second chunk lost or repeated items');
 $id = $journal->state['tasks'][$parent]['items'][50];
 $child = $journal->state['items'][$id]['deletionTaskId'];
 $token = $journal->claim($child, hrtime(true)/1e9, time()); $journal->started($child, $token, 123, '123');

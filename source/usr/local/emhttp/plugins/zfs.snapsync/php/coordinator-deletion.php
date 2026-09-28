@@ -194,8 +194,10 @@ final class ZfsasCoordinatorDeletion
         else { $this->batchProjections[$id] = true; }
     }
 
-    public function command(array $task): array
+    public function command(array $task): ?array
     {
+        $task=$this->journal->cleanupExecutionTask($task,true);
+        if ($task===null) { return ['outcome'=>'validation_failure','message'=>'No independent cleanup owner remains.']; }
         if (!isset($task['parameters']['deleteJob'])) {
             return ['outcome'=>'validation_failure', 'recoveryRequired'=>true,
                 'message'=>'Legacy deletion execution authority requires a fresh plan.'];
@@ -219,17 +221,29 @@ final class ZfsasCoordinatorDeletion
             $item = $this->journal->state['items'][$itemId] ?? null;
             $parent = $item ? ($this->journal->state['tasks'][$item['taskId']] ?? null) : null;
             if (!$item || !$parent || $parent['runId'] !== $ownerId
-                || ($item['deletionTaskId'] ?? '') !== $task['id'] || $item['state'] !== 'deleting'
+                || ($item['deletionTaskId'] ?? '') !== ($task['parameters']['cleanupOriginTaskId'] ?? $task['id']) || $item['state'] !== 'deleting'
                 || $item['spec']['snapshot'] !== $job['SNAPSHOT'] || $item['spec']['guid'] !== $job['SNAPSHOT_GUID']) {
                 return ['outcome'=>'validation_failure', 'recoveryRequired'=>true,
                     'message'=>'Deletion lacks journal-owned item approval. Review a new selection.'];
             }
             $approval = ['version'=>1, 'taskId'=>$task['id'], 'jobId'=>$job['JOB_ID'],
                 'batch'=>$parent['parameters']['batch'], 'item'=>$item['spec']];
+            if (!empty($task['parameters']['sharedCleanup'])) {
+                $approval['sharedPending']=['jobs'=>[],'tokens'=>[]];
+                foreach ($task['parameters']['cleanupOwners'] as $ownerId=>$capture) {
+                    $approval['sharedPending']['jobs'][]=$capture['parameters']['deleteJob']['JOB_ID'];
+                    $ownerItem=$this->journal->state['items'][$capture['parameters']['ownerItemId'] ?? ''] ?? null;
+                    $ownerBatch=$ownerItem ? ($this->journal->state['tasks'][$ownerItem['taskId']]['parameters']['batch'] ?? null) : null;
+                    if ($ownerBatch) { $approval['sharedPending']['tokens'][]=$ownerBatch['token']; }
+                }
+            }
             self::publish($path . '.approval.json', json_encode($approval, JSON_THROW_ON_ERROR));
         }
         if (isset($task['parameters']['pressure'])) {
             self::publish($path.'.pressure.json',json_encode(['taskId'=>$task['id'],'job'=>$job,'pressure'=>$task['parameters']['pressure']],JSON_THROW_ON_ERROR));
+        }
+        if ($this->journal->delegateCleanup($task['id'],time())!==null) {
+            $this->changed($task['id']);return null;
         }
         $text = "JOB_TYPE=\"delete\"\n";
         foreach ($job as $key => $value) { $text .= $key . '="' . str_replace(['\\','"'], ['\\\\','\\"'], $value) . '"' . "\n"; }
@@ -241,6 +255,12 @@ final class ZfsasCoordinatorDeletion
     {
         $task = $this->journal->state['tasks'][$id];
         if ($task['kind'] !== 'delete' || !isset($task['parameters']['deleteJob'])) { return; }
+        if (!empty($task['parameters']['sharedCleanup'])) {
+            foreach ($task['parameters']['cleanupOwners'] as $ownerId=>$_) {
+                if (isset($this->journal->state['tasks'][$ownerId])) { $this->changed($ownerId); }
+            }
+            return;
+        }
         if (ZfsasCoordinatorState::terminal($task['state'])) {
             unset($this->active[$id]);
             $result = $task['result'] ?? [];
@@ -264,6 +284,7 @@ final class ZfsasCoordinatorDeletion
         $rows = []; $counts = ['queued'=>0,'running'=>0,'retry_wait'=>0];
         foreach (array_keys($this->active) as $id) {
             $task = $this->journal->state['tasks'][$id]; $job = $task['parameters']['deleteJob'];
+            if (isset($task['parameters']['cleanupTaskId'])) { $task=$this->journal->state['tasks'][$task['parameters']['cleanupTaskId']] ?? $task; }
             $state = in_array($task['state'], ['running','launching','stopping'], true) ? 'running' : ($task['state'] === 'retry_wait' ? 'retry_wait' : 'queued');
             $counts[$state]++;
             $fields = ['JOB', $job['JOB_ID'], $state, (string) ($task['retryAt'] ?? 0)];

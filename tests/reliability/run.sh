@@ -52,6 +52,7 @@ php tests/reliability/coordinator_replan.php
 php tests/reliability/coordinator_retention.php
 php tests/reliability/coordinator_delete.php
 php tests/reliability/coordinator_delete_authority.php
+php tests/reliability/coordinator_shared_cleanup.php
 php tests/reliability/coordinator_deletion_items.php
 php tests/reliability/coordinator_batch_handoff.php
 php tests/reliability/coordinator_socket.php

@@ -6,10 +6,11 @@ require_once __DIR__ . "/coordinator-indexes.php";
 require_once __DIR__ . "/coordinator-items.php";
 require_once __DIR__ . "/coordinator-references.php";
 require_once __DIR__ . "/coordinator-delete-authority.php";
+require_once __DIR__ . "/coordinator-shared-cleanup.php";
 /** Single-writer, boot-local coordinator state. Never place this under /boot. */
 final class ZfsasCoordinatorState
 {
-    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences, ZfsasCoordinatorDeleteAuthority;
+    use ZfsasCoordinatorPressure, ZfsasCoordinatorWorkerState, ZfsasCoordinatorJournal, ZfsasCoordinatorIndexes, ZfsasCoordinatorItems, ZfsasCoordinatorReferences, ZfsasCoordinatorDeleteAuthority, ZfsasCoordinatorSharedCleanup;
     private string $root;
     private $lock;
     public array $state;
@@ -202,6 +203,7 @@ final class ZfsasCoordinatorState
         $task['state'] = 'failed'; $task['result'] = $result;
         $task['blocked'] = $result['reason'] ?? '';
         $task['retryAt'] = null; $task['retryMonotonic'] = null;
+        $this->finishSharedCleanup($taskId, $now);
         $this->settle($task['runId'], $now);
         $this->commit();
     }
@@ -268,6 +270,7 @@ final class ZfsasCoordinatorState
         }
         $task['retryAt'] = $delay ? $now + $delay : null;
         $task['retryMonotonic'] = $delay ? $monotonic + $delay : null;
+        $this->finishSharedCleanup($taskId, $now);
         $this->settle($task['runId'], $now);
         $this->commit(); return true;
     }
@@ -281,6 +284,10 @@ final class ZfsasCoordinatorState
             $failed = $failed || $state === 'failed';
             $allComplete = $allComplete && $state === 'complete';
             $active = $active || in_array($state, ['launching', 'running', 'stopping'], true);
+            $physicalId=$this->state['tasks'][$id]['parameters']['cleanupTaskId'] ?? '';
+            $physical=$this->state['tasks'][$physicalId] ?? null;
+            if ($physical && ($physical['parameters']['cleanupSelected'] ?? '')===$id
+                && in_array($physical['state'],['launching','running','stopping'],true)) { $active=true; }
         }
         if ($failed) {
             foreach ($run['tasks'] as $id) {
@@ -311,6 +318,9 @@ final class ZfsasCoordinatorState
     {
         $run =& $this->state['runs'][$runId];
         if ($run['state'] !== 'canceling') { return; }
+        foreach ($run['cleanupShutdown'] ?? [] as $token=>$_) {
+            if (($this->state['attempts'][$token]['state'] ?? '') !== 'stopped') { return; }
+        }
         foreach ($run['tasks'] as $id) {
             if (in_array($this->state['tasks'][$id]['state'], ['launching', 'running', 'stopping'], true)) { return; }
         }
@@ -344,9 +354,11 @@ final class ZfsasCoordinatorState
                 if (($task['parameters']['phase'] ?? '') === 'replication_transfer') { $task['result']=['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Transfer canceled; explicit validated Retry is required for any interrupted receive.']; }
                 $task['state'] = 'stopping'; $tokens[] = $task['attempt'];
             } elseif (!self::terminal($task['state'])) { $task['state'] = 'canceled'; }
+            $tokens = array_merge($tokens, $this->revokeCleanupOwner($id, $now));
         }
         foreach ($this->ownedRuns($runId) as $child) { $tokens = array_merge($tokens, $this->cancel($child, $now)); }
         $this->finishCancellation($runId, $now);
+        foreach ($run['tasks'] as $id) { $this->finishSharedCleanup($id,$now); }
         $this->commit(); return $tokens;
     }
 
@@ -369,6 +381,14 @@ final class ZfsasCoordinatorState
             $this->settle($run['id'], $now);
         } else {
             $task['state'] = 'queued'; $task['retryAt'] = $now; $task['retryMonotonic'] = $monotonic;
+        }
+        $this->finishSharedCleanup($task['id'],$now);
+        foreach ($task['parameters']['cleanupOwners'] ?? [] as $ownerId=>$_) {
+            $ownerRun=$this->state['tasks'][$ownerId]['runId'] ?? null;
+            if ($ownerRun) {
+                if ($this->state['runs'][$ownerRun]['state']==='canceling') { $this->finishCancellation($ownerRun,$now); }
+                elseif (!self::terminal($this->state['runs'][$ownerRun]['state'])) { $this->settle($ownerRun,$now); }
+            }
         }
         $this->commit();
     }
@@ -454,7 +474,15 @@ final class ZfsasCoordinatorState
     {
         $terminal = array_filter($this->state['runs'], fn($run) => self::terminal($run['state']));
         uasort($terminal, fn($a, $b) => $b['finishedAt'] <=> $a['finishedAt']);
-        $changed = false; $count = 0;$neededReviews=[];
+        $changed = false; $count = 0;$neededReviews=[];$neededCleanupOwners=[];
+        foreach (array_keys($this->sharedCleanupTasks) as $taskId) {
+            foreach ($this->state['tasks'][$taskId]['parameters']['cleanupOwners'] as $ownerId=>$_) {
+                $ownerRun=$this->state['tasks'][$ownerId]['runId'] ?? null;
+                if ($ownerRun) { $neededCleanupOwners[$ownerRun]=true; }
+                $approvalRun=$this->state['tasks'][$ownerId]['parameters']['ownerRunId'] ?? '';
+                if ($approvalRun!=='') { $neededCleanupOwners[$approvalRun]=true; }
+            }
+        }
         foreach($this->state['tasks'] as $consumer){
             $review=$consumer['parameters']['reviewRunId'] ?? null;
             if(!$review)continue;
@@ -467,11 +495,15 @@ final class ZfsasCoordinatorState
             if ($cleanup && !self::terminal($cleanup['state'])) { continue; }
             // A child deletion result remains evidence for its unfinished owner.
             foreach ($run['tasks'] as $taskId) {
+                foreach ($this->state['tasks'][$taskId]['parameters']['cleanupOwners'] ?? [] as $ownerTaskId=>$_) {
+                    $sharedOwner=$this->state['runs'][$this->state['tasks'][$ownerTaskId]['runId'] ?? ''] ?? null;
+                    if ($sharedOwner && (!self::terminal($sharedOwner['state']) || $this->runRequiresReview($sharedOwner['id']))) { continue 3; }
+                }
                 $ownerId = $this->state['tasks'][$taskId]['parameters']['ownerRunId'] ?? '';
                 if ($ownerId !== '' && isset($this->state['runs'][$ownerId])
                     && (!self::terminal($this->state['runs'][$ownerId]['state']) || $this->runRequiresReview($ownerId))) { continue 2; }
             }
-            if(isset($neededReviews[$id]))continue;
+            if(isset($neededReviews[$id]) || isset($neededCleanupOwners[$id]))continue;
             if (++$count <= 1000 && $run['finishedAt'] >= $now - 30 * 86400) { continue; }
             foreach ($run['tasks'] as $task) {
                 foreach ($this->state['attempts'] as $token => $attempt) {

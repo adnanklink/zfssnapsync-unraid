@@ -18,7 +18,15 @@ foreach ($batch['items'] as $item) { if ($item['snapshot'] === $snapshot && $ite
 if (!$found) { echo 'Snapshot was not approved'; exit(1); }
 $rows = zfsas_sm_dataset_snapshots($batch['dataset'], $error, true);
 if ($error) { echo $error; exit(1); }
-foreach ($rows as &$row) { zfsas_sm_ignore_owned_pending($row, $batch); } unset($row);
+foreach ($rows as &$row) {
+    zfsas_sm_ignore_owned_pending($row, $batch);
+    // Only the exact captured mutation may ignore its other registered owners.
+    // Holds, clones, transfers, foreign pending work and policy checks still apply.
+    if ($row['snapshot']===$snapshot && (string)$row['guid']===$guid && isset($approval['sharedPending'])) {
+        if (in_array($row['pendingDeleteJobId'] ?? '',$approval['sharedPending']['jobs'],true)) { $row['pendingDelete']=false; }
+        if (empty($row['pendingDelete']) && !array_diff($row['pendingBatchTokens'] ?? [],$approval['sharedPending']['tokens'])) { $row['pendingAction']=''; }
+    }
+} unset($row);
 $eligible = false;
 foreach ($rows as $row) {
     if ($row['snapshot'] !== $snapshot || (string) $row['guid'] !== $guid) { continue; }

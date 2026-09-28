@@ -12,6 +12,7 @@ trait ZfsasCoordinatorIndexes
     private function rebuildIndexes(): void
     {
         $this->readyTasks = []; $this->activeTasks = []; $this->dependents = []; $this->indexedDependencies = []; $this->deadlineVersions = [];
+        $this->sharedCleanupTasks = []; $this->sharedCleanupKeys = [];
         $this->referenceNames = []; $this->referenceGuids = []; $this->indexedReferences = [];
         foreach (array_keys($this->state['references']) as $id) { $this->indexReference($id); }
         $this->deadlines = new SplPriorityQueue();
@@ -21,6 +22,7 @@ trait ZfsasCoordinatorIndexes
 
     private function indexTask(string $id): void
     {
+        $this->indexSharedCleanup($id);
         unset($this->readyTasks[$id], $this->activeTasks[$id]);
         $version = ($this->deadlineVersions[$id] ?? 0) + 1;
         $this->deadlineVersions[$id] = $version;

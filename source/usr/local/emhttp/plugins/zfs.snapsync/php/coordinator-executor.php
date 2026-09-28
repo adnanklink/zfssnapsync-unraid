@@ -108,6 +108,12 @@ final class ZfsasCoordinatorExecutor
 
     public function tick(float $now): float
     {
+        foreach ($this->journal->reconcileSharedCleanup(time()) as $token) {
+            $this->stopping[$token] ??= ['since'=>$now,'recovery'=>false];
+        }
+        foreach ($this->journal->takeSharedCleanupChanges() as $id) {
+            if ($this->onTransition) { ($this->onTransition)($id); }
+        }
         foreach ($this->journal->activeTaskIds() as $activeTaskId) {
             $token = $this->journal->state['tasks'][$activeTaskId]['attempt'];
             $attempt = $this->journal->state['attempts'][$token];
@@ -195,7 +201,10 @@ final class ZfsasCoordinatorExecutor
         foreach ($ready as $taskId) {
             $task = $this->journal->state['tasks'][$taskId]; $kind = $task['kind'];
             if (!in_array($task['state'], ['queued', 'waiting', 'retry_wait'], true)) { continue; }
-            if (($active[$kind] ?? 0) >= ($this->limits[$kind] ?? 0)) { continue; }
+            $atLimit=($active[$kind] ?? 0) >= ($this->limits[$kind] ?? 0);
+            $canDelegate=$kind==='delete' && empty($task['parameters']['sharedCleanup'])
+                && (!empty($task['parameters']['nativeSchedule']) || !empty($task['parameters']['ownerItemId']));
+            if ($atLimit && !$canDelegate) { continue; }
             $command = ($this->command)($task);
             if ($command === null) { continue; } // Resource/array/configuration admission gate.
             if (isset($command['outcome'])) {
@@ -204,6 +213,7 @@ final class ZfsasCoordinatorExecutor
                 if ($this->onTransition) { ($this->onTransition)($taskId); }
                 continue;
             }
+            if ($atLimit) { continue; }
             $token = $this->journal->claim($taskId, $now, time(), $this->generation);
             $dir = $this->root . '/attempts/' . $token;
             if (!mkdir($dir, 0700, true)) { throw new RuntimeException('Cannot create attempt launch gate.'); }
@@ -220,6 +230,9 @@ final class ZfsasCoordinatorExecutor
         }
         // Process checks are only needed while attempts exist; idle scheduling
         // sleeps to its actual deadline instead of scanning inventories.
+        // Delegation can publish a new physical task during this admission pass.
+        // Wake for that new work without polling unchanged blocked admissions.
+        if (array_diff($this->journal->runnable($now),$ready)) { return $now + .01; }
         return $this->journal->activeTaskIds() ? $now + .1 : $this->journal->nextDeadline($now);
     }
 }

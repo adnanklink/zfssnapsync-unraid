@@ -56,14 +56,14 @@ trait ZfsasCoordinatorJournal
         if (is_file($root . '/checkpoint.json')) {
             $state = self::decodeEnvelope((string) file_get_contents($root . '/checkpoint.json'));
             $version = $state['version'] ?? null;
-            if (!in_array($version, [1, 2, 3], true)) { throw new RuntimeException('Unsupported coordinator journal version.'); }
+            if (!in_array($version, [1, 2, 3, 4], true)) { throw new RuntimeException('Unsupported coordinator journal version.'); }
             if (!is_int($state['sequence'] ?? null) || $state['sequence'] < 0) { throw new RuntimeException('Coordinator checkpoint sequence is corrupt.'); }
-            foreach ($version === 3 ? self::COLLECTIONS : array_slice(self::COLLECTIONS, 0, 5) as $collection) {
+            foreach ($version >= 3 ? self::COLLECTIONS : array_slice(self::COLLECTIONS, 0, 5) as $collection) {
                 if (!is_array($state[$collection] ?? null)) { throw new RuntimeException('Coordinator checkpoint collection is corrupt.'); }
             }
             $state += self::emptyState();
         }
-        $state['version'] = 3;
+        $state['version'] = max(3,$version);
         $offset = 0; $records = 0; $previous = null;
         $stream = is_file($root . '/journal.ndjson') ? fopen($root . '/journal.ndjson', 'rb') : false;
         if ($stream) {
@@ -74,13 +74,15 @@ trait ZfsasCoordinatorJournal
                     if (!str_ends_with($line, "\n")) { break; }
                     $event = self::decodeEnvelope($line);
                     $sequence = $event['sequence'] ?? null;
-                    if (($event['version'] ?? null) !== 3 || !is_int($sequence) || $sequence < 1
+                    if (!in_array($event['version'] ?? null,[3,4],true) || !is_int($sequence) || $sequence < 1
                         || ($previous !== null && $sequence !== $previous + 1)
                         || !is_array($event['put'] ?? null) || !is_array($event['remove'] ?? null)) {
                         throw new RuntimeException('Coordinator journal sequence or record is corrupt.');
                     }
                     $previous = $sequence;
                     if ($sequence > $state['sequence']) {
+                        if ($event['version'] < $state['version']) { throw new RuntimeException('Coordinator authority format cannot be downgraded.'); }
+                        if ($event['version']===4) { $state['version']=4;$version=4; }
                         if ($sequence !== $state['sequence'] + 1) { throw new RuntimeException('Coordinator journal sequence gap; refusing recovery.'); }
                         foreach (['put', 'remove'] as $operation) {
                             foreach ($event[$operation] as $collection => $entries) {
@@ -164,14 +166,14 @@ trait ZfsasCoordinatorJournal
                 if ($deleted) { $remove[$collection] = $deleted; }
             }
             $sequence = $this->state['sequence'] + 1;
-            $bytes = self::envelope(['version' => 3, 'sequence' => $sequence, 'put' => $put, 'remove' => $remove]);
+            $bytes = self::envelope(['version' => $this->state['version'], 'sequence' => $sequence, 'put' => $put, 'remove' => $remove]);
             $stream = fopen($this->root . '/journal.ndjson', 'ab');
             if (!$stream) { throw new RuntimeException('Cannot append RAM journal.'); }
             try { self::writeJournalBytes($stream, $bytes); } finally { fclose($stream); }
             $this->state['sequence'] = $sequence; $this->publishedEntities = $entities;
             $this->updateIndexes($put, $remove);
             $this->journalRecords++; $this->journalBytes += strlen($bytes);
-            if (!is_file($this->root . '/checkpoint.json') || $this->loadedVersion !== 3
+            if (!is_file($this->root . '/checkpoint.json') || $this->loadedVersion !== $this->state['version']
                 || $this->journalRecords >= 1024 || $this->journalBytes >= 8 * 1048576) { $this->checkpoint(); }
         } catch (Throwable $error) { $this->journalFailed = true; throw $error; }
     }
@@ -190,6 +192,6 @@ trait ZfsasCoordinatorJournal
         if (!$stream) { throw new RuntimeException('Cannot compact RAM journal.'); }
         try { self::writeJournalBytes($stream, ''); } finally { fclose($stream); }
         if (!rename($path, $this->root . '/journal.ndjson')) { throw new RuntimeException('Cannot compact RAM journal.'); }
-        $this->journalRecords = 0; $this->journalBytes = 0; $this->loadedVersion = 3;
+        $this->journalRecords = 0; $this->journalBytes = 0; $this->loadedVersion = $this->state['version'];
     }
 }
