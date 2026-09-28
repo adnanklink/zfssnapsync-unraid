@@ -4,7 +4,9 @@
   "images": {
     "overview.png": {
       "capture": "section-overview-light.png",
-      "sha256": "8a9c382126d32fdecc267c02367b0cb2de3f6505e16c10933424465d46983830"
+      "sha256": "0708543183a01c848ca9ea03476cef23d8c34dd4ae71c7f77eeed920be1cd088",
+      "sourceRevision": "3fee847",
+      "note": "Refreshed after Auto status visibility correction; other captures use the recorded inputDigest."
     },
     "automation.png": {
       "capture": "automation-configured.png",
