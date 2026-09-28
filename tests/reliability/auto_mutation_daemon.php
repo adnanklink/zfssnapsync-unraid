@@ -10,7 +10,10 @@ function until(callable $fn) {
     throw new RuntimeException('Auto daemon timeout: '.@file_get_contents('/tmp/auto-mutation-daemon.log').' '.@file_get_contents('/var/log/zfs_snapsync.log'));
 }
 $dir='/boot/config/plugins/zfs.snapsync';@mkdir($dir,0770,true);
-file_put_contents($dir.'/zfs_snapsync.conf',"DATASETS=\"tank/data:0G\"\nPREFIX=\"auto-\"\nSCHEDULE_MODE=\"disabled\"\n");
+$mode=empty($partialReplan)?'disabled':'hourly';
+file_put_contents($dir.'/zfs_snapsync.conf',"DATASETS=\"tank/data:0G\"\nPREFIX=\"auto-\"\nSCHEDULE_MODE=\"$mode\"\n");
+if(!empty($partialReplan))file_put_contents('/tmp/save-after-auto-snapshot','1');
+if(!empty($changedCompletedIdentity))file_put_contents('/tmp/change-completed-guid','1');
 file_put_contents($dir.'/zfs_send.conf',"SEND_SNAPSHOT_PREFIX=\"send-\"\n");
 @mkdir('/var/local/emhttp',0770,true);file_put_contents('/var/local/emhttp/var.ini','mdState="STARTED"');
 $initial=['snapshots'=>[
@@ -41,6 +44,7 @@ elif op=='get':
   row=s['snapshots'].get(name,{'guid':'10','available':'10000000000','quota':'0','refquota':'0','used':'0','referenced':'0'})
   for prop in props:
    data={'name':name,'property':prop,'value':row.get(prop,'-'),'source':'local'}
+   if prop=='guid' and '@' in name and 'auto-replan-' in os.getenv('ZFSAS_TASK_ID','') and os.path.exists('/tmp/change-completed-guid'):data['value']='999'
    print('\t'.join(data[x] for x in fields.split(',')))
 elif op in ['destroy','snapshot']:
  if os.path.exists('/tmp/block-auto-mutation'):
@@ -55,6 +59,11 @@ elif op in ['destroy','snapshot']:
  s['mutations'].append([op,target,os.getenv('ZFSAS_TASK_ID','')])
  with open(path+'.pending','w') as f:json.dump(s,f)
  os.replace(path+'.pending',path)
+ if op=='snapshot' and os.path.exists('/tmp/save-after-auto-snapshot'):
+  config='/boot/config/plugins/zfs.snapsync/zfs_snapsync.conf'
+  with open(config) as f:text=f.read()
+  with open(config,'w') as f:f.write(text.replace('tank/data:0G','tank/data:0G,tank/new:0G'))
+  os.unlink('/tmp/save-after-auto-snapshot')
 else:sys.exit(3)
 PY);
 file_put_contents('/usr/local/bin/zpool',"#!/bin/sh\nif [ \"\$1\" = get ]; then echo 0; elif [ \"\$1\" = list ]; then echo tank; else echo fixture; fi\n");
@@ -62,6 +71,23 @@ chmod('/usr/local/bin/zfs',0755);chmod('/usr/local/bin/zpool',0755);
 $daemon=proc_open([PHP_BINARY,$plugin.'/coordinator-daemon.php'],[1=>['file','/tmp/auto-mutation-daemon.log','a'],2=>['file','/tmp/auto-mutation-daemon.log','a']],$pipes);
 try {
     until(function(){try{return rpc(['action'=>'status']);}catch(Throwable $e){return false;}});
+    if(!empty($partialReplan)) {
+        $expected=empty($changedCompletedIdentity)?'complete':'failed';
+        $run=until(function()use($expected){foreach(rpc(['action'=>'status'])['runs'] as $r)if($r['schedule']==='auto' && $r['state']===$expected && ($r['autoReplanCount'] ?? 0)===1)return $r;return false;});
+        check(($run['autoReplanCount'] ?? 0)===1,'Actual automatic run did not replan once: '.json_encode($run));
+        $state=json_decode(file_get_contents('/tmp/auto-zfs.json'),true);
+        $created=array_values(array_filter($state['mutations'],static fn($row)=>$row[0]==='snapshot'));
+        if(!empty($changedCompletedIdentity)) {
+            check(count($state['mutations'])===2 && count($created)===1,'Changed completed snapshot did not stop continuation');
+            echo "PASS: actual partial Auto continuation rejects changed completed checkpoint identity before further mutation\n";
+            return;
+        }
+        check(count($state['mutations'])===3 && count($created)===2,'Partial continuation repeated completed mutations: '.json_encode($state));
+        check(str_starts_with($created[0][1],'tank/data@') && str_starts_with($created[1][1],'tank/new@'),'Continuation failed to preserve completed dataset work');
+        check(count(array_filter(rpc(['action'=>'status'])['runs'],static fn($r)=>$r['schedule']==='auto'))===1,'Continuation replaced the operation or accepted occurrence');
+        echo "PASS: actual daemon continues after a settings save, verifies and preserves completed snapshot identity, creates only the new dataset checkpoint and retains the occurrence\n";
+        return;
+    }
     $receipt=rpc(['action'=>'auto','commandId'=>'individual-auto']);
     $run=until(function()use($receipt){foreach(rpc(['action'=>'status'])['runs'] as $r)if($r['id']===$receipt['runId']&&in_array($r['state'],['complete','failed','canceled'],true))return $r;return false;});
     check($run['state']==='complete',json_encode($run).' '.@file_get_contents('/var/log/zfs_snapsync.log').' '.json_encode(rpc(['action'=>'operation_detail','runId'=>$run['id']])));

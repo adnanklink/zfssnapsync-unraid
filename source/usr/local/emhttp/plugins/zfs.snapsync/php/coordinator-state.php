@@ -286,6 +286,7 @@ final class ZfsasCoordinatorState
         $run =& $this->state['runs'][$runId];
         $failed = false; $allComplete = true; $active = false;
         foreach ($run['tasks'] as $id) {
+            if(!empty($this->state['tasks'][$id]['supersededBy']))continue;
             $state = $this->state['tasks'][$id]['state'] ?? 'missing';
             $failed = $failed || $state === 'failed';
             $allComplete = $allComplete && $state === 'complete';
@@ -476,7 +477,7 @@ final class ZfsasCoordinatorState
         }
         foreach ($this->state['runs'][$runId]['tasks'] as $id) {
             $task = $this->state['tasks'][$id];
-            if (isset($task['recoveryResolvedBy'])) { continue; }
+            if (isset($task['recoveryResolvedBy']) || !empty($task['supersededBy'])) { continue; }
             if (!empty($task['parameters']['inspection']['resumeRequired']) && $task['state']!=='complete') { return true; }
             if (!empty($task['result']['recoveryRequired']) || $task['blocked'] === 'recovery_required') { return true; }
             foreach ($task['items'] ?? [] as $itemId) {

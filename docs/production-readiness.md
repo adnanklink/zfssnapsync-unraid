@@ -13,7 +13,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 5. Native SSH execution and recovery | Complete in fixtures; native admission enabled; 39-suite regression run passed; host acceptance remains separate |
 | 6. SSH cleanup parity | Complete in fixtures; real-SSH/coordinator checks and 39-suite regression run passed; host acceptance remains separate |
 | 7. Individual Auto Snapshot mutation tasks | Implemented; policy, actual-daemon, cancellation and lifecycle fixtures pass; full regression run in progress |
-| 8. Safe partial automatic replanning | Pending |
+| 8. Safe partial automatic replanning | Implemented; state and actual-daemon continuation/identity regressions pass |
 | 9. Lifecycle and reboot compatibility | Pending |
 | 10. Operational UI feedback | Pending |
 | 11. Fault, flash-write and scale acceptance | Pending |
@@ -244,3 +244,28 @@ and an actual daemon using the unmodified production policy path pass. The latte
 checks deletion-before-creation ordering, distinct task identities, preserved newest
 checkpoints, Dry Run, update draining, cancellation and injected policy-driver loss.
 Full CI and real-host acceptance remain separate verification steps.
+
+## Task 8 partial automatic replanning
+
+After a configuration change stops an automatic occurrence, the coordinator can
+append a continuation within that same operation. It retains prior task outcomes
+and attempt diagnostics, command receipts and schedule acceptance. Superseded
+failures remain historical evidence. Completed deletions are not replayed;
+completed creations carry exact dataset and snapshot GUID proofs, are protected
+as checkpoints, and are verified before continuing. The policy driver skips
+creation for those already completed datasets and evaluates unfinished work under
+the current saved policy.
+
+Continuation requires the same enabled schedule, the latest accepted occurrence,
+no competing Auto run, verified worker shutdown and no ambiguous mutation grant.
+Manual approvals, explicit pauses, lifecycle barriers, changed schedules and
+uncertain outcomes do not gain automatic authorization. Journal format 8 makes the
+supersession boundary explicit to older readers. Completed-work captures remain
+in RAM and are pruned with their task ownership.
+
+State-machine tests verify preserved identities, references, outcomes and timing,
+and reject manual, stale and ambiguous work. Actual daemon tests save settings
+immediately after snapshot creation: the original operation continues and creates
+only the newly selected dataset's checkpoint. A changed completed checkpoint GUID
+stops continuation before another mutation. Reliability regressions pass; dedicated
+host acceptance and the final combined verification remain release gates.

@@ -2,6 +2,72 @@
 /** The Auto policy driver proposes one mutation and waits for its owned result. */
 trait ZfsasCoordinatorAutoMutations
 {
+    /** Preserve evidence while replacing only safely stopped automatic work. */
+    public function replanPartialAuto(string $runId,array $parameters,int $now): bool
+    {
+        $run=$this->state['runs'][$runId] ?? null;
+        if(!$run || $run['manual'] || $run['schedule']!=='auto' || $run['state']!=='failed'
+            || $run['revision']===$parameters['revision'] || !empty($run['upgradeReviewRequired']))return false;
+        if(($this->state['schedules']['auto']['runId'] ?? '')!==$runId)return false;
+        foreach($this->state['runs'] as $other) {
+            if($other['id']===$runId || self::terminal($other['state']))continue;
+            foreach($other['tasks'] as $id)if(!empty($this->state['tasks'][$id]['parameters']['individualMutations']))return false;
+        }
+        $driver=null;$completed=[];$superseded=[];
+        foreach($run['tasks'] as $id) {
+            $task=$this->state['tasks'][$id];$p=$task['parameters'];
+            if(!empty($task['supersededBy']))continue;
+            if(in_array($task['state'],['running','launching','stopping'],true) || $task['attempt']!==null)return false;
+            if(!empty($p['individualMutations'])) {
+                $driver=$task;
+                if(($task['result']['reason'] ?? '')!=='configuration')return false;
+                $superseded[]=$id;continue;
+            }
+            $mutation=$p['autoMutation'] ?? null;
+            if(!$mutation)return false;
+            $physical=$this->state['tasks'][$p['cleanupTaskId'] ?? ''] ?? $task;
+            if($physical['attempt']!==null || in_array($physical['state'],['running','launching','stopping'],true))return false;
+            if($task['state']==='complete' && ($task['result']['itemState'] ?? '')==='completed') {
+                if($mutation['proposal']['action']==='snapshot') {
+                    $guid=$task['result']['guid'] ?? null;
+                    if(!is_string($guid) || !preg_match('/^[0-9]{1,20}$/D',$guid))return false;
+                    $proposal=$mutation['proposal'];$dataset=explode('@',$proposal['snapshot'])[0];
+                    $completed[$dataset]=['role'=>'checkpoint','endpoint'=>'local','dataset'=>$dataset,
+                        'datasetGuid'=>$proposal['datasetGuid'],'snapshot'=>$proposal['snapshot'],'guid'=>$guid];
+                }
+                continue;
+            }
+            foreach($this->state['attempts'] as $attempt) {
+                if($attempt['taskId']!==$physical['id'])continue;
+                // An older attempt without explicit pre-mutation evidence is
+                // ambiguous; it cannot be retried using a settings save.
+                if(!empty($attempt['autoMutationAuthorized']) || !isset($attempt['result'])
+                    || ($attempt['result']['mutationStarted'] ?? true)!==false)return false;
+            }
+            $superseded[]=$id;
+        }
+        if(!$driver || ($driver['parameters']['scheduleSpec'] ?? null)!==$parameters['scheduleSpec']
+            || $parameters['scheduleSpec']['kind']==='disabled' || !$parameters['mutationDatasets'])return false;
+        foreach($driver['parameters']['completedAutoSnapshots'] ?? [] as $dataset=>$proof)$completed[$dataset] ??= $proof;
+        $number=(int)($run['autoReplanCount'] ?? 0)+1;
+        $id=$runId.':auto-replan-'.$number;
+        $parameters['completedAutoSnapshots']=$completed;
+        $this->checkReferenceAdmission(array_values($completed));
+        $this->state['tasks'][$id]=['id'=>$id,'runId'=>$runId,'kind'=>'auto','dataset'=>'','parameters'=>$parameters,
+            'dependencies'=>[],'references'=>array_values($completed),'state'=>'queued','attemptCount'=>0,'attempt'=>null,
+            'retryAt'=>null,'retryMonotonic'=>null,'blocked'=>'','result'=>null];
+        $this->registerReferences($id,array_values($completed));
+        foreach($superseded as $old)$this->state['tasks'][$old]['supersededBy']=$id;
+        $this->state['runs'][$runId]['tasks'][]=$id;
+        $this->state['runs'][$runId]['autoReplanCount']=$number;
+        $this->state['runs'][$runId]['replannedFrom'] ??= $run['revision'];
+        $this->state['runs'][$runId]['replannedAt']=$now;
+        $this->state['runs'][$runId]['revision']=$parameters['revision'];
+        $this->state['runs'][$runId]['state']='queued';$this->state['runs'][$runId]['finishedAt']=null;
+        $this->state['version']=max(8,$this->state['version']);
+        $this->commit();return true;
+    }
+
     private function proposeAutoMutation(string $parentId,string $token,array $proposal,int $now): array
     {
         $parent=$this->state['tasks'][$parentId];$p=$parent['parameters'];

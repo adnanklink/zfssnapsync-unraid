@@ -2,7 +2,7 @@
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/auto-mutation.php';
 require_once __DIR__.'/coordinator-worker-client.php';
-$sequence=1;
+$sequence=1;$mutationStarted=false;
 try {
     $task=(string)getenv('ZFSAS_TASK_ID');$path=$argv[1] ?? '';
     if($path!=='/tmp/zfs-snapsync-coordinator/attempt-inputs/'.hash('sha256',$task).'.auto.json' || is_link($path))throw new InvalidArgumentException('Invalid Auto mutation capture.');
@@ -17,6 +17,7 @@ try {
             zfsas_coordinator_worker_report('delete_authorize',$sequence++,['jobId'=>$p['deleteJob']['JOB_ID'],'snapshot'=>$proposal['snapshot'],'guid'=>$proposal['guid']]);
         }
         if($p['revision']!==zfsas_config_revision('/boot/config/plugins/zfs.snapsync'))throw new InvalidArgumentException('Configuration changed at the Auto mutation boundary.');
+        $mutationStarted=true;
         ZfsasReplicationInspection::autoMutation($proposal['action']==='delete'?'destroy':'snapshot',$proposal['snapshot']);
         $result=['outcome'=>'success','itemState'=>'completed','snapshot'=>$proposal['snapshot'],
             'message'=>$proposal['action']==='delete'?'Automatic snapshot deleted.':'Automatic snapshot created.'];
@@ -27,6 +28,6 @@ try {
         }
     }
 } catch(Throwable $error) {
-    $result=['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>$error->getMessage()];
+    $result=['outcome'=>'validation_failure','recoveryRequired'=>$mutationStarted,'mutationStarted'=>$mutationStarted,'message'=>$error->getMessage()];
 }
 zfsas_coordinator_worker_report('result',$sequence,$result);

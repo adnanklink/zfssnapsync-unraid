@@ -56,6 +56,7 @@ trait ZfsasCoordinatorWorkerState
             $response += $this->proposeAutoMutation($taskId,$token,$payload,$now);
         } elseif ($type === 'auto_authorize') {
             $response += $this->authorizeAutoMutation($taskId,$payload);
+            $attempt['autoMutationAuthorized']=true;
         } elseif ($type === 'delete_authorize') {
             $response += $this->authorizeDeletion($taskId, $payload);
         } elseif ($type==='source_item') {

@@ -56,7 +56,7 @@ trait ZfsasCoordinatorJournal
         if (is_file($root . '/checkpoint.json')) {
             $state = self::decodeEnvelope((string) file_get_contents($root . '/checkpoint.json'));
             $version = $state['version'] ?? null;
-            if (!in_array($version, [1, 2, 3, 4, 5, 6, 7], true)) { throw new RuntimeException('Unsupported coordinator journal version.'); }
+            if (!in_array($version, [1, 2, 3, 4, 5, 6, 7, 8], true)) { throw new RuntimeException('Unsupported coordinator journal version.'); }
             if (!is_int($state['sequence'] ?? null) || $state['sequence'] < 0) { throw new RuntimeException('Coordinator checkpoint sequence is corrupt.'); }
             foreach ($version >= 3 ? self::COLLECTIONS : array_slice(self::COLLECTIONS, 0, 5) as $collection) {
                 if (!is_array($state[$collection] ?? null)) { throw new RuntimeException('Coordinator checkpoint collection is corrupt.'); }
@@ -74,7 +74,7 @@ trait ZfsasCoordinatorJournal
                     if (!str_ends_with($line, "\n")) { break; }
                     $event = self::decodeEnvelope($line);
                     $sequence = $event['sequence'] ?? null;
-                    if (!in_array($event['version'] ?? null,[3,4,5,6,7],true) || !is_int($sequence) || $sequence < 1
+                    if (!in_array($event['version'] ?? null,[3,4,5,6,7,8],true) || !is_int($sequence) || $sequence < 1
                         || ($previous !== null && $sequence !== $previous + 1)
                         || !is_array($event['put'] ?? null) || !is_array($event['remove'] ?? null)) {
                         throw new RuntimeException('Coordinator journal sequence or record is corrupt.');

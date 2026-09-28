@@ -27,6 +27,7 @@ php tests/reliability/inventory_cache.php
 php tests/reliability/batch_item_recovery.php
 php tests/reliability/coordinator_state.php
 php tests/reliability/coordinator_auto_mutations.php
+php tests/reliability/coordinator_partial_auto.php
 php tests/reliability/auto_mutation_policy.php
 php tests/reliability/coordinator_references.php
 php tests/reliability/endpoint_identity.php

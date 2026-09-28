@@ -1841,6 +1841,10 @@ fi
 
 prepare_runtime_state
 acquire_lock
+AUTO_COMPLETED_DATASETS=""
+if [[ "${ZFSAS_INDIVIDUAL_AUTO:-0}" == 1 ]]; then
+    AUTO_COMPLETED_DATASETS="$(php /usr/local/emhttp/plugins/zfs.snapsync/php/auto-mutation-client.php completed)"
+fi
 zfsas_log_prepare_for_append "$LOG_FILE" "$LOG_ARCHIVE_FILE" "$DEBUG_LOG_MAX_BYTES" 500 20 "$DEBUG_LOG_ARCHIVE_MAX_BYTES" || true
 
 IFS=',' read -r -a raw_pairs <<<"$DATASETS"
@@ -2088,6 +2092,10 @@ timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
 for pair in "${pairs[@]}"; do
 	abort_if_stop_requested
 	ds="${pair%:*}"
+	if [[ -n "$AUTO_COMPLETED_DATASETS" ]] && newline_set_contains $'\n'"$AUTO_COMPLETED_DATASETS"$'\n' "$ds"; then
+		log "Keeping the verified snapshot already created for $ds in this occurrence."
+		continue
+	fi
 	skip_create_for=""
 	while IFS= read -r unresolved_dataset; do
 		[[ -n "$unresolved_dataset" ]] || continue

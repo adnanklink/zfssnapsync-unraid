@@ -76,6 +76,12 @@ function zfsas_coordinator_prune_artifacts(ZfsasCoordinatorState $journal, strin
         $revision = basename($path);
         if (preg_match('/^[a-f0-9]{64}$/D', $revision) && !isset($revisions[$revision])) { $removeTree($path); }
     }
+    $completedInputs=[];
+    foreach($journal->state['tasks'] as $task)if(!empty($task['parameters']['individualMutations']))$completedInputs[hash('sha256',$task['id'])]=true;
+    foreach(glob($root.'/config/*.auto-completed.json') ?: [] as $path) {
+        $id=basename($path,'.auto-completed.json');
+        if(preg_match('/^[a-f0-9]{64}$/D',$id) && !isset($completedInputs[$id]))@unlink($path);
+    }
     $terminal = [];
     foreach (glob($batches . '/*.json') ?: [] as $path) {
         $token = basename($path, '.json');

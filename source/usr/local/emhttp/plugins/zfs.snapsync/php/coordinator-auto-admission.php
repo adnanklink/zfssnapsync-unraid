@@ -38,8 +38,26 @@ function zfsas_coordinator_auto_command(ZfsasCoordinatorState $journal, array $t
         $journal->state['tasks'][$task['id']]['parameters']=$parameters;
         $journal->commit();
     }
-    return ['/usr/bin/env', 'ZFSAS_COORDINATED=1', 'ZFSAS_INDIVIDUAL_AUTO=1', 'CONFIG_FILE=' . $capture . '/zfs_snapsync.conf',
+    $completed=$root.'/config/'.hash('sha256',$task['id']).'.auto-completed.json';
+    $text=json_encode(['taskId'=>$task['id'],'revision'=>$parameters['revision'],'snapshots'=>$parameters['completedAutoSnapshots'] ?? []],JSON_THROW_ON_ERROR);
+    if(file_put_contents($completed.'.pending',$text)!==strlen($text) || !rename($completed.'.pending',$completed))throw new RuntimeException('Cannot capture completed Auto snapshots.');
+    return ['/usr/bin/env', 'ZFSAS_COORDINATED=1', 'ZFSAS_INDIVIDUAL_AUTO=1', 'ZFSAS_AUTO_COMPLETED_FILE='.$completed, 'CONFIG_FILE=' . $capture . '/zfs_snapsync.conf',
         'ZFSAS_CONFIG_REVISION=' . $parameters['revision'], '/bin/bash', __DIR__.'/../scripts/coordinator-auto-attempt.sh'];
+}
+
+function zfsas_coordinator_replan_partial_auto(ZfsasCoordinatorState $journal,string $runId,string $configDir): void
+{
+    $run=$journal->state['runs'][$runId] ?? null;
+    if(!$run || $run['state']!=='failed' || $run['manual'] || $run['schedule']!=='auto'
+        || is_file(zfsas_ops_control_path('paused','auto')) || is_file($configDir.'/maintenance')
+        || is_file('/var/run/zfs-snapsync-coordinator/refresh.json'))return;
+    $pair=zfsas_config_read_pair($configDir,true);
+    if(!$pair || $pair['revision']===$run['revision'] || trim($pair['auto']['DATASETS'])==='')return;
+    $parameters=['revision'=>$pair['revision'],'autoConfig'=>$pair['rawAuto'],'sendConfig'=>$pair['rawSend'],
+        'prefixHistory'=>$pair['prefixHistory'],'scheduleSpec'=>ZfsasSchedule::autoConfig($pair['auto']),
+        'individualMutations'=>true,'mutationPrefix'=>$pair['auto']['PREFIX'],
+        'mutationDatasets'=>array_values(array_unique(array_map(static fn($entry)=>trim(substr($entry,0,strrpos($entry,':'))),explode(',',$pair['auto']['DATASETS']))))];
+    $journal->replanPartialAuto($runId,$parameters,time());
 }
 
 function zfsas_coordinator_auto_mutation_command(array $task,ZfsasCoordinatorState $journal,string $root,string $revision): array

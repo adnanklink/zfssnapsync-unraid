@@ -94,7 +94,11 @@ $command = static function (array $task) use ($root, $configDir, $journal, $dele
 };
 $outcome = static function ($task, $code) use ($configDir, $journal): array {
     if(isset($task['parameters']['autoMutation'])) {return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Automatic mutation stopped without a verified result. Review before another run.'];}
-    if(!empty($task['parameters']['individualMutations']) && $code!==0) {return ['outcome'=>'validation_failure','recoveryRequired'=>true,'message'=>'Automatic policy run stopped. Completed mutations are preserved; review the remaining work.'];}
+    if(!empty($task['parameters']['individualMutations']) && $code!==0) {
+        $changed=$task['parameters']['revision']!==zfsas_config_revision($configDir);
+        return ['outcome'=>'validation_failure','reason'=>$changed?'configuration':'interruption','recoveryRequired'=>!$changed,
+            'message'=>$changed?'Settings changed; checking whether unfinished automatic work can be replanned.':'Automatic policy run stopped. Completed mutations are preserved; review the remaining work.'];
+    }
     if (!empty($task['parameters']['nativeSchedule'])) { return ['outcome'=>'transient_failure','message'=>'Scheduled task stopped without an explicit outcome.']; }
     if (in_array($task['kind'], ['send','finalize'],true)) { return ['outcome'=>'transient_failure','recoveryRequired'=>true,'message'=>'Native replication stopped without an explicit result.']; }
     if ($task['kind'] === 'prepare') { return ['outcome'=>'transient_failure','message'=>'Inspection stopped without an explicit result.']; }
@@ -111,7 +115,7 @@ $outcome = static function ($task, $code) use ($configDir, $journal): array {
 };
 $remoteShutdown = new ZfsasRemoteShutdown();
 $executor = new ZfsasCoordinatorExecutor($journal, $root, $runtime, $command, $outcome, [],
-    static function($taskId) use ($journal, $deletion) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); zfsas_coordinator_source_followup($journal,$journal->state['tasks'][$taskId]['runId']); },
+    static function($taskId) use ($journal, $deletion, $configDir) { $journal->resolveReplicationRecovery($journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_project_batch($journal, $taskId); $deletion->changed($taskId); zfsas_coordinator_source_followup($journal,$journal->state['tasks'][$taskId]['runId']); zfsas_coordinator_replan_partial_auto($journal,$journal->state['tasks'][$taskId]['runId'],$configDir); },
     [$remoteShutdown,'poll']);
 foreach (array_keys($journal->state['runs']) as $runId) { zfsas_coordinator_source_followup($journal,$runId); }
 // Replay persistent decisions before allowing recovery to admit another attempt.

@@ -5,6 +5,19 @@ require_once __DIR__.'/coordinator-worker-client.php';
 try {
     $token=(string)getenv('ZFSAS_ATTEMPT_TOKEN');
     if(!preg_match('/^[a-f0-9]{48}$/D',$token))throw new InvalidArgumentException('Missing Auto policy grant.');
+    if(($argv[1] ?? '')==='completed') {
+        $task=(string)getenv('ZFSAS_TASK_ID');$path=(string)getenv('ZFSAS_AUTO_COMPLETED_FILE');
+        if($path!=='/tmp/zfs-snapsync-coordinator/config/'.hash('sha256',$task).'.auto-completed.json' || is_link($path))throw new InvalidArgumentException('Invalid completed Auto capture.');
+        $capture=json_decode((string)file_get_contents($path),true,32,JSON_THROW_ON_ERROR);
+        if($capture['taskId']!==$task || $capture['revision']!==zfsas_config_revision('/boot/config/plugins/zfs.snapsync'))throw new InvalidArgumentException('Completed Auto capture changed.');
+        foreach($capture['snapshots'] as $dataset=>$proof) {
+            foreach([$dataset=>$proof['datasetGuid'],$proof['snapshot']=>$proof['guid']] as $name=>$guid) {
+                if(trim(ZfsasReplicationInspection::command(['get','-H','-p','-o','value','guid','--',$name]))!==$guid)throw new InvalidArgumentException('A completed Auto snapshot or dataset changed; remaining work requires review.');
+            }
+            echo $dataset,"\n";
+        }
+        exit;
+    }
     $path='/tmp/zfs-snapsync-coordinator/attempts/'.$token.'/auto-proposal.json';
     if(is_link(dirname($path)) || is_link($path))throw new InvalidArgumentException('Unsafe Auto proposal path.');
     if(($argv[1] ?? '')==='capture') {
