@@ -124,6 +124,36 @@ Snapshot Manager works on one dataset at a time, with search, filters, and pagin
 
 **Used** and **Written** are different ZFS measurements. Zero does not mean a snapshot is empty, and Written totals do not predict how much space deletion will reclaim.
 
+## Stop managing a dataset and remove its history
+
+In **Snapshots**, choose the dataset, then **Stop automation and clean up…**.
+Review the Auto Snapshot selection and backup jobs to remove. **Stop automation**
+saves those configuration changes; it does not delete snapshots. Runs belonging
+entirely to that scope are canceled and shutdown is verified. Mixed-scope work must
+finish or be canceled separately in Activity. Recursive jobs and ancestor Auto
+cleanup must be resolved separately so child datasets remain outside this workflow.
+
+Review the source and destinations, then choose **Delete N snapshots**. SnapSync
+history is selected initially by its known naming prefixes; review legacy names
+carefully. Manual/other-tool snapshots start unselected. Only the captured selection
+is authorized, and the review expires after five minutes. Dataset contents and child
+datasets remain intact. Destination snapshots are deleted first; a destination
+failure prevents source deletion and leaves automation stopped.
+
+Holds, clones, other jobs and interrupted receives remain protected. The review
+explains SnapSync versus external holds when their tags are available. Release a
+SnapSync hold separately through **Protection → Release plugin hold** on that host;
+external holds belong to their owning tool. Explicitly abandoning recovery is offered
+only for fully stopped operations belonging solely to the reviewed retired jobs.
+It does not discard a receiver's unresolved receive token or another job's protection.
+
+If a job was already removed, expand **Job already removed? Add its destination**
+and explicitly select local or SSH transport and the destination dataset. After a
+reboot, inspect again and reselect destinations: retirement reviews and deletion
+authority live in RAM. Closing the dialog never restores stopped automation.
+
+![Dataset cleanup review (demo)](docs/screenshots/retirement-review-light-1440.png)
+
 ## Backup copies and replication
 
 A backup job specifies a source, destination, schedule, whether to include child datasets, and a destination free-space target. In **Backup copies**, choose **Add job**, complete the three setup steps, and choose **Create job**. For an existing job, choose **Edit**, select a section, then **Save job**. There is no second page-level save. **Cancel** preserves the saved job and asks before discarding changes.

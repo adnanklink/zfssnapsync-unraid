@@ -1,0 +1,11 @@
+{
+  "scope": "Production retirement dialog with controlled demo data; 10,000-count selection fixture, not live host acceptance",
+  "command": "ZFSAS_DOC_CAPTURE=1 node tests/reliability/retirement_browser.cjs",
+  "images": {
+    "retirement-review-dark-1440.png": "ac974daf9d2f6abb85d6c54732817e2bede1769ed9375b282ea2992438953ec8",
+    "retirement-review-dark-390.png": "92eb681003bc8535033baa28796adaef4999021d361274218fb1613aae911927",
+    "retirement-review-light-1440.png": "8285da28bb0be89069ed5515edd2f632580c03ae794aa5bed4bda51f40833d25",
+    "retirement-review-light-390.png": "a197117560c44146ea431a69de3265bce180626a6e6f95b9714a3136923c4678"
+  },
+  "implementationRevision": "4464eea"
+}

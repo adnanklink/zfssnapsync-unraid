@@ -5,6 +5,8 @@ It answers one question: "What changed for me?"
 
 ## Unreleased production-readiness candidate
 
+- Add **Stop automation and clean up…** for retiring one dataset, reviewing source and destination history, and deleting destinations before the source. Keep held snapshots, other jobs, clones and interrupted receives protected; require explicit review of any retired recovery references.
+
 - Coordinate local and SSH replication, reviewed recovery and retention cleanup through the same ownership safeguards. Receivers use a temporary helper.
 - Allow independently approved cleanup requests to share a deletion while preserving each owner's authorization and cancellation.
 - Track automatic snapshot creation and deletion individually. Continue eligible automatic work after settings change while preserving verified completed snapshots.

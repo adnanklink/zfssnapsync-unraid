@@ -362,3 +362,39 @@ real-pool scale/fault evidence, cross-host WebGUI acceptance, 48-hour soak and f
 accepted-byte promotion remain outstanding. Required host connection details and
 disposable roots have been requested. The source branch and documentation are cleanly
 committed; final acceptance must use the eventual versioned candidate's exact inputs.
+
+## Dataset retirement candidate
+
+The Snapshots dataset action now separates stopping automation from explicitly
+authorizing snapshot deletion. Exact-source jobs and the selected Auto membership
+are removed under revision/configuration locks. Mixed or recursive scope is blocked.
+A captured review covers local or SSH destinations and the source, with destination
+deletions first. Holds, clones, unresolved receives and other operations remain
+protected. A separate acknowledgment can abandon only fully stopped recovery owned
+solely by retired jobs. Already-removed jobs require explicit destination selection.
+
+Backend, guided dialog, regression tests and review-renewal fixes are separate
+commits (`435544a`, `20cf27a`, `2028e26`, `4464eea`). Review renewal retains destinations
+even after job removal. Ordinary snapshot deletion protection remains unchanged.
+
+Focused local/real-SSH daemon tests passed at
+`/tmp/snapsync-tests-20260928T191022-1a806d/results.json`; local interruption,
+identity replacement, expiry and captured-selection faults passed at
+`/tmp/snapsync-tests-20260928T191105-03e9f1/results.json`. Updated reliability
+coverage passed at `/tmp/snapsync-tests-20260928T191905-5468fd/results.json`,
+including already-removed jobs and mixed Auto scope. Desktop/narrow browser
+reinspection passed at `/tmp/snapsync-tests-20260928T192130-33dc25/results.json`.
+Syntax passed at `/tmp/snapsync-tests-20260928T191941-f67dab/results.json`.
+These are scoped, frozen-input results; they are not a production certificate.
+
+Four light/dark desktop/narrow retirement screenshots were captured from production
+views with controlled demo responses and visually inspected. Their hashes and
+implementation revision are in `screenshots/retirement-capture.json`.
+The 10,000-count browser fixture tests global captured selection; these images do
+not establish live ZFS scale performance.
+
+The existing stage-1 README assertions still require wording superseded by earlier
+SSH documentation changes. Automatic approval review rejected changing those
+assertions, citing documentation-gate integrity. They remain untouched and their
+failure is recorded separately from retirement verification. Dedicated-host gates
+in `host-acceptance.md` now include this workflow; publication remains gated.
