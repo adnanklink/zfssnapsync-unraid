@@ -54,7 +54,7 @@
     picker.append(filters);filters.prepend(discovery);advanced.classList.remove('ui-advanced');advanced.querySelector('summary').textContent='Filters';
     const pager=$('page-text').closest('.toolbar');pager.classList.add('ui-pager');manager.append(pager);
     const sizes=[...manager.children].find(el=>el.tagName==='DETAILS');if(sizes){sizes.classList.add('ui-size-help');pager.after(sizes);}
-    const datasetActions=$('dataset-actions'), cleanup=$('cleanup');
+    const datasetActions=$('dataset-actions'), cleanup=$('cleanup'), retirementAction=$('retirement-open');
     const takePanel=document.createElement('div');takePanel.id='take-snapshot-panel';takePanel.className='ui-dataset-action-panel';takePanel.hidden=true;
     while(datasetActions.firstChild)takePanel.append(datasetActions.firstChild);
     const cleanupDetails=cleanup.querySelector('details'), cleanupPanel=document.createElement('div');cleanupPanel.id='cleanup-options';cleanupPanel.className='ui-dataset-action-panel';cleanupPanel.hidden=true;
@@ -64,7 +64,7 @@
     const panels=[[takePanel,takeToggle],[cleanupPanel,cleanupToggle]];
     panels.forEach(([panel,toggle])=>{toggle.setAttribute('aria-controls',panel.id);toggle.setAttribute('aria-expanded','false');});
     function togglePanel(panel,toggle){const open=panel.hidden;panels.forEach(([other,control])=>{other.hidden=true;control.setAttribute('aria-expanded','false');});panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)panel.querySelector('input,select')?.focus();}
-    datasetActions.append(takeToggle,cleanupToggle);datasetActions.after(takePanel,cleanup);
+    datasetActions.append(takeToggle,cleanupToggle);if(retirementAction)datasetActions.append(retirementAction);datasetActions.after(takePanel,cleanup);
     $('dataset').addEventListener('change',()=>panels.forEach(([panel,toggle])=>{panel.hidden=true;toggle.setAttribute('aria-expanded','false');}));
     panels.forEach(([panel,toggle])=>panel.addEventListener('keydown',event=>{if(event.key==='Escape'){panel.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();event.preventDefault();}}));
     // Bound browsing height while retaining every row and the original actions.

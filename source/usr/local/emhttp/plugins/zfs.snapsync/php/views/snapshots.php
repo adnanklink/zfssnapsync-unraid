@@ -5,7 +5,7 @@
 <button id="reload-datasets" type="button">Refresh datasets</button></div></section>
 <p id="notice" role="status" aria-live="polite"></p>
 <section id="manager" hidden>
-<h2 id="dataset-title"></h2><div class="toolbar" id="dataset-actions"><label>New snapshot name<input id="snapshot-name" placeholder="manual-2026-09-16"></label><button id="take-snapshot">Take snapshot</button></div><p id="active-snapshot-filters" class="muted" role="status"></p>
+<h2 id="dataset-title"></h2><div class="toolbar" id="dataset-actions"><label>New snapshot name<input id="snapshot-name" placeholder="manual-2026-09-16"></label><button id="take-snapshot">Take snapshot</button><button type="button" id="retirement-open" class="btn-quiet">Stop automation and clean up…</button></div><p id="active-snapshot-filters" class="muted" role="status"></p>
 <section id="cleanup" hidden><details class="ui-advanced"><summary>Preview cleanup</summary><div class="toolbar"><label>Policy<select id="cleanup-mode"><option value="zero_change">Zero-change cleanup</option><option value="retention">Configured retention cleanup</option></select></label>
 <label><span>Snapshot scope</span><select id="cleanup-scope"><option value="1">Auto Snapshot only</option><option value="0">All origins (zero-change only)</option></select></label><button id="preview-cleanup">Preview cleanup</button></div>
 <p class="muted">Preview makes no changes. Newest snapshots, required anchors, holds, clones, replication references and incomplete metadata remain protected. Pool-wide low-space cleanup is separate. Written totals are not guaranteed reclaimable space.</p></details></section>
@@ -49,3 +49,6 @@
 <p id="snapshot-transfer-error" role="alert"></p><div class="ui-form-footer"><button class="btn-primary" type="submit" id="snapshot-transfer-submit">Send snapshot</button></div>
 </form></dialog>
 <script src="/plugins/zfs.snapsync/js/snapshot-selection.js"></script><script src="/plugins/zfs.snapsync/js/snapshot-manager.js?v=<?= (int) filemtime(__DIR__ . '/../../js/snapshot-manager.js') ?>"></script>
+
+<dialog id="dataset-retirement" aria-labelledby="retirement-title"><h2 id="retirement-title">Stop automation and clean up</h2><p id="retirement-message" role="status"></p><div id="retirement-body"></div><p id="retirement-count"></p><div class="toolbar"><button type="button" id="retirement-close">Close</button><button type="button" id="retirement-next" hidden>Continue</button></div></dialog>
+<script src="/plugins/zfs.snapsync/js/dataset-retirement.js?v=<?= (int) filemtime(__DIR__ . '/../../js/dataset-retirement.js') ?>"></script>

@@ -923,3 +923,8 @@
 .zfsas-workspace #manager>.ui-pager{align-items:center;gap:10px;margin:0}
 .zfsas-workspace #manager>.ui-pager label{flex-direction:row;align-items:center;gap:8px}
 .zfsas-workspace #page-text{white-space:nowrap}
+
+.zfsas-workspace #dataset-retirement { width:min(760px,calc(100vw - 32px)); max-height:85vh; overflow:auto; }
+.zfsas-workspace #dataset-retirement .retirement-snapshot { display:flex; flex-direction:row; font-weight:normal; align-items:flex-start; gap:10px; padding:8px 0; overflow-wrap:anywhere; }
+
+.zfsas-workspace #dataset-retirement .retirement-snapshot input { flex:0 0 auto; width:auto; margin-top:3px; }
