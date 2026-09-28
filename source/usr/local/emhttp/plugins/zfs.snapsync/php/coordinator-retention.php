@@ -35,6 +35,10 @@ function zfsas_coordinator_prune_artifacts(ZfsasCoordinatorState $journal, strin
         $id = basename($path, '.job');
         if (preg_match('/^[a-f0-9]{64}$/D', $id) && !isset($inputs[$id])) { @unlink($path); }
     }
+    foreach (glob($root . '/attempt-inputs/*.remote-delete.json') ?: [] as $path) {
+        $id=basename($path,'.remote-delete.json');
+        if (preg_match('/^[a-f0-9]{64}$/D',$id) && !isset($inputs[$id])) { @unlink($path); }
+    }
     foreach (glob($root . '/attempt-inputs/*.job.pressure.json') ?: [] as $path) {
         $id = basename($path, '.job.pressure.json');
         if (preg_match('/^[a-f0-9]{64}$/D', $id) && !isset($inputs[$id])) { @unlink($path); }

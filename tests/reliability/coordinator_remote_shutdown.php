@@ -50,4 +50,8 @@ check($journal->state['runs'][$receipt['runId']]['state']==='running','Missing r
 $executor->cancel($receipt['runId']);unset($executor);
 $executor=new ZfsasCoordinatorExecutor($journal,$root,$root.'/runtime',$command,$outcome,[],null,$probe);
 drive($executor,fn()=>$journal->state['runs'][$receipt['runId']]['state']==='canceled');
-echo "PASS: remote shutdown holds completion, cancellation, restart grants and missing-adapter ownership\n";
+$receipt=$journal->submit('remote-delete',['tasks'=>['delete'=>['kind'=>'delete','parameters'=>['remoteOwnership'=>true,'receiverLeases'=>[]]]]],time());
+check($journal->state['version']===6,'Remote cleanup retained an executor format that cannot fence guards or destruction');
+$checkpoint=json_decode(file_get_contents($root.'/checkpoint.json'),true);
+check(json_decode($checkpoint['payload'],true)['version']===6,'Remote cleanup admission preceded old-reader rejection');
+echo "PASS: remote shutdown holds completion, cancellation, restart grants and missing-adapter ownership; cleanup upgrades its authority format\n";

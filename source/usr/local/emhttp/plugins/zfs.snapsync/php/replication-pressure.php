@@ -19,13 +19,13 @@ function zfsas_replication_pressure_capacity(string $destination, int $required,
     }
 }
 
-function zfsas_replication_pressure_proposal(array $parameters, array $shortage, int &$sequence): array
+function zfsas_replication_pressure_proposal(array $parameters, array $shortage, int &$sequence,?callable $readReceiver=null): array
 {
     if (($parameters['cleanupPolicy']['mode'] ?? '')!=='older_anchors' || $parameters['inspection']['mode']==='full') { return $shortage; }
-    zfsas_replication_pressure_capacity($parameters['replication']['destination'],$shortage['requiredBytes']);
+    zfsas_replication_pressure_capacity($parameters['replication']['destination'],$shortage['requiredBytes'],$readReceiver);
     $candidate=$parameters['pressureCandidate'] ?? null;
     if (empty($parameters['pressurePlanned'])) {
-        $tasks=zfsas_replication_anchor_candidates($parameters['replication'],$parameters['inspection'],$parameters['cleanupPolicy']);
+        $tasks=zfsas_replication_anchor_candidates($parameters['replication'],$parameters['inspection'],$parameters['cleanupPolicy'],$readReceiver);
         $jobs=array_values(array_map(static fn($task)=>$task['parameters']['deleteJob'],$tasks));
         $candidate=$jobs[0] ?? null;$offset=0;
         foreach(array_chunk($jobs,50) as $chunk) {

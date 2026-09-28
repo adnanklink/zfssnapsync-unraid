@@ -67,7 +67,11 @@ function zfsas_replication_cleanup_candidates(array $request, array $inspection,
             $job['PRESSURE_NEWEST_GUID']=$newestRow['guid'];
             $job['PRESSURE_CUTOFF']=(string)($now-$policy['keepAll']*86400);
         }
-        $tasks['cleanup-'.count($tasks)]=['kind'=>'delete','dataset'=>$destination,'parameters'=>['deleteJob'=>$job,'nativeSchedule'=>true],'dependencies'=>[]];
+        $parameters=['deleteJob'=>$job,'nativeSchedule'=>true];
+        if (($request['transport'] ?? 'local')==='ssh') {
+            $parameters+=['endpoint'=>$inspection['receiverEndpoint'],'replication'=>$request,'inspection'=>$inspection,'cleanupPolicy'=>$policy];
+        }
+        $tasks['cleanup-'.count($tasks)]=['kind'=>'delete','dataset'=>$destination,'parameters'=>$parameters,'dependencies'=>[]];
     }
     if ($anchors) {
         uasort($tasks, static function ($a, $b) use ($compare) {

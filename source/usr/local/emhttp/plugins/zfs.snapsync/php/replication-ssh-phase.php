@@ -3,6 +3,7 @@ require_once __DIR__.'/replication-ssh-receiver.php';
 require_once __DIR__.'/replication-plan.php';
 require_once __DIR__.'/send-queue-helpers.php';
 require_once __DIR__.'/transfer-progress.php';
+require_once __DIR__.'/replication-pressure.php';
 
 function zfsas_replication_ssh_phase(array $p,int &$sequence,callable $report): array
 {
@@ -33,6 +34,9 @@ function zfsas_replication_ssh_phase(array $p,int &$sequence,callable $report): 
         }
         if ($complete) {return $result;}
         $space=zfsas_replication_space($p,null,[$reader,'poolRead'],[$reader,'read']);
+        if($phase==='replication_space' && $space['outcome']==='validation_failure' && ($space['reason'] ?? '')==='space') {
+            return zfsas_replication_pressure_proposal($p,$space,$sequence,[$reader,'read']);
+        }
         if ($space['outcome']!=='success' || $phase==='replication_space') {return $space;}
         $rate=$p['rateLimit'] ?? '0';
         if (zfsas_send_normalize_rate_limit($rate)===null || ($rate!=='0' && !trim((string)shell_exec('command -v mbuffer 2>/dev/null')))) {throw new InvalidArgumentException('Configured transfer rate requires a valid rate and installed mbuffer.');}

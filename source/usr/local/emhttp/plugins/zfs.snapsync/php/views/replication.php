@@ -67,7 +67,7 @@
                   <?php $cleanupMode=zfsas_send_cleanup_mode($config,$job); ?>
                   <select class="zfsas-send-select" name="job_cleanup_policy[<?php echo (int)$index; ?>]">
                     <option value="retention_only" <?php echo $cleanupMode==='retention_only'?'selected':''; ?>>Preserve retained snapshots</option>
-                    <option value="older_anchors" <?php echo $cleanupMode==='older_anchors'?'selected':''; ?>>Delete older retained snapshots when space is needed (local only)</option>
+                    <option value="older_anchors" <?php echo $cleanupMode==='older_anchors'?'selected':''; ?>>Delete older retained snapshots when space is needed</option>
                   </select>
                   <div class="zfsas-send-help">Enabling this permanently removes older daily/weekly restore points, oldest first, until the space target is met. The keep-all window, newest checkpoint and required replication references remain protected. Only this job's snapshots on the receiving dataset are eligible.</div>
                 </div>

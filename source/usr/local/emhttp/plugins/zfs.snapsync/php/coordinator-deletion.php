@@ -64,9 +64,9 @@ final class ZfsasCoordinatorDeletion
         if (!str_starts_with($job['JOB_ID'],'sm-') && $job['SEND_SCHEDULE_JOB_ID']!=='') {
             $config=zfsas_send_parse_config_file(zfsas_ops_plugin_config_dir().'/zfs_send.conf',zfsas_send_defaults());
             foreach (zfsas_send_parse_jobs($config['SEND_JOBS'] ?? '') as $schedule) {
-                if ($schedule['id']===$job['SEND_SCHEDULE_JOB_ID'] && ($schedule['transport'] ?? 'local')==='local') {
+                if ($schedule['id']===$job['SEND_SCHEDULE_JOB_ID'] && in_array($schedule['transport'] ?? 'local',['local','ssh'],true)) {
                     // Old inbox entries carry no native run authority. Keep them
-                    // for review rather than replaying old local cleanup plans.
+                    // for review rather than replaying old cleanup plans.
                     $this->quarantine($line); return null;
                 }
             }
@@ -244,6 +244,14 @@ final class ZfsasCoordinatorDeletion
         }
         if ($this->journal->delegateCleanup($task['id'],time())!==null) {
             $this->changed($task['id']);return null;
+        }
+        if (($task['parameters']['endpoint'] ?? 'local')!=='local') {
+            if (empty($task['parameters']['remoteOwnership']) || empty($task['parameters']['receiverCapture'])) {
+                return ['outcome'=>'validation_failure','message'=>'Remote cleanup lacks captured receiver ownership.'];
+            }
+            $path=$this->root.'/attempt-inputs/'.hash('sha256',$task['id']).'.remote-delete.json';
+            self::publish($path,json_encode(['taskId'=>$task['id'],'parameters'=>$task['parameters']],JSON_THROW_ON_ERROR));
+            return ['/bin/bash',__DIR__.'/../scripts/coordinator-remote-delete-attempt.sh',$path];
         }
         $text = "JOB_TYPE=\"delete\"\n";
         foreach ($job as $key => $value) { $text .= $key . '="' . str_replace(['\\','"'], ['\\\\','\\"'], $value) . '"' . "\n"; }

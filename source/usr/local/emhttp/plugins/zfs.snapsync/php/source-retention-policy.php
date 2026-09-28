@@ -22,15 +22,20 @@ function zfsas_source_policies(array $config): array
     }
     return $doc['jobs'];
 }
-function zfsas_source_binding(array $job): string
+function zfsas_source_binding(array $job,array $config=[]): string
 {
     $scope=[];foreach (['id','source','destination','children','transport'] as $key) { $scope[$key]=$job[$key] ?? ''; }
+    if(($job['transport'] ?? 'local')==='ssh') {
+        require_once __DIR__.'/replication-ssh-connection.php';
+        $scope['connection']=ZfsasSshConnection::normalize($config);
+    }
     return hash('sha256',json_encode($scope,JSON_THROW_ON_ERROR));
 }
 function zfsas_source_policy(array $config,array $job): array
 {
     $policy=zfsas_source_policies($config)[$job['id']] ?? ['keep'=>0,'binding'=>'','datasets'=>[]];
-    if (($job['transport'] ?? 'local')!=='local' || $policy['binding']!==zfsas_source_binding($job)) { $policy['keep']=0; }
+    try {$binding=zfsas_source_binding($job,$config);}catch(InvalidArgumentException $error){$binding=null;}
+    if (!in_array($job['transport'] ?? 'local',['local','ssh'],true) || $policy['binding']!==$binding) { $policy['keep']=0; }
     return $policy;
 }
 function zfsas_source_member_policy(array $policy,string $source): array
@@ -55,7 +60,7 @@ function zfsas_source_review_write(string $token,array $review): void
         if (file_put_contents($tmp,json_encode($review,JSON_THROW_ON_ERROR))===false || !rename($tmp,$path)) { throw new RuntimeException('Cannot publish source review.'); }
     } finally { if (is_file($tmp)) { unlink($tmp); } }
 }
-function zfsas_source_save(array $previous,array $jobs,array $choices,array $tokens,string $revision,?callable $membership=null,?callable $inventory=null): string
+function zfsas_source_save(array $previous,array $jobs,array $choices,array $tokens,string $revision,?callable $membership=null,?callable $inventory=null,?array $connectionConfig=null): string
 {
     require_once __DIR__.'/replication-membership.php';
     $membership ??= 'zfsas_replication_membership';
@@ -68,9 +73,11 @@ function zfsas_source_save(array $previous,array $jobs,array $choices,array $tok
         if (!array_key_exists($id,$choices)) { $result[$id]=$prior; continue; }
         $choice=(string)$choices[$id];
         if (!preg_match('/^(?:0|[1-9][0-9]{0,3})$/D',$choice) || (int)$choice>1000) { throw new InvalidArgumentException('Keep 1–1,000 source snapshots, or choose Keep all.'); }
-        $keep=(int)$choice;$binding=zfsas_source_binding($job);
+        $keep=(int)$choice;
+        try {$binding=zfsas_source_binding($job,$connectionConfig ?? $previous);}
+        catch(InvalidArgumentException $error){if($keep>0)throw $error;$binding='';}
         if ($keep===0) { $result[$id]=['keep'=>0,'binding'=>$binding,'datasets'=>[]];continue; }
-        if (($job['transport'] ?? 'local')!=='local') { throw new InvalidArgumentException('Source retention is available for local jobs only.'); }
+        if (!in_array($job['transport'] ?? 'local',['local','ssh'],true)) { throw new InvalidArgumentException('Unsupported source retention transport.'); }
         $token=$tokens[$id] ?? '';
         if ($token==='') {
             if ($prior['keep']>0 && $keep>=$prior['keep'] && $prior['binding']===$binding) { $result[$id]=$prior;$result[$id]['keep']=$keep;continue; }

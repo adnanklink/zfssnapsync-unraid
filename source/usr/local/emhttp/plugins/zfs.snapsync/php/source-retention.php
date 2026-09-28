@@ -43,18 +43,23 @@ function zfsas_source_guid(string $name,callable $read): string
     return $guid;
 }
 /** Every configured consumer participates, including paused and foreign-prefix jobs. */
-function zfsas_source_receivers(string $source,array $jobs,array $inventory,callable $read): array
+function zfsas_source_receivers(string $source,array $jobs,array $inventory,callable $read,?callable $resolveReceiver=null): array
 {
     $receivers=[];
     foreach ($jobs as $job) {
         if ($job['source']!==$source && !(($job['children'] ?? '0')==='1' && str_starts_with($source,$job['source'].'/'))) { continue; }
-        if (($job['transport'] ?? 'local')!=='local') { throw new RuntimeException('A configured remote receiver needs this source; source cleanup requires verified local receivers.'); }
+        $receiverRead=$read;$endpoint='local';$capture=null;
+        if (($job['transport'] ?? 'local')!=='local') {
+            if($resolveReceiver===null){throw new RuntimeException('A configured remote receiver is unverified; source cleanup is deferred.');}
+            $context=$resolveReceiver($job);$receiverRead=$context['read'];$endpoint=$context['endpoint'];$capture=$context['capture'];
+        }
         $destination=$job['destination'].substr($source,strlen($job['source']));
-        if (isset($receivers[$destination])) { continue; }
-        $guid=zfsas_source_guid($destination,$read);
-        $token=trim($read(['get','-H','-o','value','receive_resume_token','--',$destination]));
+        $key=ZfsasEndpointIdentity::resource($endpoint,$destination);
+        if (isset($receivers[$key])) { continue; }
+        $guid=zfsas_source_guid($destination,$receiverRead);
+        $token=trim($receiverRead(['get','-H','-o','value','receive_resume_token','--',$destination]));
         if ($token!=='-') { throw new RuntimeException('Receiver '.$destination.' has an unresolved resume token; source checkpoints remain protected.'); }
-        $text=$read(['list','-H','-p','-o','name,guid','-t','snapshot','-d','1','--',$destination]);
+        $text=$receiverRead(['list','-H','-p','-o','name,guid','-t','snapshot','-d','1','--',$destination]);
         if (strlen($text)>8*1048576) { throw new RuntimeException('Receiver inventory exceeds the bounded limit.'); }
         $names=[];
         foreach (explode("\n",rtrim($text,"\n")) as $line) {
@@ -69,7 +74,8 @@ function zfsas_source_receivers(string $source,array $jobs,array $inventory,call
             if (($names[$target] ?? '')===$row['guid']) { $common=['source'=>$row['snapshot'],'snapshot'=>$target,'guid'=>$row['guid']];break; }
         }
         if (!$common) { throw new RuntimeException('Receiver '.$destination.' has no verified common checkpoint; source cleanup is deferred.'); }
-        $receivers[$destination]=['dataset'=>$destination,'datasetGuid'=>$guid,'base'=>$common];
+        $receivers[$key]=['dataset'=>$destination,'datasetGuid'=>$guid,'base'=>$common];
+        if($capture!==null){$receivers[$key]+=['endpoint'=>$endpoint,'receiverCapture'=>$capture];}
     }
     if (!$receivers) { throw new RuntimeException('No configured receiver proves this source is replicated.'); }
     return array_values($receivers);
@@ -93,18 +99,19 @@ function zfsas_source_select(array $inventory,array $p,array $receivers): array
     }
     return ['candidates'=>$candidates,'protected'=>$protected,'anchors'=>$anchors,'owned'=>count($owned)];
 }
-function zfsas_source_plan(array $p,array $jobs,?callable $read=null): array
+function zfsas_source_plan(array $p,array $jobs,?callable $read=null,?callable $resolveReceiver=null): array
 {
     $read ??= [ZfsasReplicationInspection::class,'command'];
     if (($p['policy']['datasets'][$p['source']] ?? '')!==$p['sourceDatasetGuid'] || $p['policy']['keep']<1) { throw new InvalidArgumentException('Source membership is not authorized for cleanup. Review source retention again.'); }
     if (zfsas_source_guid($p['source'],$read)!==$p['sourceDatasetGuid']) { throw new InvalidArgumentException('Source dataset identity changed.'); }
     $inventory=zfsas_source_inventory($p['source'],$read);
-    $receivers=zfsas_source_receivers($p['source'],$jobs,$inventory,$read);
+    $receivers=zfsas_source_receivers($p['source'],$jobs,$inventory,$read,$resolveReceiver);
+    $ownContext=($p['job']['transport'] ?? 'local')==='ssh' && $resolveReceiver!==null?$resolveReceiver($p['job']):['endpoint'=>'local','read'=>$read];
     $verifiedReceiver=false;
     foreach ($receivers as $receiver) {
-        if ($receiver['dataset']===$p['destination']) {
+        if ($receiver['dataset']===$p['destination'] && ($receiver['endpoint'] ?? 'local')===$ownContext['endpoint']) {
             $target=$p['destination'].substr($p['verified']['snapshot'],strlen($p['source']));
-            $verifiedReceiver=zfsas_source_guid($target,$read)===$p['verified']['guid'];
+            $verifiedReceiver=zfsas_source_guid($target,$ownContext['read'])===$p['verified']['guid'];
         }
     }
     if (!$verifiedReceiver) { throw new RuntimeException('The successful receiver checkpoint is no longer verified.'); }
@@ -119,13 +126,15 @@ function zfsas_source_plan(array $p,array $jobs,?callable $read=null): array
             'phase'=>'source_retention_delete','revision'=>$p['revision'],'job'=>$p['job'],'policy'=>$p['policy'],
             'source'=>$p['source'],'sourceDatasetGuid'=>$p['sourceDatasetGuid'],'destination'=>$p['destination'],
             'candidates'=>$chunk,'anchors'=>$selection['anchors'],'receivers'=>$receivers]];
+        $leases=array_values(array_filter($receivers,static fn($receiver)=>isset($receiver['receiverCapture'])));
+        if($leases){$tasks['delete-'.$i]['parameters']+=['remoteOwnership'=>true,'receiverLeases'=>$leases];}
     }
     $tasks['finish']=['kind'=>'finalize','dataset'=>$p['source'],'parameters'=>['phase'=>'source_retention_guard','revision'=>$p['revision'],'source'=>$p['source']],'dependencies'=>array_keys($tasks)];
     return ['tasks'=>$tasks,'summary'=>['eligible'=>count($selection['candidates']),'protected'=>count($selection['protected']),
         'reasons'=>array_count_values(array_column($selection['protected'],'reason'))]];
 }
 /** Called under source and receiver gates and the single global deletion lock. */
-function zfsas_source_delete(array $p,callable $read,callable $destroy,callable $authorize,?callable $record=null): array
+function zfsas_source_delete(array $p,callable $read,callable $destroy,callable $authorize,?callable $record=null,?callable $receiverReader=null): array
 {
     $record ??= static function(array $row,string $state,string $message): void {};
     $deleted=0;$skipped=(int)($p['referenceSkipped'] ?? 0);$reasons=[];
@@ -142,9 +151,11 @@ function zfsas_source_delete(array $p,callable $read,callable $destroy,callable 
         if ($actual!==$expected) { throw new RuntimeException('Retained source checkpoints changed. Cleanup stopped.'); }
     }
     foreach ($p['receivers'] as $receiver) {
-        if (zfsas_source_guid($receiver['dataset'],$read)!==$receiver['datasetGuid']
-            || trim($read(['get','-H','-o','value','receive_resume_token','--',$receiver['dataset']]))!=='-'
-            || zfsas_source_guid($receiver['base']['snapshot'],$read)!==$receiver['base']['guid']) {
+        if(isset($receiver['receiverCapture']) && $receiverReader===null){throw new RuntimeException('Captured SSH receiver cannot be revalidated.');}
+        $inspect=isset($receiver['receiverCapture'])?$receiverReader($receiver):$read;
+        if (zfsas_source_guid($receiver['dataset'],$inspect)!==$receiver['datasetGuid']
+            || trim($inspect(['get','-H','-o','value','receive_resume_token','--',$receiver['dataset']]))!=='-'
+            || zfsas_source_guid($receiver['base']['snapshot'],$inspect)!==$receiver['base']['guid']) {
             throw new RuntimeException('Receiver identity, recovery state or incremental base changed. Cleanup stopped.');
         }
     }
@@ -173,7 +184,7 @@ function zfsas_source_delete(array $p,callable $read,callable $destroy,callable 
     return ['outcome'=>'success','deleted'=>$deleted,'skipped'=>$skipped,'referenceSkipped'=>(int)($p['referenceSkipped'] ?? 0),'reasons'=>$reasons,
         'message'=>"Source cleanup: $deleted deleted; $skipped skipped. Protected checkpoints may exceed the retention count."];
 }
-function zfsas_source_review(array $p,array $jobs,?callable $read=null): array
+function zfsas_source_review(array $p,array $jobs,?callable $read=null,?callable $resolveReceiver=null): array
 {
     $read ??= [ZfsasReplicationInspection::class,'command'];
     $members=zfsas_replication_membership($p['job'],$read);$datasets=[];$rows=[];$unmanaged=0;$eligible=0;$protected=0;
@@ -185,7 +196,7 @@ function zfsas_source_review(array $p,array $jobs,?callable $read=null): array
         $unmanaged+=count($inventory)-count($owned);
         if (!$owned) { continue; }
         try {
-            $receivers=zfsas_source_receivers($source,$jobs,$inventory,$read);$newest=reset($owned);
+            $receivers=zfsas_source_receivers($source,$jobs,$inventory,$read,$resolveReceiver);$newest=reset($owned);
             $selection=zfsas_source_select($inventory,['job'=>$p['job'],'sourceDatasetGuid'=>$guid,'policy'=>['keep'=>$p['keep']],
                 'verified'=>['snapshot'=>$newest['snapshot'],'guid'=>$newest['guid']]],$receivers);
             foreach ($selection['protected'] as $row) { $rows[]=$row+['eligible'=>false];$protected++; }
@@ -200,6 +211,6 @@ function zfsas_source_review(array $p,array $jobs,?callable $read=null): array
         if (count($rows)>50000 || strlen(json_encode($rows,JSON_THROW_ON_ERROR))>16*1048576) { throw new RuntimeException('Source review exceeds the bounded limit. Review a smaller scope.'); }
     }
     if (count($rows)>50000 || strlen(json_encode($rows,JSON_THROW_ON_ERROR))>16*1048576) { throw new RuntimeException('Source retention review exceeds the bounded limit. Review a smaller recursive scope.'); }
-    return ['state'=>'ready','expires'=>time()+300,'revision'=>$p['revision'],'binding'=>zfsas_source_binding($p['job']),
+    return ['state'=>'ready','expires'=>time()+300,'revision'=>$p['revision'],'binding'=>zfsas_source_binding($p['job'],$p['receiverConfig'] ?? []),
         'keep'=>$p['keep'],'datasets'=>$datasets,'rows'=>$rows,'eligible'=>$eligible,'protected'=>$protected,'unmanaged'=>$unmanaged];
 }

@@ -98,6 +98,9 @@ trait ZfsasCoordinatorPressure
             'gateId'=>$taskId,'requiredBytes'=>$result['requiredBytes'],
             'revision'=>$task['parameters']['revision'],'policy'=>$task['parameters']['cleanupPolicy'],
             'inspection'=>$task['parameters']['inspection'],'replication'=>$task['parameters']['replication']]];
+        if(isset($task['parameters']['receiverCapture'])) {
+            $parameters['receiverCapture']=$task['parameters']['receiverCapture'];$parameters['remoteOwnership']=true;
+        }
         $this->state['tasks'][$id]=['id'=>$id,'runId'=>$task['runId'],'kind'=>'delete','dataset'=>$candidate['DATASET'],
             'parameters'=>$parameters,'dependencies'=>[],'references'=>[],'state'=>'queued','attemptCount'=>0,
             'attempt'=>null,'retryAt'=>null,'retryMonotonic'=>null,'blocked'=>'','result'=>null];

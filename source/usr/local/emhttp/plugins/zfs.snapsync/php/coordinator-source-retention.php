@@ -51,6 +51,6 @@ function zfsas_coordinator_source_command(array $task,ZfsasCoordinatorState $jou
     $text=json_encode(['taskId'=>$task['id'],'parameters'=>$p],JSON_THROW_ON_ERROR);
     if (@file_get_contents($path)!==$text && (file_put_contents($path.'.pending',$text)!==strlen($text) || !rename($path.'.pending',$path))) { throw new RuntimeException('Cannot publish source cleanup capture.'); }
     $gates=[$p['source'] ?? $p['job']['source']];
-    foreach ($p['receivers'] ?? [] as $receiver) { $gates[]=$receiver['dataset']; }
+    foreach ($p['receivers'] ?? [] as $receiver) {if(($receiver['endpoint'] ?? 'local')==='local'){$gates[]=$receiver['dataset'];}}
     return array_merge(['/bin/bash',__DIR__.'/../scripts/coordinator-source-attempt.sh',$path,$p['phase']],array_unique($gates));
 }

@@ -84,12 +84,24 @@ fi
 own=$(identity "$$") || fail 'Cannot inspect receiver worker identity.'
 read -r _ group start <<< "$own"
 [[ "$group" == "$$" ]] || fail 'Receiver worker requires an independent process group.'
-[[ $# == 4 ]] || fail 'Incomplete receiver mutation capture.'
+[[ $# == 4 || $# == 6 || $# == 8 ]] || fail 'Incomplete receiver mutation capture.'
 action=$1 dataset=$2 expected=$3 readonly=$4
-[[ "$action" == receive || "$action" == readonly ]] || fail 'Unsupported receiver mutation.'
+[[ "$action" == receive || "$action" == readonly || "$action" == destroy || "$action" == guard ]] || fail 'Unsupported receiver operation.'
 [[ "$dataset" =~ ^[A-Za-z0-9][A-Za-z0-9_.:+-]*(/[A-Za-z0-9_.:+-]+)+$ ]] || fail 'Invalid receiver dataset.'
 [[ "$expected" =~ ^(absent:)?[0-9]{1,20}$ && ( "$readonly" == on || "$readonly" == off ) ]] || fail 'Invalid captured receiver policy.'
 [[ "$action" != readonly || "$expected" != absent:* ]] || fail 'Readonly requires an existing receiver.'
+if [[ "$action" == guard ]]; then
+  trap '' HUP
+  [[ $# == 6 && "$expected" != absent:* ]] || fail 'Guard requires a captured receiver checkpoint.'
+  snapshot=$5 snapshot_guid=$6
+  [[ "$snapshot" == "$dataset@"* && "${snapshot#*@}" =~ ^[A-Za-z0-9_.:+-]+$ && "$snapshot_guid" =~ ^[0-9]{1,20}$ ]] || fail 'Invalid receiver checkpoint guard.'
+elif [[ "$action" == destroy ]]; then
+  [[ $# == 8 && "$expected" != absent:* ]] || fail 'Deletion requires an existing captured receiver.'
+  snapshot=$5 snapshot_guid=$6 snapshot_txg=$7 inventory_hash=$8
+  [[ "$snapshot" == "$dataset@"* && "${snapshot#*@}" =~ ^[A-Za-z0-9_.:+-]+$ && "$snapshot_guid" =~ ^[0-9]{1,20}$ && "$snapshot_txg" =~ ^[0-9]{1,20}$ && "$inventory_hash" =~ ^[a-f0-9]{64}$ ]] || fail 'Invalid captured snapshot deletion.'
+else
+  [[ $# == 4 ]] || fail 'Unexpected mutation arguments.'
+fi
 exec {live}>"$dir/live"
 flock -n -x "$live" || fail 'Receiver attempt already owns a worker.'
 printf '%s %s %s %s\n' "$boot" "$$" "$start" "$pool_guid" > "$dir/owner"
@@ -115,13 +127,15 @@ exec {auto}>"$ops/auto-cleanup.lock"
 gate_permissions "$ops/auto-cleanup.lock" 0660
 flock -n -s "$auto" || fail 'Receiver cleanup owns the datasets.'
 locks=()
+lock_mode=-x
+[[ "$action" != guard ]] || lock_mode=-s
 while IFS= read -r ancestor; do
   key=$(printf '%s' "$ancestor" | sha256sum); key=${key%% *}
   path="$ops/dataset-locks/$key.lock"
   [[ ! -L "$path" ]] || fail 'Unsafe receiver dataset gate.'
   exec {fd}>"$path"
   gate_permissions "$path" 0660
-  flock -n -x "$fd" || fail 'Another operation owns the receiver dataset.'
+  flock -n "$lock_mode" "$fd" || fail 'Another operation owns the receiver dataset.'
   locks+=("$fd")
 done < <(ancestor=$dataset; while :; do printf '%s\n' "$ancestor"; [[ "$ancestor" == */* ]] || break; ancestor=${ancestor%/*}; done | sort -u)
 
@@ -142,7 +156,44 @@ fi
 [[ ! -e "$dir/revoked" ]] || fail 'Receiver attempt was revoked.'
 # There is deliberately no general command execution, rollback, or forced receive.
 # Locks and live ownership are inherited by the mutation and pipeline children.
-if [[ "$action" == readonly ]]; then
+if [[ "$action" == guard ]]; then
+  guard_check() {
+    [[ ! -e "$dir/revoked" ]] || fail 'Receiver checkpoint guard was revoked.'
+    [[ "$(zfs get -H -p -o value guid -- "$dataset")" == "$expected" ]] || fail 'Receiver dataset changed during checkpoint protection.'
+    [[ "$(zfs get -H -o value receive_resume_token -- "$dataset")" == - ]] || fail 'Receiver recovery requires the source checkpoint.'
+    [[ "$(zfs get -H -p -o value guid -- "$snapshot")" == "$snapshot_guid" ]] || fail 'Receiver checkpoint identity changed.'
+  }
+  guard_check
+  printf '%s\n' ready
+  released=0
+  while IFS= read -r grant; do
+    if [[ "$grant" == release ]]; then released=1; break; fi
+    [[ "$grant" == check ]] || fail 'Invalid receiver guard request.'
+    guard_check
+    printf '%s\n' ready
+  done
+  # A lost SSH channel is not permission to remove the checkpoint guard while
+  # the source may still be deleting. Independent revocation releases it.
+  if (( ! released )); then while [[ ! -e "$dir/revoked" ]]; do sleep 1; done; fi
+elif [[ "$action" == destroy ]]; then
+  deletion_preflight() {
+    local inventory actual_hash metadata
+    [[ ! -e "$dir/revoked" ]] || fail 'Receiver deletion was revoked.'
+    [[ "$(zfs get -H -o value receive_resume_token -- "$dataset")" == - ]] || fail 'Receiver has an interrupted transfer.'
+    inventory=$(zfs list -H -p -t snapshot -o name,guid,createtxg,creation,userrefs,clones -d 1 -- "$dataset") || fail 'Receiver cleanup inventory is unavailable.'
+    actual_hash=$(printf '%s' "$inventory" | sha256sum);actual_hash=${actual_hash%% *}
+    [[ "$actual_hash" == "$inventory_hash" ]] || fail 'Receiver cleanup inventory changed after review.'
+    metadata=$(zfs get -H -p -o value guid,createtxg,userrefs,clones -- "$snapshot") || fail 'Selected receiver snapshot is unavailable.'
+    [[ "$metadata" == "$snapshot_guid"$'\n'"$snapshot_txg"$'\n0\n-' ]] || fail 'Selected snapshot identity or protection changed.'
+  }
+  deletion_preflight
+  printf '%s\n' ready
+  IFS= read -r -t 20 grant || fail 'Receiver deletion did not receive live authorization.'
+  [[ "$grant" == "destroy:$snapshot_guid" ]] || fail 'Invalid receiver deletion authorization.'
+  deletion_preflight
+  zfs destroy -- "$snapshot"
+  printf '%s\n' deleted
+elif [[ "$action" == readonly ]]; then
   zfs set "readonly=$readonly" "$dataset"
 else
   zfs receive -s -u -o "readonly=$readonly" -- "$dataset"

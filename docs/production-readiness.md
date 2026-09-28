@@ -11,7 +11,7 @@ remain separate from source. This record is not a release acceptance certificate
 | 3. Endpoint-aware coordination | Complete (SSH execution remains gated on task 5) |
 | 4. Independent shared cleanup owners | Complete (33-suite CI passed; host acceptance remains separate) |
 | 5. Native SSH execution and recovery | In progress; owned phase execution and shutdown verified in fixtures; scheduled cutover awaits cleanup parity |
-| 6. SSH cleanup parity | Pending |
+| 6. SSH cleanup parity | Implemented; focused real-SSH/coordinator fixtures pass; full regression run in progress |
 | 7. Individual Auto Snapshot mutation tasks | Pending |
 | 8. Safe partial automatic replanning | Pending |
 | 9. Lifecycle and reboot compatibility | Pending |
@@ -173,3 +173,35 @@ The completed owned-phase checkpoint passed all 36 isolated CI suites.
 These are transport and execution fixtures, not real OpenZFS or host acceptance.
 Scheduled SSH admission and its public recovery flow remain on their existing
 path until remote cleanup and source-retention parity can be enabled together.
+
+## Task 6 SSH cleanup parity
+
+Destination retention and pressure cleanup use the captured receiver identity,
+configuration revision, independent owner and exact snapshot GUID/TXG. A receiver
+helper acquires compatible dataset gates and checks its inventory before asking
+for a fresh coordinator authorization. The source rechecks policy and available
+space after that handshake; a met target or pending freeing withholds deletion.
+The receiver checks inventory, holds, clones and resume state again before the
+single destroy. Cancellation independently fences destroy as well as receive and
+read-only changes; local SSH exit alone never releases ownership.
+
+Source retention accounts for every configured consumer, including paused SSH
+jobs and equal dataset paths on distinct endpoints. Unavailable receiver evidence
+defers cleanup. Ephemeral shared receiver locks protect each required incremental
+checkpoint during source deletion, survive client loss, and require independently
+verified shutdown. Source retention approvals bind saved SSH connection settings;
+changing those settings invalidates the previous cleanup binding. New-job defaults
+and the existing review requirement for applicable cleanup changes are preserved.
+
+RAM journal format 6 is published before remote cleanup authority: older readers
+cannot recover deletion or checkpoint guards using receive-only shutdown rules.
+Orphaned remote deletion captures are pruned with their journal owners. No saved
+configuration format or permanent receiver installation is introduced.
+
+Focused tests pass for real SSH destructive handshakes, revoked approvals, changed
+GUID/TXG/inventory/holds/clones, delayed launches, pressure stop decisions, concurrent
+checkpoint guards and orphaned clients. Actual coordinator fixtures verify one
+physical remote deletion for two independent requests, result fanout, remote source
+cleanup and accounting, and verified receiver shutdown. The reliability suite and
+local/SSH Run All endpoint pass. These use deterministic ZFS fixtures over real SSH;
+real OpenZFS, separate hosts, flash tracing and soak acceptance remain release gates.

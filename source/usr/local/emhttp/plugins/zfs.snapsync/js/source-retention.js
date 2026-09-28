@@ -9,7 +9,7 @@
     const td=document.createElement('div');td.className='source-retention-control';
     td.innerHTML='<select aria-label="Source snapshots"><option value="all">Keep all</option><option value="count">Keep latest</option></select> <input type="number" min="1" max="1000" aria-label="Source checkpoint count" value="3">'+
       '<input type="hidden" name="job_source_keep['+index+']"><input type="hidden" name="job_source_review['+index+']" value="">'+
-      '<p class="zfsas-send-help">Local jobs only. Cleanup follows fully verified replication. Required bases, recovery references, holds and clones remain protected beyond this count. Older failed checkpoints may be removed once superseded.</p>'+
+      '<p class="zfsas-send-help">Cleanup follows fully verified replication. Required bases, recovery references, holds and clones remain protected beyond this count. Every configured receiver must be verified before source cleanup.</p>'+
       '<button type="button" class="source-review-button">Review source snapshots</button><div class="source-review-status" role="status" aria-live="polite"></div><div class="source-review-results"></div>';
     row.lastElementChild.before(td);
     const mode=td.querySelector('select'),count=td.querySelector('input[type=number]'),keep=td.querySelector('[name^=job_source_keep]'),token=td.querySelector('[name^=job_source_review]');
@@ -18,7 +18,7 @@
     let generation=0,poller=null;
     const value=name=>row.querySelector('[name^="job_'+name+'["]')?.value||'';
     const signature=()=>JSON.stringify(['id','source','destination','children','transport'].map(value).concat(keep.value,form.querySelector('[name=config_revision]')?.value));
-    function sync() { const local=value('transport')==='local';mode.disabled=!local;count.hidden=mode.value!=='count'||!local;count.disabled=count.hidden;keep.value=local&&mode.value==='count'?count.value:'0';button.disabled=keep.value==='0'; }
+    function sync() { const supported=['local','ssh'].includes(value('transport'));mode.disabled=!supported;count.hidden=mode.value!=='count'||!supported;count.disabled=count.hidden;keep.value=supported&&mode.value==='count'?count.value:'0';button.disabled=keep.value==='0'; }
     function invalidate() { ++generation;poller?.stop();poller=null;token.value='';results.replaceChildren();status.textContent='';sync(); }
     mode.addEventListener('change',invalidate);count.addEventListener('input',invalidate);
     row.addEventListener('input',event=>{if(/job_(source|destination|children|transport)\[/.test(event.target.name||''))invalidate();});

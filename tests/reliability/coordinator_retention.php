@@ -19,6 +19,7 @@ $delete = $state->submit('delete', ['tasks' => ['snapshot' => ['kind' => 'delete
 mkdir($root . '/delete-results'); mkdir($root . '/attempt-inputs');
 $input = hash('sha256', $delete['runId'] . ':snapshot');
 foreach ([$input, str_repeat('f', 64)] as $id) { file_put_contents($root . '/attempt-inputs/' . $id . '.job', 'captured'); file_put_contents($root . '/attempt-inputs/' . $id . '.job.approval.json', '{}'); }
+foreach ([$input,str_repeat('f',64)] as $id) {file_put_contents($root.'/attempt-inputs/'.$id.'.remote-delete.json','{}');}
 foreach (['active-delete', 'orphan-delete'] as $id) {
     file_put_contents($root . '/delete-results/' . $id . '.result', 'completed');
     touch($root . '/delete-results/' . $id . '.result', $old);
@@ -35,6 +36,9 @@ file_put_contents($root.'/attempt-inputs/'.str_repeat('f',64).'.inspection.json'
 $state->prune($now);
 if (!isset($state->state['tasks'][$childId])) { throw new RuntimeException('Pruning lost an unfinished owner’s completed child'); }
 zfsas_coordinator_prune_artifacts($state, $root, $batches, $now, $root . '/delete-results');
+if (!is_file($root.'/attempt-inputs/'.$input.'.remote-delete.json') || is_file($root.'/attempt-inputs/'.str_repeat('f',64).'.remote-delete.json')) {
+    throw new RuntimeException('Remote deletion capture retention violated journal ownership');
+}
 if (!is_file($root . '/delete-results/active-delete.result') || is_file($root . '/delete-results/orphan-delete.result')
     || !is_file($root . '/attempt-inputs/' . $input . '.job') || is_file($root . '/attempt-inputs/' . str_repeat('f', 64) . '.job')) {
     throw new RuntimeException('Deletion retention lost active evidence or retained expired artifacts');

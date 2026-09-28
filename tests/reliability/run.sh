@@ -32,6 +32,7 @@ php tests/reliability/replication_inspection.php
 php tests/reliability/replication_membership.php
 php tests/reliability/replication_snapshot.php
 php tests/reliability/replication_cleanup.php
+php tests/reliability/ssh_cleanup_policy.php
 php tests/reliability/retention_anchor_policy.php
 php tests/reliability/source_retention.php
 php tests/reliability/coordinator_source_retention.php

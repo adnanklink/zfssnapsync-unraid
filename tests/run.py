@@ -22,6 +22,9 @@ ISOLATED = [
     'ssh_receiver_read.php',
     'ssh_receiver_ownership.php',
     'ssh_native_phase.php',
+    'ssh_cleanup_execution.php',
+    'ssh_source_retention_daemon.php',
+    'ssh_cleanup_daemon.php',
     'replication_now_endpoint.php', 'source_retention_endpoints.php',
     'workspace_endpoints.php', 'installation_compatibility.sh', 'auto_log.sh',
 ]

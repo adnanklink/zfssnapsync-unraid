@@ -24,8 +24,8 @@ function zfsas_send_cleanup_policies(array $config): array
 function zfsas_send_cleanup_mode(array $config, array $job): string
 {
     $mode = zfsas_send_cleanup_policies($config)[$job['id']] ?? 'retention_only';
-    if ($mode === 'older_anchors' && ($job['transport'] ?? 'local') !== 'local') {
-        throw new InvalidArgumentException('Retention anchor cleanup is available for local replication only.');
+    if ($mode === 'older_anchors' && !in_array($job['transport'] ?? 'local',['local','ssh'],true)) {
+        throw new InvalidArgumentException('Retention anchor cleanup requires local or SSH replication.');
     }
     return $mode;
 }
@@ -37,8 +37,8 @@ function zfsas_send_cleanup_save(array $previous, array $jobs, array $choices): 
     foreach ($jobs as $job) {
         $id = $job['id']; $mode = $choices[$id] ?? $old[$id] ?? 'retention_only';
         if (!in_array($mode, ['retention_only', 'older_anchors'], true)
-            || ($mode === 'older_anchors' && ($job['transport'] ?? 'local') !== 'local')) {
-            throw new InvalidArgumentException('Choose a valid cleanup policy for each local replication job.');
+            || ($mode === 'older_anchors' && !in_array($job['transport'] ?? 'local',['local','ssh'],true))) {
+            throw new InvalidArgumentException('Choose a valid cleanup policy for each replication job.');
         }
         $result[$id] = $mode;
     }
