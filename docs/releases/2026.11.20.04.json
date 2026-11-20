@@ -1,0 +1,10 @@
+{
+  "version": "2026.11.20.04",
+  "status": "experimental",
+  "hostAcceptance": "pending",
+  "releasePolicy": "Experimental main distribution with dedicated-host acceptance pending.",
+  "sourceCommit": "449ab16c7495f187abb9e599bca9f48bac61649e",
+  "inputDigest": "c2a368bf944868d7d5cd9e0a902a6304703ab9bacea472e83a9101b1e2e02ad7",
+  "packageSha256": "7213fe9153f0a16bbedc6724cfbb5d56ade7484cc819cd6839eec9559a7d21a4",
+  "notes": "Job summary, on-demand stages and a single log view. Live host acceptance and the 48-hour soak remain pending."
+}

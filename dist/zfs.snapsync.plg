@@ -1,7 +1,8 @@
 <?xml version='1.0' standalone='yes'?>
-<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.11.20.03" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
+<PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="2026.11.20.04" icon="zfs-snapsync.png" pluginURL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
-### 2026.11.20.03 (2026-11-20)
+### 2026.11.20.04 (2026-11-20)
+- Open Job Details on Summary. View stages or switch between job and shared logs on demand.
 - Simplify Overview, Activity and setup forms. Find history and recovery guidance in Help.
 - Review failures across retained history. Verified recoveries leave Needs attention automatically and keep their original Activity records.
 - Recover interrupted backups when ZFS cannot estimate the remaining bytes. Keep the partial receive and check available space before transfer.
@@ -64,9 +65,9 @@ ZFS SnapSync adds plain-English scheduling and safe snapshot lifecycle managemen
 
   <SUPPORT>https://github.com/adnanklink/zfssnapsync-unraid/issues</SUPPORT>
 
-  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.11.20.03-noarch-1.txz" Min="6.12.0">
-    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.11.20.03-noarch-1.txz</URL>
-    <MD5>1467cb4a7c913a427e352d656b5d193d</MD5>
+  <FILE Name="/boot/config/plugins/zfs.snapsync/zfs-snapsync-2026.11.20.04-noarch-1.txz" Min="6.12.0">
+    <URL>https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/zfs-snapsync-2026.11.20.04-noarch-1.txz</URL>
+    <MD5>a23ce73c9ec73049d91f14bdbbbd495d</MD5>
   </FILE>
 
   <FILE Run="/bin/bash">
@@ -85,10 +86,10 @@ install_failed() {
 trap install_failed ERR
 
 PKG_DIR="/boot/config/plugins/zfs.snapsync"
-PKG_FILE="zfs-snapsync-2026.11.20.03-noarch-1.txz"
+PKG_FILE="zfs-snapsync-2026.11.20.04-noarch-1.txz"
 PKG_PATH="${PKG_DIR}/${PKG_FILE}"
 PKG_URL="https://raw.githubusercontent.com/adnanklink/zfssnapsync-unraid/main/dist/${PKG_FILE}"
-PKG_MD5="1467cb4a7c913a427e352d656b5d193d"
+PKG_MD5="a23ce73c9ec73049d91f14bdbbbd495d"
 PKG_NAME="zfs-snapsync"
 
 if command -v upgradepkg >/dev/null 2>&1; then
