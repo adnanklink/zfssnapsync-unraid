@@ -41,7 +41,7 @@
       if (!attention.contains(document.activeElement)) { attention.replaceChildren();
       const failures=data.operations.filter(needsAttention).slice(0,4);
       for(const op of failures) { const button=document.createElement('button');button.type='button';button.className='ui-attention-item';button.textContent=op.title+' · '+(op.source||label(op));button.addEventListener('click',()=>open(op.id,button));attention.append(button); }
-      if(!failures.length) attention.innerHTML='<div class="ui-empty"><strong>'+ (available?'No reported failures':'Status is incomplete')+'</strong>'+ (available?'Nothing needs attention in the available recent records.':'Some sources are unavailable. See the notices above.')+'</div>';
+      if(!failures.length) attention.textContent=available?'No failures in recent history.':'Status incomplete. See availability notices above.';
     }
     }
     rows();
@@ -54,8 +54,8 @@
     if(type) operations=operations.filter(op=>op.type===type);
     if(state) operations=operations.filter(op=>state==='active'?active(op):state==='failed'?needsAttention(op):state==='reviewed'?(op.failureResolved||op.attentionDismissed):state==='complete'?['complete','completed'].includes(op.state):op.state===state);
     if(!overview) $('activity-history-scope').textContent=failureHistory()
-      ? 'Showing retained failure history for this boot.'
-      : 'Up to 120 recent operation records. Internal worker attempts are omitted.';
+      ? 'Retained failures this boot.'
+      : 'Up to 120 recent operations this boot.';
     if(overview) operations=operations.slice(0,8);
     const body=$('operation-rows'), existing=new Map([...body.querySelectorAll('[data-operation]')].map(row=>[row.dataset.operation,row]));
     body.querySelector('[data-empty]')?.remove();
@@ -122,12 +122,12 @@
     const diagnostics = op.problem?.diagnosticAvailable
       ? '<details><summary>Recorded ZFS error</summary><pre>'+escape(op.problem.diagnostic)+'</pre></details>' : '';
     const notice = op.failureResolved
-      ? '<section class="ui-notice"><h3>Resolved by recovery</h3><p>A later recovery resolved this failure. The original attempt is recorded below.</p>'+
-        (op.problem?'<p>'+escape(op.problem.summary)+'</p>':'')+diagnostics+'</section>'
+      ? '<section class="ui-notice"><h3>Resolved by recovery</h3>'+
+        (op.problem?'<p>Original failure: '+escape(op.problem.summary)+'</p>':'')+diagnostics+'</section>'
       : op.problem
       ? '<section class="ui-notice"><h3>What happened</h3><p>'+escape(op.problem.summary)+'</p><p>'+escape([op.problem.source,op.problem.destination].filter(Boolean).join(' → '))+'</p><h3>Next action</h3><p>'+escape(op.problem.nextAction)+'</p>'+
         (reviewInSummary ? '<button type="button" data-review-recovery>Review recovery</button>' : '')+diagnostics+'</section>'
-      : '<p class="ui-notice">'+escape(label(op))+'. '+escape(active(op)?op.message || 'Work continues when prerequisites and resources are ready.':op.state==='complete'?'Work recorded as complete.':'Review recorded steps and recovery before retrying.')+'</p>';
+      : '<p class="ui-notice">'+escape(label(op))+(active(op) && op.message?' · '+escape(op.message):'')+'</p>';
     const markup=notice+'<details data-technical><summary>Technical details</summary><dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl></details>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+(op.recoveryRequired && !reviewInSummary?'<p>Recovery requires review before another transfer.</p>':'')+'<a href="'+escape(ZfsasUI.workflowUrl(op.url))+'">Open workflow →</a>';
     if(metadata.dataset.operation!==op.id || metadata.dataset.markup!==markup){
       const expanded=[...metadata.querySelectorAll('details')].map(node=>node.open);

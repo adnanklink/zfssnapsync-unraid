@@ -2,6 +2,7 @@
 <PLUGIN name="zfs.snapsync" author="Adnan Nashawaty" version="__VERSION__" icon="zfs-snapsync.png" pluginURL="__BASE_URL__/zfs.snapsync.plg" support="https://github.com/adnanklink/zfssnapsync-unraid/issues" min="6.12.0" launch="Settings/ZFSSnapSync">Plain-English ZFS snapshot scheduling, retention cleanup, and low-space protection for Unraid.
   <CHANGES>
 ### __VERSION__ (__BUILD_DATE__)
+- Simplify Overview, Activity and setup forms. Find history and recovery guidance in Help.
 - Review failures across retained history. Verified recoveries leave Needs attention automatically and keep their original Activity records.
 - Recover interrupted backups when ZFS cannot estimate the remaining bytes. Keep the partial receive and check available space before transfer.
 - Review recovery directly from the failure explanation in Activity. See the measured byte count in the job log.

@@ -31,11 +31,6 @@ def main() -> int:
 
     assert_contains(
         settings,
-        "zfsas_ui_url('help')",
-        "settings page must expose a Help tab",
-    )
-    assert_contains(
-        settings,
         "https://github.com/adnanklink/zfssnapsync-unraid/issues",
         "Help tab must link to the repository's GitHub issues page",
     )

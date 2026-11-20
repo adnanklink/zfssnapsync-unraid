@@ -61,6 +61,8 @@ echo "PASS: legacy routes, allowlisted shell/logs, unavailable sources, send ide
 
 foreach (['overview','automation','snapshots','replication','activity','settings','tools','help'] as $section) {
     $html=ui_endpoint('workspace.php','section='.$section);
+    check_ui(preg_match('~<nav\b[^>]*id="workspace-navigation"[^>]*>(.*?)</nav>~s', $html, $navigation)
+        && str_contains($navigation[1], 'href="/Settings/ZFSSnapSync?section=help"'), 'Help missing from navigation: ' . $section);
     check_ui(str_contains($html,'data-section="'.($section==='tools'?'settings':$section).'"'), 'Navigation selected wrong section: '.$section);
 }
 $source=file_get_contents($plugin.'/php/workspace-summary.php');

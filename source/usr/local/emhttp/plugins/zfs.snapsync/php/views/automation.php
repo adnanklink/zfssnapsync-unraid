@@ -22,7 +22,7 @@
       <section class="zfsas-card" data-auto-section="data">
         <h3>Datasets</h3>
         <div class="zfsas-help">
-          Choose the datasets to snapshot and clean up automatically. A dataset is a ZFS storage area, often used for a share.
+          Automatic snapshot and cleanup rules apply to the selected datasets.
         </div>
 
         <p id="dataset-discovery-status" role="status" aria-live="polite">Saved selections are shown while datasets load.</p>
@@ -42,7 +42,7 @@
             <div class="zfsas-help zfsas-dataset-count" id="dataset_count"></div>
           </div>
 
-          <p class="muted">Free-space targets accept sizes such as 500M, 100G or 2T.</p><div class="zfsas-table-wrap">
+          <p class="muted">Free-space target examples: 500M, 100G, 2T.</p><div class="zfsas-table-wrap">
             <table class="zfsas-table">
               <thead>
                 <tr>
@@ -88,7 +88,7 @@
         <h3>Schedule</h3>
         <details id="automation-schedule-options"><summary>Schedule options</summary><div id="automation-legacy-timing" hidden><p>Existing intervals retain cron alignment until converted. Conversion starts the next interval after Save.</p><label><input type="checkbox" name="convert_schedule" value="1" id="convert_schedule"> Convert legacy timing on Save</label></div><p>Run now does not change the scheduled time.</p></details>
         <div class="zfsas-field">
-          <label for="schedule_mode">How often should automatic runs happen?</label>
+          <label for="schedule_mode">Frequency</label>
           <select id="schedule_mode" name="schedule_mode" class="zfsas-select">
             <option value="disabled" <?php echo ($config['SCHEDULE_MODE'] === 'disabled') ? 'selected' : ''; ?>>Disabled (manual only)</option>
             <option value="minutes" <?php echo ($config['SCHEDULE_MODE'] === 'minutes') ? 'selected' : ''; ?>>Every N minutes</option>
@@ -98,24 +98,18 @@
             <option value="custom" <?php echo ($config['SCHEDULE_MODE'] === 'custom') ? 'selected' : ''; ?>>Advanced: custom cron</option>
           </select>
           <div class="zfsas-help">
-            The preview uses the host timezone and the saved schedule timing rules.
+            Times use the host timezone.
           </div>
         </div>
 
         <div class="zfsas-field zfsas-schedule-row" data-mode="minutes" style="margin-top: 12px;">
-          <label for="schedule_every_minutes">Every how many minutes?</label>
+          <label for="schedule_every_minutes">Interval (minutes)</label>
           <input id="schedule_every_minutes" name="schedule_every_minutes" class="zfsas-input" type="number" min="1" max="59" value="<?php echo h($config['SCHEDULE_EVERY_MINUTES']); ?>">
-          <div class="zfsas-help">
-            1 means every minute. 15 means every 15 minutes.
-          </div>
         </div>
 
         <div class="zfsas-field zfsas-schedule-row" data-mode="hourly" style="margin-top: 12px;">
-          <label for="schedule_every_hours">Every how many hours?</label>
+          <label for="schedule_every_hours">Interval (hours)</label>
           <input id="schedule_every_hours" name="schedule_every_hours" class="zfsas-input" type="number" min="1" max="24" value="<?php echo h($config['SCHEDULE_EVERY_HOURS']); ?>">
-          <div class="zfsas-help">
-            1 means every hour. 6 means every 6 hours.
-          </div>
         </div>
 
         <div class="zfsas-field zfsas-schedule-row" data-mode="daily" style="margin-top: 12px;">
@@ -124,13 +118,10 @@
             <input aria-label="Daily hour" id="schedule_daily_hour" name="schedule_daily_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_DAILY_HOUR']); ?>">
             <input aria-label="Daily minute" id="schedule_daily_minute" name="schedule_daily_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_DAILY_MINUTE']); ?>">
           </div>
-          <div class="zfsas-help">
-            Example: 03 and 30 means 3:30 AM every day.
-          </div>
         </div>
 
         <div class="zfsas-field zfsas-schedule-row" data-mode="weekly" style="margin-top: 12px;">
-          <label for="schedule_weekly_day">Weekly day and time</label>
+          <label for="schedule_weekly_day">Weekly day and time (24-hour clock)</label>
           <div class="zfsas-inline">
             <select id="schedule_weekly_day" name="schedule_weekly_day" class="zfsas-select">
               <?php foreach ($weekdayNames as $dayValue => $dayLabel) : ?>
@@ -140,16 +131,13 @@
             <input aria-label="Weekly hour" id="schedule_weekly_hour" name="schedule_weekly_hour" class="zfsas-input" type="number" min="0" max="23" value="<?php echo h($config['SCHEDULE_WEEKLY_HOUR']); ?>">
             <input aria-label="Weekly minute" id="schedule_weekly_minute" name="schedule_weekly_minute" class="zfsas-input" type="number" min="0" max="59" value="<?php echo h($config['SCHEDULE_WEEKLY_MINUTE']); ?>">
           </div>
-          <div class="zfsas-help">
-            Example: Sunday, 04 and 00 means every Sunday at 4:00 AM.
-          </div>
         </div>
 
         <div class="zfsas-field zfsas-schedule-row" data-mode="custom" style="margin-top: 12px;">
-          <label for="custom_cron_schedule">Custom cron expression (advanced)</label>
+          <label for="custom_cron_schedule">Custom cron expression</label>
           <input id="custom_cron_schedule" name="custom_cron_schedule" class="zfsas-input" value="<?php echo h($config['CUSTOM_CRON_SCHEDULE']); ?>">
           <div class="zfsas-help">
-            Use only if you need behavior outside the plain-English options. Format must have exactly 5 fields.
+            Enter five fields: minute, hour, day of month, month, day of week.
           </div>
         </div>
 
@@ -198,7 +186,7 @@
             <span>Dry run (preview only, no snapshot create/delete)</span>
           </label>
           <div class="zfsas-help">
-            Leave this unchecked for normal operation. In Dry Run mode, open Activity → Logs → Auto Snapshot debug to see each action that would be taken.
+            See planned actions in Activity → Logs → Auto Snapshot debug.
           </div>
         </div>
     <?php echo zfsas_config_tools_markup('auto', $configDir, $pageConfig); ?>

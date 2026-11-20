@@ -19,7 +19,7 @@
     <input type="hidden" name="csrf_token" value="<?php echo zfsas_send_h($csrfToken); ?>">
     <?php endif; ?>
 
-<section class="ui-card" id="backup-list-panel"><div class="ui-card-heading"><div><h2>Your backup jobs</h2><p class="muted">Choose what to copy and where to keep it. Backups are read-only; restore a writable copy when needed.</p></div><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
+<section class="ui-card" id="backup-list-panel"><div class="ui-card-heading"><h2>Backup jobs</h2><button type="button" class="btn btn-primary" id="open-new-job">Add job</button></div>
 <p id="dataset-discovery-status" role="status" aria-live="polite">Discovering ZFS datasets…</p>
 
 <div id="replication-job-list"></div>
@@ -80,26 +80,25 @@
 </div></div></section>
 <details class="ui-card" id="replication-shared"><summary>Shared backup settings</summary>      <div class="zfsas-send-inline-grid">
         <div class="zfsas-send-field">
-          <label for="send_snapshot_prefix">Send snapshot prefix base</label>
+          <label for="send_snapshot_prefix">Send snapshot prefix</label>
           <input id="send_snapshot_prefix" name="send_snapshot_prefix" class="zfsas-send-input" value="<?php echo zfsas_send_h($config['SEND_SNAPSHOT_PREFIX']); ?>">
-          <div class="zfsas-send-help">The script appends a per-job id automatically so each replication path gets its own isolated send snapshot namespace.</div>
+          <div class="zfsas-send-help">SnapSync adds the job ID to this prefix.</div>
         </div>
         <div class="zfsas-send-field">
           <label for="send_max_parallel">Parallel send jobs</label>
           <input id="send_max_parallel" name="send_max_parallel" class="zfsas-send-input" type="number" min="1" max="8" value="<?php echo zfsas_send_h($config['SEND_MAX_PARALLEL']); ?>">
-          <div class="zfsas-send-help">How many queued send jobs may transfer at the same time. Deletes still run one at a time.</div>
+          <div class="zfsas-send-help">Deletions run one at a time.</div>
         </div>
         <div class="zfsas-send-field">
-          <label for="send_rate_limit">Outbound stream rate limit</label>
+          <label for="send_rate_limit">Rate limit per stream</label>
           <input id="send_rate_limit" name="send_rate_limit" class="zfsas-send-input" value="<?php echo zfsas_send_h($config['SEND_RATE_LIMIT'] ?? '0'); ?>" placeholder="1M">
-          <div class="zfsas-send-help">Caps every ZFS send stream before SSH using mbuffer. Use 0 to disable, or a positive rate such as 1M or 8M. Keep this non-zero on Internet-constrained links.</div>
+          <div class="zfsas-send-help">Use 0 for unlimited or a rate such as 1M per second.</div>
         </div>
       </div>
 
       <label for="shared-transport">Connection transport</label><select id="shared-transport"><option value="local">Local datasets</option><option value="ssh">SSH receiver</option></select><div id="shared-ssh-settings" style="margin-top: 14px;">
-        <h4 style="margin-top:0;">SSH receiver settings</h4>
         <div class="zfsas-send-help">
-          SSH sends run zfs send through an audited ssh receive command. SSH transport uses keys or other preconfigured non-interactive authentication. This page stores connection metadata and an optional local private-key path only; it does not store raw passwords or private-key contents.
+          SSH sends run zfs send through an audited ssh receive command. Configure non-interactive authentication on the receiver.
         </div>
         <div class="zfsas-send-retention-grid" style="margin-top: 12px;">
           <div class="zfsas-send-field">
@@ -118,39 +117,29 @@
         <div class="zfsas-send-field" style="margin-top: 12px;">
           <label for="send_ssh_key_path">SSH private key path</label>
           <input id="send_ssh_key_path" name="send_ssh_key_path" class="zfsas-send-input" value="<?php echo zfsas_send_h($config['SEND_SSH_KEY_PATH'] ?? ''); ?>" placeholder="/boot/config/ssh/root_id_ed25519">
-          <div class="zfsas-send-help">Leave blank to use the system SSH agent/default keys. Prefer a key restricted to the receiver and keep file permissions tight.</div>
+          <div class="zfsas-send-help">Leave blank to use the SSH agent or default keys.</div>
         </div>
       </div>
 
       <div class="zfsas-send-inline-grid" style="margin-top: 18px;">
         <div class="zfsas-send-field">
-          <label>Retention Policy</label>
-          <div class="zfsas-send-help">
-            Scheduled sends queue destination snapshot deletions using the same keep-all / daily / weekly retention pattern as autosnapshot. The newest successful send checkpoint is always protected so the next incremental send still has a valid base.
-            This retention pass runs before the transfer, then a zero-change cleanup pass runs after the transfer to queue any duplicate no-change snapshots that slipped in with the replicated history.
-          </div>
-        </div>
-        <div class="zfsas-send-field">
-          <label>&nbsp;</label>
-          <div class="zfsas-send-help">Deletes are queued in the background instead of blocking the active send.</div>
+          <h3>Destination history</h3>
+          <p class="zfsas-send-help">Scheduled backups delete eligible destination snapshots as they age through these windows. The latest successful checkpoint stays protected.</p>
         </div>
       </div>
 
       <div class="zfsas-send-retention-grid">
         <div class="zfsas-send-field">
-          <label for="send_keep_all_for_days">Keep all snapshots for</label>
+          <label for="send_keep_all_for_days">Keep all through (days)</label>
           <input id="send_keep_all_for_days" name="send_keep_all_for_days" class="zfsas-send-input" type="number" min="1" max="36500" value="<?php echo zfsas_send_h($config['SEND_KEEP_ALL_FOR_DAYS']); ?>">
-          <div class="zfsas-send-help">Newest snapshots inside the destination tree stay at full resolution for this many days.</div>
         </div>
         <div class="zfsas-send-field">
-          <label for="send_keep_daily_until_days">Keep daily snapshots until</label>
+          <label for="send_keep_daily_until_days">Keep one per day through (days)</label>
           <input id="send_keep_daily_until_days" name="send_keep_daily_until_days" class="zfsas-send-input" type="number" min="2" max="36500" value="<?php echo zfsas_send_h($config['SEND_KEEP_DAILY_UNTIL_DAYS']); ?>">
-          <div class="zfsas-send-help">After the full-resolution window, the destination keeps one snapshot per day until this age.</div>
         </div>
         <div class="zfsas-send-field">
-          <label for="send_keep_weekly_until_days">Keep weekly snapshots until</label>
+          <label for="send_keep_weekly_until_days">Keep one per week through (days)</label>
           <input id="send_keep_weekly_until_days" name="send_keep_weekly_until_days" class="zfsas-send-input" type="number" min="3" max="36500" value="<?php echo zfsas_send_h($config['SEND_KEEP_WEEKLY_UNTIL_DAYS']); ?>">
-          <div class="zfsas-send-help">After the daily window, the destination keeps one snapshot per week until this age.</div>
         </div>
       </div>
     <?php echo zfsas_config_tools_markup('send', $configDir, $pageConfig); ?>
@@ -158,7 +147,7 @@
     </details>
 <section hidden class="ui-flow" id="edit-job-dialog" aria-labelledby="edit-job-title"><div class="ui-dialog-header"><h2 id="edit-job-title">Replication job</h2><button type="button" id="cancel-job-edit" class="btn-quiet">Cancel</button></div><div id="job-editor-body"></div><p id="job-editor-error" role="alert"></p><div class="ui-form-footer"><button type="button" class="btn btn-primary" id="finish-job-edit">Save job</button></div></section>
     <div class="zfsas-send-actions">
-      <div id="send_run_status" class="zfsas-send-run-status">Manual ZFS send is ready.</div>
+      <div id="send_run_status" class="zfsas-send-run-status" role="status"></div>
       <div id="send_feedback" class="zfsas-send-feedback">
         <?php if (!empty($errors)) : ?>
           <div class="zfsas-send-alert zfsas-send-alert-error">
@@ -175,7 +164,7 @@
   </form>
 <script src="/plugins/zfs.snapsync/js/config-tools.js"></script>
 
-<p class="ui-footnote">Monitor transfers and review failures in <a href="/Settings/ZFSSnapSync?section=activity&type=replication">Activity</a>.</p>
+<p class="ui-footnote"><a href="/Settings/ZFSSnapSync?section=activity&amp;type=replication">View backup activity →</a></p>
 </div>
 <script type="application/json" id="replication-options"><?php echo json_encode([$saveApiUrl, $runApiUrl, $queueStatusApiUrl, $queueStreamApiUrl, $queueActionApiUrl, $queueLogDownloadApiUrl], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
 <script src="/plugins/zfs.snapsync/js/source-retention.js?v=<?= (int) filemtime(__DIR__ . '/../../js/source-retention.js') ?>"></script>

@@ -9,7 +9,7 @@
   function render() {
     if(list.contains(document.activeElement) || list.querySelector('details[open]'))return;
     list.replaceChildren();
-    if(!records().length){list.innerHTML='<div class="ui-empty"><strong>No replication jobs yet</strong>Add a source and destination to keep another copy of your datasets.</div>';return;}
+    if(!records().length){list.innerHTML='<div class="ui-empty">No backup jobs configured.</div>';return;}
     const table=document.createElement('table');table.innerHTML='<thead><tr><th>Source → destination</th><th>Schedule</th><th>State</th><th>Actions</th></tr></thead><tbody></tbody>';
     for(const row of records()) {
       const id=value(row,'id'), schedule=summary?.schedules?.find(item=>item.id===id), item=document.createElement('tr');
@@ -136,7 +136,7 @@
   panels.performance.append(sharedGrid);
   panels.connection.append($('shared-transport').previousElementSibling,$('shared-transport'),$('shared-ssh-settings'));
   [...shared.children].filter(el=>el.matches('.zfsas-send-inline-grid,.zfsas-send-retention-grid,[data-config-tools]')).forEach(el=>panels.history.append(el));
-  shared.querySelector('summary').after(tabs);const globalNote=document.createElement('p');globalNote.className='muted';globalNote.textContent='These settings apply to all backup jobs. Saving here does not save your job draft.';tabs.before(globalNote);
+  shared.querySelector('summary').after(tabs);const globalNote=document.createElement('p');globalNote.className='muted';globalNote.textContent='Applies to all jobs. Save individual job edits separately.';tabs.before(globalNote);
   const returnButton=action('Return to job',returnFromShared);returnButton.hidden=true;shared.querySelector('.ui-form-footer').append(returnButton);
   function selectShared(key){for(const [name,panel] of Object.entries(panels))panel.hidden=name!==key;[...tabs.children].forEach(tab=>{const selected=tab.id==='tab-'+key;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;});}
   tabs.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const all=[...tabs.children],i=all.indexOf(document.activeElement);const n=event.key==='Home'?0:event.key==='End'?all.length-1:(i+(event.key==='ArrowRight'?1:-1)+all.length)%all.length;all[n].click();all[n].focus();event.preventDefault();});

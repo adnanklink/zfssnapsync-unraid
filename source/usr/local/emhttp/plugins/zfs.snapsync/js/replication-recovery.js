@@ -5,7 +5,7 @@
   function ensure(){
     if(dialog)return;
     dialog=document.createElement('dialog');dialog.id='replication-recovery';dialog.setAttribute('aria-labelledby','replication-recovery-title');
-    dialog.innerHTML='<div class="ui-dialog-header"><h2 id="replication-recovery-title">Review interrupted replication</h2><button type="button" data-close-dialog>Close</button></div><p class="ui-notice">Recovery finishes reviewed original snapshots. It does not create fresh snapshots, authorize additional cleanup, or resume a paused schedule. Earlier history may be unavailable after reboot.</p><p class="recovery-status" role="status"></p><ul class="recovery-members source-review-list"></ul><div class="recovery-pages toolbar"></div><button type="button" class="recovery-approve btn-primary" disabled>Retry reviewed work</button>';
+    dialog.innerHTML='<div class="ui-dialog-header"><h2 id="replication-recovery-title">Review interrupted replication</h2><button type="button" data-close-dialog>Close</button></div><p class="ui-notice">Retry finishes only the reviewed original snapshots. Cleanup approvals and paused schedules stay as they are.</p><p class="recovery-status" role="status"></p><ul class="recovery-members source-review-list"></ul><div class="recovery-pages toolbar"></div><button type="button" class="recovery-approve btn-primary" disabled>Retry reviewed work</button>';
     document.querySelector('.zfsas-workspace').append(dialog);
     dialog.addEventListener('close',()=>{++generation;poller?.stop();poller=null;});
   }
@@ -42,7 +42,7 @@
             const result=await ZfsasRequests.request('recovery-execute',base+'coordinator-action.php',{action:'retry_reviewed',review_id:started.runId});
             if(mine!==generation)return;
             if(result.blocked){status.textContent='Another run owns this configuration. Close and review again after it stops.';return;}
-            status.textContent='Reviewed recovery queued. Recovery does not request a fresh run; the normal schedule is unchanged.';
+            status.textContent='Recovery queued.';
             const link=document.createElement('a');link.href=ZfsasUI.workflowUrl('/Settings/ZFSSnapSync?section=activity');link.textContent='Follow recovery in Activity →';pages.replaceChildren(link);
             window.dispatchEvent(new Event('snapsync:recovery-started'));
           }catch(e){if(mine===generation){status.textContent=e.message;approve.disabled=false;}}

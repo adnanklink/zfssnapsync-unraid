@@ -3,6 +3,11 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
+## 2026.11.20.03 — Experimental (2026-11-20)
+
+- Overview shows setup hints only for unconfigured tasks. Configured tasks show their dataset or backup job count.
+- Shorten schedule and backup settings and link directly from Activity to help about history and recovery.
+
 ## 2026.11.20.02 — Experimental (2026-11-20)
 
 - Review outstanding failures across retained Activity history and move between them with **Next failure**.
