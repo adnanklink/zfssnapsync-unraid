@@ -33,7 +33,9 @@ function zfsas_replication_ssh_phase(array $p,int &$sequence,callable $report): 
             $result['message']='Verified receiver snapshot, dataset identity and protection policy.';return $result;
         }
         if ($complete) {return $result;}
-        $space=zfsas_replication_space($p,null,[$reader,'poolRead'],[$reader,'read']);
+        $space=zfsas_replication_space($p,null,[$reader,'poolRead'],[$reader,'read'], static function () use ($report, &$sequence) {
+            $report('progress', $sequence++, zfsas_resume_measurement_progress());
+        });
         if($phase==='replication_space' && $space['outcome']==='validation_failure' && ($space['reason'] ?? '')==='space') {
             return zfsas_replication_pressure_proposal($p,$space,$sequence,[$reader,'read']);
         }

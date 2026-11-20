@@ -50,7 +50,7 @@ function zfsas_run_progress(array $run, int $now): array
         if ($task['state'] !== 'running') { $phases[] = ($task['blocked'] ?? '') ?: $task['state']; continue; }
         $sample = $task['progress'] ?? [];
         $phases[] = $sample['phase'] ?? $task['phase'] ?? $task['kind'];
-        if (isset($task['progressAt']) && $now - $task['progressAt'] > 10) {
+        if (isset($task['progressAt']) && $now - $task['progressAt'] > 10 && ($sample['phase'] ?? '') !== 'resume_measurement') {
             $messages[] = 'Waiting for a fresh worker progress sample.'; continue;
         }
         if (!empty($sample['message'])) { $messages[] = $sample['message']; }

@@ -64,6 +64,24 @@ final class ZfsasReplicationInspection
         return self::boundedCommand('zpool',$arguments);
     }
 
+    /** Count a source stream in the owned worker group. Only wc's count reaches PHP. */
+    public static function measureResumeBytes(string $token): int
+    {
+        try {
+            // Like the transfer itself, a sequential read may exceed the metadata timeout.
+            $count = trim(self::boundedCommand('/bin/bash', [
+                '-o', 'pipefail', '-c', 'zfs send -t "$1" | wc -c', 'snapsync-measure', $token,
+            ], 0));
+        } catch (ZfsasReplicationCommandError $error) {
+            throw new ZfsasReplicationCommandError('Could not read the complete remaining stream.',
+                str_replace($token, '[redacted]', $error->diagnostic), $error->getCode());
+        }
+        if (!preg_match('/^[1-9][0-9]{0,17}$/D', $count)) {
+            throw new RuntimeException('The stream count was empty or outside the supported range.');
+        }
+        return (int)$count;
+    }
+
     public static function autoMutation(string $action,string $snapshot): void
     {
         if(!in_array($action,['snapshot','destroy'],true))throw new InvalidArgumentException('Unsupported Auto mutation.');

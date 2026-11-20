@@ -34,3 +34,8 @@ for($i=0;$i<350;$i++)$j->state['attempts']['fixture'.$i]=['taskId'=>$r.':bad','s
 $d=zfsas_operation_detail($j,$r,-1);check(count($d['entries'])<=200&&strlen(json_encode($d))<131072,'History exceeds response bound');
 check($d['previousOffset']!==null,'Large history lost pagination');
 echo "PASS: job-only diagnostics, original attempt retention, failure priority, dependency explanations, redaction and bounded history\n";
+$oldResume = ['kind'=>'prepare','state'=>'failed','parameters'=>['inspection'=>['mode'=>'resume']],
+    'result'=>['message'=>'Unable to measure the incremental stream size.']];
+check(zfsas_operation_problem([$oldResume])['code']==='resume_estimate','Old resume failure lacks recovery guidance');
+$oldResume['parameters']['inspection']['mode']='full';
+check(zfsas_operation_problem([$oldResume])['code']!=='resume_estimate','Unrelated failure labeled as interrupted receive');

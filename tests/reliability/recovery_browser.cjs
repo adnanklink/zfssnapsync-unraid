@@ -26,6 +26,8 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   });
   await page.goto('http://recovery.test/');await page.getByRole('button',{name:'Details',exact:true}).click();
   assert.match(await page.locator('#operation-metadata').textContent(),/What happened.*earlier transfer.*Next action/s);
+  assert.equal(await page.locator('#operation-metadata button[data-review-recovery]').count(),1);
+  assert.equal(await page.getByText(op.problem.nextAction,{exact:true}).count(),1);
   await page.getByRole('button',{name:'Show job log',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('quota exceeded'));
   assert(! (await page.locator('#operation-detail-log').textContent()).includes('OTHER JOB'));
   assert(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop>0));
@@ -33,11 +35,11 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   assert.equal(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop),100);
   await page.getByText('More log options',{exact:true}).click();
   await page.getByRole('button',{name:'Shared replication log — includes other jobs',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('OTHER JOB'));
-  await page.getByRole('button',{name:'Review recovery',exact:true}).click();await page.getByRole('button',{name:'Retry 1 reviewed datasets',exact:true}).waitFor({timeout:5000}).catch(async e=>{throw new Error(e.message+' STATUS: '+await page.locator('.recovery-status').textContent());});
+  await page.getByRole('button',{name:'Review recovery',exact:true}).click();await page.getByRole('button',{name:'Retry 1 reviewed dataset',exact:true}).waitFor({timeout:5000}).catch(async e=>{throw new Error(e.message+' STATUS: '+await page.locator('.recovery-status').textContent());});
   assert.match(await page.locator('.recovery-status').textContent(),/1 eligible; 1 unavailable/);
   assert(await page.locator('.recovery-members li').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1)),'Recovery paths overflow');
   assert.match(await page.locator('.recovery-members').textContent(),/ORIGINAL_A/);
-  await page.getByRole('button',{name:'Retry 1 reviewed datasets',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.recovery-status').textContent.includes('queued'));
+  await page.getByRole('button',{name:'Retry 1 reviewed dataset',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.recovery-status').textContent.includes('queued'));
   assert.equal(retries,1);assert.equal(reviews,1);
   await page.locator('#replication-recovery [data-close-dialog]').click();slow=true;
   await page.getByRole('button',{name:'Review recovery',exact:true}).click();await page.locator('#replication-recovery [data-close-dialog]').click();await page.waitForTimeout(700);

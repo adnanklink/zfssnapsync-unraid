@@ -18,6 +18,21 @@ function zfsas_coordinator_replication_command(array $task, string $root, string
             }
         } catch (InvalidArgumentException $error) {return ['outcome'=>'validation_failure','message'=>$error->getMessage()];}
     }
+    // Only a completed sibling space check can supply this derived input.
+    unset($parameters['measuredResumeBytes']);
+    if ($journal !== null && $parameters['phase'] === 'replication_transfer' && ($parameters['inspection']['mode'] ?? '') === 'resume') {
+        foreach ($task['dependencies'] as $id) {
+            $space = $journal->state['tasks'][$id];
+            $bytes = $space['result']['measuredResumeBytes'] ?? null;
+            if ($space['state'] === 'complete' && ($space['parameters']['phase'] ?? '') === 'replication_space'
+                && $space['parameters']['replication'] === $parameters['replication']
+                && $space['parameters']['inspection'] === $parameters['inspection']
+                && is_int($bytes) && $bytes > 0 && $bytes < 1000000000000000000) {
+                $parameters['measuredResumeBytes'] = $bytes;
+                break;
+            }
+        }
+    }
     if ($task['kind'] === 'finalize' && $journal !== null) {
         foreach ($task['dependencies'] as $id) {
             $child = $journal->state['tasks'][$id];

@@ -40,9 +40,13 @@ try {
                 if ($actual !== $readonly) { throw new RuntimeException('Receiver readonly policy could not be verified.'); }
                 $result['message'] = 'Verified expected receiver snapshot and dataset GUIDs. '.($readonly === 'on' ? 'Backup destination is read-only.' : 'Restored destination is writable; mount it when ready.');
             } elseif (in_array($phase,['replication_space','replication_transfer'],true)) {
-                if (!$complete) { $result = zfsas_replication_space($parameters); }
+                $sequence = 3;
+                if (!$complete) {
+                    $result = zfsas_replication_space($parameters, onMeasure: static function () use (&$sequence) {
+                        zfsas_coordinator_worker_report('progress', $sequence++, zfsas_resume_measurement_progress());
+                    });
+                }
                 if (!$complete && $phase === 'replication_space' && ($result['outcome'] ?? '')==='validation_failure' && ($result['reason'] ?? '')==='space') {
-                    $sequence=3;
                     $result=zfsas_replication_pressure_proposal($parameters,$result,$sequence);
                 }
                 if (!$complete && $phase === 'replication_transfer' && $result['outcome'] === 'success') {
@@ -52,8 +56,7 @@ try {
                     }
                     // Ownership is rechecked immediately before the mutation. The
                     // pipeline uses one incremental target, no intermediates or -F.
-                    zfsas_coordinator_worker_report('progress',3,['phase'=>'transfer','message'=>'Transferring the verified incremental snapshot.']);
-                    $sequence = 4;
+                    zfsas_coordinator_worker_report('progress',$sequence++,['phase'=>'transfer','message'=>'Transferring the verified incremental snapshot.']);
                     $request = $parameters['replication'];
                     $resumeToken = $parameters['inspection']['mode'] === 'resume' ? zfsas_replication_resume_token($parameters) : '';
                     $process = proc_open(['/bin/bash','-o','pipefail','-c',

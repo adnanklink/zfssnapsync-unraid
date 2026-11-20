@@ -18,6 +18,11 @@ function zfsas_operation_problem(array $tasks): ?array
     $code=$r['failureCode'] ?? (($r['inspection']['resumeRequired'] ?? false)?'interrupted_receive':($r['reason'] ?? 'unknown'));
     $message=$r['message'] ?? 'This step stopped without recording an error.';
     if(str_contains($message,'Receiver has an interrupted transfer'))$code='interrupted_receive';
+    if ($code === 'unknown' && ($p['inspection']['mode'] ?? '') === 'resume'
+        && $message === 'Unable to measure the incremental stream size.') {
+        $code = 'resume_estimate';
+        $message = 'The previous run stopped before transfer because SnapSync could not use the ZFS estimate for the remaining stream.';
+    }
     if($code==='unknown'){
         if(preg_match('/(snapshot.*(?:absent|missing|not exist)|cannot open.*snapshot)/i',$message))$code='missing_snapshot';
         elseif(preg_match('/(base.*(?:absent|differ|changed)|no.*common|no.*base)/i',$message))$code='incompatible_base';
@@ -32,6 +37,8 @@ function zfsas_operation_problem(array $tasks): ?array
     $diagnostic=zfsas_diagnostic_text(($r['diagnostic'] ?? '') ?: ($task['lastDiagnostic']['text'] ?? ''));
     $next=match($code){
         'interrupted_receive'=>'Review the interrupted transfer before sending another snapshot.',
+        'resume_estimate'=>'Review the interrupted transfer again. SnapSync can now measure the remaining stream directly when ZFS returns an unusable size.',
+        'resume_measurement'=>'Keep the partial backup and source snapshot. Check the job log for a source read error before reviewing recovery again.',
         'space'=>'Free destination space or review the configured cleanup policy, then review Retry.',
         'missing_snapshot'=>'The original source snapshot is unavailable. Review the source; a fresh run cannot resume a missing snapshot.',
         'incompatible_base'=>'The source and receiver do not have the required matching base. Review both snapshot histories; no forced rollback will be attempted.',

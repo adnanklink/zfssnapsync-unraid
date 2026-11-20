@@ -4,7 +4,7 @@
   const overview=document.querySelector('.zfsas-workspace').dataset.section==='overview';
   const terminal=new Set(['complete','completed','failed','canceled','skipped','recorded']);
   let snapshot=null, selected=null, busy=false, logPoll=null,detailLogPoll=null,stagePoll=null;
-  const phaseLabel=value=>({replication_schedule:'Check datasets',replication_snapshot:'Create source snapshot',replication_member:'Inspect destination',replication_inspect:'Inspect destination',replication_space:'Check destination space',replication_transfer:'Transfer snapshot',replication_verify:'Verify received snapshot',replication_run_verify:'Verify all datasets',recovery_scan:'Inspect recovery membership',recovery_member_review:'Review interrupted snapshot',recovery_review_finish:'Complete recovery review',recovery_execute_start:'Start reviewed recovery',recovery_finish:'Verify recovery'}[value] || (value||'—').replaceAll('_',' '));
+  const phaseLabel=value=>({replication_schedule:'Check datasets',replication_snapshot:'Create source snapshot',replication_member:'Inspect destination',replication_inspect:'Inspect destination',replication_space:'Check destination space',resume_measurement:'Measure remaining stream',replication_transfer:'Transfer snapshot',replication_verify:'Verify received snapshot',replication_run_verify:'Verify all datasets',recovery_scan:'Inspect recovery membership',recovery_member_review:'Review interrupted snapshot',recovery_review_finish:'Complete recovery review',recovery_execute_start:'Start reviewed recovery',recovery_finish:'Verify recovery'}[value] || (value||'—').replaceAll('_',' '));
   const needsAttention=op=>op.needsAttention ?? ((op.state==='failed'||op.recoveryRequired)&&!op.attentionDismissed);
   const active=operation=>!terminal.has(operation.state);
   const date=epoch=>epoch ? new Date(epoch*1000).toLocaleString(undefined,{timeZone:snapshot?.timezone || 'UTC',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not recorded';
@@ -70,7 +70,7 @@
         row.cells[2].append(activity);
       }
       const phase=activity.querySelector('.ui-transfer-phase'),bar=activity.querySelector('progress'),message=activity.querySelector('.ui-transfer-message');
-      const phaseText=active(op)?(op.phase || (op.blocked||[]).join(', ') || '').replaceAll('_',' '):'';
+      const phaseText=active(op) && (op.phase || op.blocked?.length) ? phaseLabel(op.phase || op.blocked.join(', ')) : '';
       const messageText=active(op)?op.message || '':'';
       if(phase.textContent!==phaseText)phase.textContent=phaseText;
       if(message.textContent!==messageText)message.textContent=messageText;
@@ -91,7 +91,7 @@
   }
   function detail(op) {
     $('operation-title').textContent=op.title;
-    const entries=[['Status',label(op)],['Phase',phaseLabel(op.problem?.phase || op.phase)],['Source',op.source||'Configured datasets'],['Destination',op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId],...(op.sourceCleanupOf?[['Replication run',op.sourceCleanupOf]]:[]),...(op.sourceCleanupRunId?[['Source cleanup run',op.sourceCleanupRunId]]:[])];
+    const entries=[['Status',label(op)],['Phase',phaseLabel(op.problem?.phase || op.phase)],['Source',op.problem?.source||op.source||'Configured datasets'],['Destination',op.problem?.destination||op.destination||'—'],['Requested',date(op.createdAt)],['Next retry',op.retryAt?date(op.retryAt):'—'],['Waiting for',(op.blocked||[]).join(', ')||'—'],['Run',op.parentId||op.nativeId],...(op.sourceCleanupOf?[['Replication run',op.sourceCleanupOf]]:[]),...(op.sourceCleanupRunId?[['Source cleanup run',op.sourceCleanupRunId]]:[])];
     if(op.attentionDismissed)entries.push(['Needs attention','Dismissed for this alert; history and recovery protections remain intact.']);
     if(op.sourceCleanupOf)for(const [label,key] of [['Protected checkpoints','protectedReasons'],['Skipped checkpoints','skippedReasons']])entries.push([label,Object.entries(op.sourceCleanup?.[key]||{}).map(([reason,count])=>reason+' ('+count+')').join('; ')||'None recorded']);
     const content=$('operation-body');
@@ -99,20 +99,27 @@
     if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
     const drawer=$('operation-detail'), scroll=drawer.scrollTop;
     if (content.contains(document.activeElement)) return;
-    const problem=op.problem?'<section class="ui-notice"><h3>What happened</h3><p>'+escape(op.problem.summary)+'</p><p>'+escape([op.problem.source,op.problem.destination].filter(Boolean).join(' → '))+'</p><h3>Next action</h3><p>'+escape(op.problem.nextAction)+'</p>'+(op.problem.diagnosticAvailable?'<details><summary>ZFS error recorded for this step or an earlier attempt</summary><pre>'+escape(op.problem.diagnostic)+'</pre></details>':'<small>The original ZFS error is unavailable in this run’s recorded history.</small>')+'</section>':'';
-    const markup=problem+'<p class="ui-notice">'+escape(label(op))+'. '+escape(op.problem?.nextAction || (active(op)?'Work continues when prerequisites and resources are ready.':op.state==='complete'?'Work recorded as complete.':'Review recorded steps and recovery before retrying.'))+'</p><details data-technical><summary>Technical details</summary><dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl></details>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+(op.recoveryRequired?'<p class="error">Recovery requires review before another transfer. Use the recovery action below when available.</p>':'')+'<a href="'+escape(ZfsasUI.workflowUrl(op.url))+'">Open workflow →</a>';
+    const reviewInSummary = Boolean(op.problem && op.actions.includes('review_recovery'));
+    const diagnostics = op.problem?.diagnosticAvailable
+      ? '<details><summary>Recorded ZFS error</summary><pre>'+escape(op.problem.diagnostic)+'</pre></details>' : '';
+    const notice = op.problem
+      ? '<section class="ui-notice"><h3>What happened</h3><p>'+escape(op.problem.summary)+'</p><p>'+escape([op.problem.source,op.problem.destination].filter(Boolean).join(' → '))+'</p><h3>Next action</h3><p>'+escape(op.problem.nextAction)+'</p>'+
+        (reviewInSummary ? '<button type="button" data-review-recovery>Review recovery</button>' : '')+diagnostics+'</section>'
+      : '<p class="ui-notice">'+escape(label(op))+'. '+escape(active(op)?op.message || 'Work continues when prerequisites and resources are ready.':op.state==='complete'?'Work recorded as complete.':'Review recorded steps and recovery before retrying.')+'</p>';
+    const markup=notice+'<details data-technical><summary>Technical details</summary><dl>'+entries.map(([key,value])=>'<dt>'+escape(key)+'</dt><dd>'+escape(value)+'</dd>').join('')+'</dl></details>'+(Number.isFinite(op.progress)?'<label>Reported progress<progress max="100" value="'+Math.max(0,Math.min(100,op.progress))+'"></progress>'+escape(op.progress)+'%</label>':'')+(op.recoveryRequired && !reviewInSummary?'<p>Recovery requires review before another transfer.</p>':'')+'<a href="'+escape(ZfsasUI.workflowUrl(op.url))+'">Open workflow →</a>';
     if(metadata.dataset.operation!==op.id || metadata.dataset.markup!==markup){
       const expanded=[...metadata.querySelectorAll('details')].map(node=>node.open);
       metadata.innerHTML=markup;metadata.querySelectorAll('details').forEach((node,i)=>node.open=expanded[i]||false);metadata.dataset.markup=markup;metadata.dataset.operation=op.id;
+      metadata.querySelector('[data-review-recovery]')?.addEventListener('click',()=>perform(op,'review_recovery'));
       const related=op.sourceCleanupRunId||op.sourceCleanupOf;
       if(related){const button=document.createElement('button');button.type='button';button.textContent=op.sourceCleanupRunId?'View source cleanup':'View completed replication';button.addEventListener('click',()=>{if(snapshot.operations.some(item=>item.id==='coordinator:'+related))open('coordinator:'+related,button);else ZfsasUI.notice('Related run details are outside the current history window.');});metadata.append(button);}
     }
     drawer.scrollTop=scroll;
     const actions=$('operation-actions');
-    const fingerprint=JSON.stringify([op.id,op.actions,op.attentionToken,snapshot.service]);
+    const fingerprint=JSON.stringify([op.id,op.actions,reviewInSummary,op.attentionToken,snapshot.service]);
     if(actions.dataset.fingerprint!==fingerprint) {
       actions.replaceChildren();actions.dataset.fingerprint=fingerprint;
-      for(const action of op.actions) {const button=document.createElement('button');button.type='button';button.textContent={review_recovery:'Review recovery',cancel:'Cancel run',retry:'Retry',clear_failed:'Clear failed record',dismiss_attention:'Dismiss from Needs attention',restore_attention:'Restore to Needs attention'}[action];if(action==='cancel')button.className='ui-danger';button.addEventListener('click',()=>perform(op,action));actions.append(button);}
+      for(const action of op.actions) {if(reviewInSummary && action==='review_recovery')continue;const button=document.createElement('button');button.type='button';button.textContent={review_recovery:'Review recovery',cancel:'Cancel run',retry:'Retry',clear_failed:'Clear failed record',dismiss_attention:'Dismiss from Needs attention',restore_attention:'Restore to Needs attention'}[action];if(action==='cancel')button.className='ui-danger';button.addEventListener('click',()=>perform(op,action));actions.append(button);}
       if(op.coordinator || op.id.startsWith('coordinator:')){if(snapshot.service&&(!snapshot.service.compatible||snapshot.service.refreshPending)){const reason=document.createElement('p');reason.textContent=snapshot.service.message;actions.append(reason);}const log=document.createElement('button');log.type='button';log.textContent='Show job log';log.addEventListener('click',()=>showDetailLog(op));actions.append(log);}
       const logs=document.createElement('details');logs.className='ui-action-menu';logs.innerHTML='<summary>More log options</summary>';actions.append(logs);
       const shared=document.createElement('button');shared.type='button';shared.textContent='Shared '+(op.logType||op.type)+' log — includes other jobs';shared.addEventListener('click',()=>showDetailLog(op,true));logs.append(shared);

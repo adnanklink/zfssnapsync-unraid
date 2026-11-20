@@ -34,7 +34,7 @@
         for(const item of data.rows){const li=document.createElement('li');li.textContent=item.source+' → '+item.destination+'\n'+(item.snapshot?item.snapshot+'\n':'')+item.message;rows.append(li);}
         if(data.nextOffset!==null){const next=document.createElement('button');next.type='button';next.textContent='Next datasets';next.onclick=()=>loadPage(url+'&offset='+data.nextOffset);pages.append(next);}
         const first=document.createElement('button');first.type='button';first.textContent='First datasets';first.onclick=()=>loadPage(url);pages.append(first);
-        approve.disabled=data.expired||data.eligible===0;approve.textContent='Retry '+data.eligible+' reviewed datasets';
+        approve.disabled=data.expired||data.eligible===0;approve.textContent='Retry '+data.eligible+(data.eligible===1?' reviewed dataset':' reviewed datasets');
         approve.onclick=async()=>{
           if(Date.now()>=data.expiresAt*1000){approve.disabled=true;status.textContent='Review expired. Close this panel and review again.';return;}
           approve.disabled=true;

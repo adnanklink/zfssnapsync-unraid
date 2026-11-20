@@ -4,7 +4,7 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current experimental release: `2026.09.28.01` · Requires Unraid 6.12.0 or newer**
+**Current experimental release: `2026.11.20.01` · Requires Unraid 6.12.0 or newer**
 
 Main is the experimental release channel. Local and SSH jobs use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Automated verification has passed, but dedicated-host acceptance and the 48-hour soak remain incomplete. This release is available for normal use and issue reporting; it is not certified production-ready. See [known testing gaps](docs/host-acceptance.md) and the optional [testing checklist](docs/personal-unraid-checklist.md).
 
@@ -199,7 +199,7 @@ This policy:
 - Deletes eligible anchors oldest first, one at a time, and checks measured space after each deletion.
 - Stops when space is sufficient or fails with a space reason when protected history or quotas prevent progress.
 
-Space approval requires the stream estimate plus the greater of the configured free-space target, 16 MiB, or 5% of the estimate. Estimated reclaimable bytes never substitute for measuring available space.
+Space approval requires the stream estimate plus the greater of the configured free-space target, 16 MiB, or 5% of the estimate. Estimated reclaimable bytes never substitute for measuring available space. When ZFS returns an unusable resume estimate, SnapSync reads the remaining source stream and counts its bytes. This can add source I/O. Activity shows the measurement, and the job log records the count. The receiver's saved progress stays in place during the check.
 
 The opt-in applies to local and SSH scheduled jobs and configured-job Run Now. It grants no cleanup authority to Snapshot Manager manual sends.
 

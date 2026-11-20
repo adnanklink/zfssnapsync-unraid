@@ -3,6 +3,11 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
+## 2026.11.20.01 — Experimental (2026-11-20)
+
+- Resume interrupted backups when ZFS returns an unusable size estimate. SnapSync measures the remaining stream, checks destination headroom, and verifies the received snapshot.
+- In Activity, open **Review recovery** directly from the failure explanation. The job log records the measured byte count or the source read error.
+
 ## 2026.09.28.01 — Experimental (2026-09-28)
 
 - Add **Stop automation and clean up…** for retiring one dataset, reviewing source and destination history, and deleting destinations before the source. Keep held snapshots, other jobs, clones and interrupted receives protected; require explicit review of any retired recovery references.

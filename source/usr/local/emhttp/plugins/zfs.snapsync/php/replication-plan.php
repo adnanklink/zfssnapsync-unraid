@@ -52,19 +52,40 @@ function zfsas_replication_revalidate(array $parameters, ?callable $read=null, ?
     return $result;
 }
 
-function zfsas_replication_space(array $parameters, ?callable $read=null, ?callable $readPool=null, ?callable $readReceiver=null): array
+function zfsas_replication_space(array $parameters, ?callable $read=null, ?callable $readPool=null, ?callable $readReceiver=null, ?callable $onMeasure=null): array
 {
     $read ??= [ZfsasReplicationInspection::class,'command'];
     $readPool ??= [ZfsasReplicationInspection::class,'poolCommand'];
     $readReceiver ??= $read;
     $request = $parameters['replication']; $base = $parameters['inspection']['base']['snapshot'] ?? null;
+    $measurement = [];
+    $token = null;
     if ($parameters['inspection']['mode'] === 'resume') {
-        $token=zfsas_replication_resume_token($parameters,$readReceiver);
-        $estimate=$read(['send','-nP','-t',$token]);
-    } else { $estimate = $read(array_merge(['send','-nP'],$base === null ? [] : ['-i',$base],[$request['sourceSnapshot']])); }
-    if (!preg_match('/^size\s+([0-9]+)$/m', $estimate, $match)
-        || strlen($match[1]) > 18) { throw new RuntimeException('Unable to measure the incremental stream size.'); }
-    $required = (int)$match[1];
+        $token = zfsas_replication_resume_token($parameters, $readReceiver);
+    }
+    if ($token !== null && isset($parameters['measuredResumeBytes'])) {
+        // Supplied by the coordinator from the completed space check for this token.
+        $required = $parameters['measuredResumeBytes'];
+    } else {
+        $args = $token !== null ? ['-t', $token] : array_merge($base === null ? [] : ['-i', $base], [$request['sourceSnapshot']]);
+        $estimate = $read(array_merge(['send', '-nP'], $args));
+        if (preg_match('/^size[ \t]+([0-9]{1,18})$/m', $estimate, $match) && ($token === null || (int)$match[1] > 0)) {
+            $required = (int)$match[1];
+        } elseif ($token !== null) {
+            // OpenZFS can subtract completed bytes from a smaller unsigned estimate.
+            if ($onMeasure !== null) { $onMeasure(); }
+            try {
+                $required = ZfsasReplicationInspection::measureResumeBytes($token);
+            } catch (RuntimeException $error) {
+                return zfsas_replication_error_result($error) + ['failureCode'=>'resume_measurement', 'recoveryRequired'=>true];
+            }
+            zfsas_replication_resume_token($parameters, $readReceiver);
+            $measurement = ['measuredResumeBytes'=>$required,
+                'message'=>sprintf('Measured %s bytes remaining by reading the saved stream.', number_format($required))];
+        } else {
+            throw new RuntimeException('Unable to measure the incremental stream size.');
+        }
+    }
     $capacity = $parameters['inspection']['mode'] === 'full' ? substr($request['destination'],0,strrpos($request['destination'],'/')) : $request['destination'];
     $available = trim($readReceiver(['get','-H','-p','-o','value','available','--',$capacity]));
     if (!ctype_digit($available) || strlen($available) > 18) { throw new RuntimeException('Incomplete receiver available-space measurement.'); }
@@ -82,14 +103,19 @@ function zfsas_replication_space(array $parameters, ?callable $read=null, ?calla
 
         return ['outcome'=>'validation_failure','reason'=>'space','requiredBytes'=>$required,'availableBytes'=>(int)$available,'message'=>"Insufficient destination space: need $required bytes including margin, measured $available available. No further cleanup is authorized by this plan; free space or review cleanup and Retry."];
     }
-    return ['outcome'=>'success','requiredBytes'=>$required,'availableBytes'=>(int)$available];
+    return ['outcome'=>'success','requiredBytes'=>$required,'availableBytes'=>(int)$available] + $measurement;
+}
+
+function zfsas_resume_measurement_progress(): array
+{
+    return ['phase'=>'resume_measurement', 'message'=>'Reading the remaining source stream to measure its size. The partial backup stays in place.'];
 }
 
 function zfsas_replication_resume_token(array $parameters, ?callable $readReceiver=null): string
 {
     $readReceiver ??= [ZfsasReplicationInspection::class,'command'];
     $token=trim($readReceiver(['get','-H','-o','value','receive_resume_token','--',$parameters['replication']['destination']]));
-    if ($token === '-' || !hash_equals($parameters['inspection']['resumeHash'] ?? '',hash('sha256',$token))) {
+    if ($token === '' || $token === '-' || !hash_equals($parameters['inspection']['resumeHash'] ?? '',hash('sha256',$token))) {
         throw new InvalidArgumentException('Resume token changed before execution.');
     }
     return $token;
