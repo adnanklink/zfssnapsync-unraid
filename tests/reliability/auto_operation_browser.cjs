@@ -15,6 +15,8 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
    return route.fulfill({contentType:'text/plain',body:'ZFSAS_JSON_BEGIN'+JSON.stringify(data)+'ZFSAS_JSON_END'});
   });
   await page.goto('http://auto.test/');await page.getByText('Waiting for prerequisite work to finish.',{exact:true}).waitFor({state:'visible'});const trigger=page.getByRole('button',{name:'Details',exact:true});await trigger.focus();await page.keyboard.press('Enter');
+  await page.getByRole('tab',{name:'Summary'}).focus();await page.keyboard.press('ArrowRight');
+  assert.equal(await page.getByRole('tab',{name:'Stages'}).getAttribute('aria-selected'),'true');
   const summary=page.locator('#operation-checklist summary');await summary.waitFor();await summary.focus();await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.querySelector('#operation-checklist li')?.textContent.includes('tank/data'));
   assert.match(await page.locator('#operation-checklist').textContent(),/2 recorded steps/);

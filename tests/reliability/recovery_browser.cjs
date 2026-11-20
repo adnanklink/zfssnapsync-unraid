@@ -6,7 +6,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
  const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
  try{
   const page=await browser.newPage({viewport:{width:760,height:900}}),errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message);});
-  let reviews=0,retries=0,slow=false;
+  let reviews=0,retries=0,slow=false,detailReads=0;
   const op={id:'coordinator:run-'+ 'a'.repeat(24),nativeId:'run-'+ 'a'.repeat(24),type:'replication',coordinator:true,title:'Replication',state:'failed',createdAt:1700000000,actions:['review_recovery'],logType:'replication',url:'?section=replication',source:'tank/'+ 'long-source-'.repeat(50),problem:{summary:'An earlier transfer is unfinished at the destination.',nextAction:'Review the interrupted transfer before sending another snapshot.',source:'tank/data',destination:'backup/data',diagnosticAvailable:false}};
   await page.route('http://recovery.test/**',async route=>{
    const req=route.request(),url=new URL(req.url());
@@ -14,7 +14,7 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
    if(/\.(js|css)$/.test(url.pathname))return route.fulfill({contentType:url.pathname.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(plugin+url.pathname.replace('/plugins/zfs.snapsync',''),'utf8')});
    let data={ok:true};
    if(url.pathname.endsWith('workspace-summary.php'))data={...data,generatedAt:1700000000,timezone:'UTC',sources:{},operations:[op],schedules:[],pausedSchedules:[]};
-   if(url.pathname.endsWith('operation-detail.php')){assert.equal(url.searchParams.get('operation_id'),op.id);data={...data,scope:'job',historyNotice:'Runtime history is lost after reboot.',previousOffset:null,nextOffset:null,entries:Array.from({length:100},(_,i)=>({at:1700000000+i,phase:'transfer',state:'transient_failure',source:'tank/data',destination:'backup/data',message:'Original attempt '+i,diagnostic:'cannot receive: quota exceeded',exitCode:1}))};}
+   if(url.pathname.endsWith('operation-detail.php')){detailReads++;assert.equal(url.searchParams.get('operation_id'),op.id);data={...data,scope:'job',historyNotice:'Runtime history is lost after reboot.',previousOffset:null,nextOffset:null,entries:Array.from({length:100},(_,i)=>({at:1700000000+i,phase:'transfer',state:'transient_failure',source:'tank/data',destination:'backup/data',message:'Original attempt '+i,diagnostic:'cannot receive: quota exceeded',exitCode:1}))};}
    if(url.pathname.endsWith('workspace-log.php'))data={...data,content:'OTHER JOB SHARED LOG'};
    if(url.pathname.endsWith('coordinator-action.php')){
     const body=new URLSearchParams(req.postData());
@@ -25,16 +25,18 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
    return route.fulfill({contentType:'text/plain',body:'ZFSAS_JSON_BEGIN'+JSON.stringify(data)+'ZFSAS_JSON_END'});
   });
   await page.goto('http://recovery.test/');await page.getByRole('button',{name:'Details',exact:true}).click();
-  assert.match(await page.locator('#operation-metadata').textContent(),/What happened.*earlier transfer.*Next action/s);
+  assert.match(await page.locator('#operation-metadata').textContent(),/Failed.*earlier transfer.*Next action/s);
   assert.equal(await page.locator('#operation-metadata button[data-review-recovery]').count(),1);
   assert.equal(await page.getByText(op.problem.nextAction,{exact:true}).count(),1);
-  await page.getByRole('button',{name:'Show job log',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('quota exceeded'));
+  assert.equal(detailReads,0,'Opening the summary loaded diagnostics');
+  assert(await page.locator('#operation-view-summary').getByText('tank/data → backup/data',{exact:true}).isVisible());
+  await page.getByRole('tab',{name:'Log',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('quota exceeded'));
   assert(! (await page.locator('#operation-detail-log').textContent()).includes('OTHER JOB'));
   assert(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop>0));
   await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop=100);await page.locator('#activity-refresh').evaluate(el=>el.click());await page.waitForTimeout(150);
   assert.equal(await page.locator('#operation-detail-log').evaluate(el=>el.scrollTop),100);
-  await page.getByText('More log options',{exact:true}).click();
-  await page.getByRole('button',{name:'Shared replication log — includes other jobs',exact:true}).click();await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('OTHER JOB'));
+  await page.selectOption('#operation-log-source','shared');await page.waitForFunction(()=>document.getElementById('operation-detail-log')?.textContent.includes('OTHER JOB'));
+  await page.getByRole('tab',{name:'Summary'}).click();
   await page.getByRole('button',{name:'Review recovery',exact:true}).click();await page.getByRole('button',{name:'Retry 1 reviewed dataset',exact:true}).waitFor({timeout:5000}).catch(async e=>{throw new Error(e.message+' STATUS: '+await page.locator('.recovery-status').textContent());});
   assert.match(await page.locator('.recovery-status').textContent(),/1 eligible; 1 unavailable/);
   assert(await page.locator('.recovery-members li').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1)),'Recovery paths overflow');

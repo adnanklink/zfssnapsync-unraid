@@ -642,6 +642,8 @@
   text-align:left;
   justify-content:start;
   margin-bottom:10px}
+.zfsas-workspace #operation-tabs { margin-bottom:16px; }
+.zfsas-workspace .ui-operation-target code { white-space:normal; overflow-wrap:anywhere; }
 .zfsas-workspace #operation-actions {
   margin-top:24px}
 .zfsas-workspace #operation-rows td:nth-child(2) {

@@ -41,5 +41,24 @@ $jobCount = count($overviewJobs);
 <?php endif; ?>
 <section class="ui-card"><div class="ui-card-heading"><h2><?= $isOverview ? 'Current & recent work' : 'Operations' ?></h2><span id="activity-updated" class="muted">Connecting…</span></div><div class="table-wrap"><table class="ui-operations-table"><thead><tr><th>Operation</th><th>Dataset / destination</th><th>Status</th><th>Requested</th><th></th></tr></thead><tbody id="operation-rows"><tr><td colspan="5" class="ui-empty">Loading runtime records…</td></tr></tbody></table></div><p class="ui-footnote" id="activity-history-scope"><?= $isOverview ? 'Up to 8 recent operations this boot.' : 'Up to 120 recent operations this boot.' ?></p><?php if (!$isOverview): ?><a href="<?= zfsas_ui_url('help') ?>#recovery">About history and recovery</a><?php endif; ?></section>
 <?php if (!$isOverview): ?><section class="ui-card"><details id="activity-logs"><summary>Logs</summary><div class="toolbar"><label>Log source<select id="activity-log-type"><option value="auto">Latest Auto Snapshot run</option><option value="debug">Auto Snapshot debug</option><option value="replication">Replication</option><option value="migration">Migration</option><option value="batch">Snapshot batches</option><option value="coordinator">Coordinator</option></select></label><button type="button" id="activity-log-refresh">Refresh log</button><a class="btn" href="/plugins/zfs.snapsync/php/log-tail.php?download=1">Download Auto Snapshot logs</a></div><p class="ui-footnote">Last 200 lines. Shared logs may include other operations.</p><pre id="activity-log-output">Choose a log source.</pre></details></section><?php endif; ?>
-<dialog id="operation-detail" aria-labelledby="operation-title"><div class="ui-dialog-header"><h2 id="operation-title">Operation details</h2><button type="button" data-close-dialog aria-label="Close operation details">Close</button></div><div id="operation-body"></div><div id="operation-actions" class="toolbar"></div><?php if (!$isOverview): ?><button id="next-failure" type="button" hidden>Next failure</button><?php endif; ?><p id="operation-action-message" role="status"></p></dialog>
+<dialog id="operation-detail" aria-labelledby="operation-title">
+  <div class="ui-dialog-header"><h2 id="operation-title">Operation details</h2><button type="button" data-close-dialog aria-label="Close operation details">Close</button></div>
+  <div id="operation-tabs" class="ui-tabs" role="tablist" aria-label="Operation details">
+    <?php foreach (['summary' => 'Summary', 'stages' => 'Stages', 'log' => 'Log'] as $key => $name): ?>
+      <button type="button" role="tab" id="operation-tab-<?= $key ?>" aria-controls="operation-view-<?= $key ?>" aria-selected="<?= $key === 'summary' ? 'true' : 'false' ?>" tabindex="<?= $key === 'summary' ? 0 : -1 ?>"><?= $name ?></button>
+    <?php endforeach; ?>
+  </div>
+  <section id="operation-view-summary" role="tabpanel" aria-labelledby="operation-tab-summary">
+    <div id="operation-body"></div>
+    <div id="operation-actions" class="toolbar"></div>
+    <?php if (!$isOverview): ?><button id="next-failure" type="button" hidden>Next failure</button><?php endif; ?>
+    <p id="operation-action-message" role="status"></p>
+  </section>
+  <section id="operation-view-stages" role="tabpanel" aria-labelledby="operation-tab-stages" hidden></section>
+  <section id="operation-view-log" role="tabpanel" aria-labelledby="operation-tab-log" hidden>
+    <label id="operation-log-choice">Log source<select id="operation-log-source"><option value="job">This job only</option><option value="shared">Shared log (includes other jobs)</option></select></label>
+    <p id="operation-shared-label" hidden></p>
+    <a id="operation-log-download" hidden>Download failure log</a>
+  </section>
+</dialog>
 <script src="/plugins/zfs.snapsync/js/operations.js?v=<?= (int) filemtime(__DIR__ . '/../../js/operations.js') ?>"></script>

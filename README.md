@@ -4,7 +4,7 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current experimental release: `2026.11.20.03` · Requires Unraid 6.12.0 or newer**
+**Current experimental release: `2026.11.20.04` · Requires Unraid 6.12.0 or newer**
 
 Main is the experimental release channel. Local and SSH jobs use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Automated verification has passed, but dedicated-host acceptance and the 48-hour soak remain incomplete. This release is available for normal use and issue reporting; it is not certified production-ready. See [known testing gaps](docs/host-acceptance.md) and the optional [testing checklist](docs/personal-unraid-checklist.md).
 
@@ -166,7 +166,7 @@ A backup job specifies a source, destination, schedule, whether to include child
 
 Local and SSH scheduled jobs and configured-job Run Now use coordinator-owned preparation, cleanup, space checks, transfer, and verification. Recursive membership is captured for the run, and every expected child must report verified success before the run completes. Snapshot Manager also supports explicit local sends and validated Retry of interrupted receives.
 
-In a job’s **Details**, the outcome and next action appear above a replication checklist: **Check datasets → Create source snapshots → Inspect destinations → Cleanup → Check space → Transfer → Verify**. Expand a stage for dataset results and attempt counts, with pages of up to 50 datasets. Failed stages open initially. Unplanned or unexecuted work is not shown as successful; manual sends and recovery reuse captured snapshots. Linked source-retention cleanup remains a separate operation. Timestamps, IDs, and raw diagnostics are under expandable technical details. **Show job log** shows only that run’s steps and attempts, including available ZFS error output. Shared category logs are labeled separately and can include other jobs. Older attempts may lack diagnostics because earlier versions did not preserve them.
+Open a job’s **Details** for its outcome, source and destination, and available actions. **Stages** shows the recorded checklist for automatic snapshots and replication. Expand a stage for dataset results and attempt counts, in pages of up to 50 datasets. Failed stages open first. **Log** opens the selected run’s entries when available. Choose the shared log to see other jobs in that category. Older attempts may lack recorded ZFS diagnostics. Linked source-retention cleanup has its own operation.
 
 For an unfinished local or SSH receive, choose **Review recovery** in Details or in its saved Backup copies row’s Actions menu. Review the original snapshots and unavailable members, then choose **Retry reviewed datasets** within five minutes. Recovery validates dataset/snapshot identities, bases and resume state again before sending. It finishes eligible original work without creating fresh snapshots or granting cleanup authority; completed snapshots are verified without retransmission. The normal schedule and any persistent pause remain unchanged. Run Now starts new work and cannot substitute for this review.
 

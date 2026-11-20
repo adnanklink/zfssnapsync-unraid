@@ -3,6 +3,10 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
+## 2026.11.20.04 — Experimental (2026-11-20)
+
+- Job Details opens on Summary with the outcome and available actions. Open Stages for dataset results or Log for recorded output. Switch between job and shared logs in one place.
+
 ## 2026.11.20.03 — Experimental (2026-11-20)
 
 - Overview shows setup hints only for unconfigured tasks. Configured tasks show their dataset or backup job count.
