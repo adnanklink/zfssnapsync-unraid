@@ -4,9 +4,13 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current experimental release: `2026.11.20.04` · Requires Unraid 6.12.0 or newer**
+**Beta release `2026.11.20.04` · Requires Unraid 6.12.0 or newer**
 
-Main is the experimental release channel. Local and SSH jobs use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Automated verification has passed, but dedicated-host acceptance and the 48-hour soak remain incomplete. This release is available for normal use and issue reporting; it is not certified production-ready. See [known testing gaps](docs/host-acceptance.md) and the optional [testing checklist](docs/personal-unraid-checklist.md).
+> **Risk of data loss.** SnapSync is beta software. Retention and cleanup can permanently delete snapshots, and rollback can discard newer changes. Before using SnapSync on important data, keep an independent backup and verify that you can restore from it.
+>
+> You use SnapSync at your own risk. It is provided “as is,” without warranty. To the extent permitted by applicable law, the authors and contributors are not liable for data loss or corruption arising from its use. See the [MIT License](LICENSE).
+
+The `main` channel distributes experimental builds. Dedicated-host testing and the 48-hour soak are still pending. See the [known testing gaps](docs/host-acceptance.md) and [tester checklist](docs/personal-unraid-checklist.md).
 
 ## Install and update
 

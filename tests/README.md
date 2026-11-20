@@ -33,8 +33,9 @@ named file-backed pools and must leave none behind. A missing prerequisite is a
 failure, never a successful skip. Host/SSH and soak acceptance remain separate
 release gates until their full harnesses are implemented.
 
-Runtime updates are explicit: update the exact image/browser versions and npm
-lock, rebuild, and rerun the suites. An unavailable pinned dependency must fail
+When updating Chromium, choose a Debian security archive timestamp that contains
+the exact versions of both chromium and chromium-common. Update the browser pin
+and archive timestamp together, rebuild, and rerun the suites. An unavailable pinned dependency must fail
 the build rather than silently select a different version. The archived test
 image digest identifies the actual environment used for a release.
 
