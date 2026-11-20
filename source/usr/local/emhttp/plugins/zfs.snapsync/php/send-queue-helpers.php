@@ -773,10 +773,11 @@ function zfsas_ops_send_job_state_label($job)
     return ucfirst(str_replace('_', ' ', $state));
 }
 
-function zfsas_ops_send_queue_status_payload($limit = 120, $activityOrder = false)
+function zfsas_ops_send_queue_status_payload($limit = 120, $activityOrder = false, bool $failuresOnly = false)
 {
     $rows = [];
     foreach (zfsas_ops_recent_send_jobs($limit, $activityOrder) as $job) {
+        if ($failuresOnly && ($job['STATE'] ?? '') !== 'failed' && ($job['RECOVERY_REQUIRED'] ?? '0') !== '1') { continue; }
         $step = zfsas_ops_send_job_step_parts($job);
         $rows[] = [
             'id' => (string) ($job['JOB_ID'] ?? ''),

@@ -3,6 +3,11 @@
 This file is written for everyday users in plain English.
 It answers one question: "What changed for me?"
 
+## 2026.11.20.02 — Experimental (2026-11-20)
+
+- Review outstanding failures across retained Activity history and move between them with **Next failure**.
+- Remove verified recoveries from **Needs attention** automatically. Find the original failures under **Recovered or dismissed**.
+
 ## 2026.11.20.01 — Experimental (2026-11-20)
 
 - Resume interrupted backups when ZFS returns an unusable size estimate. SnapSync measures the remaining stream, checks destination headroom, and verifies the received snapshot.

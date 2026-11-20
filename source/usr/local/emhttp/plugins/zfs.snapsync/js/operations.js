@@ -6,9 +6,11 @@
   let snapshot=null, selected=null, busy=false, logPoll=null,detailLogPoll=null,stagePoll=null;
   const phaseLabel=value=>({replication_schedule:'Check datasets',replication_snapshot:'Create source snapshot',replication_member:'Inspect destination',replication_inspect:'Inspect destination',replication_space:'Check destination space',resume_measurement:'Measure remaining stream',replication_transfer:'Transfer snapshot',replication_verify:'Verify received snapshot',replication_run_verify:'Verify all datasets',recovery_scan:'Inspect recovery membership',recovery_member_review:'Review interrupted snapshot',recovery_review_finish:'Complete recovery review',recovery_execute_start:'Start reviewed recovery',recovery_finish:'Verify recovery'}[value] || (value||'—').replaceAll('_',' '));
   const needsAttention=op=>op.needsAttention ?? ((op.state==='failed'||op.recoveryRequired)&&!op.attentionDismissed);
+  const reviewingFailures=()=>$('activity-state')?.value==='failed';
+  const failureHistory=()=>reviewingFailures() || $('activity-state')?.value==='reviewed';
   const active=operation=>!terminal.has(operation.state);
   const date=epoch=>epoch ? new Date(epoch*1000).toLocaleString(undefined,{timeZone:snapshot?.timezone || 'UTC',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not recorded';
-  const label=operation=>operation.state==='canceling'?'Stopping · cancellation saved':operation.stateLabel || ({retry_wait:'Waiting to retry',complete:'Completed',running:'Running',queued:'Queued',failed:'Failed',canceled:'Canceled',waiting:'Waiting'}[operation.state] || operation.state);
+  const label=operation=>operation.failureResolved?'Failed · recovered':operation.state==='canceling'?'Stopping · cancellation saved':operation.stateLabel || ({retry_wait:'Waiting to retry',complete:'Completed',running:'Running',queued:'Queued',failed:'Failed',canceled:'Canceled',waiting:'Waiting'}[operation.state] || operation.state);
   function render(data) {
     snapshot=data;
     const available=Object.values(data.sources).every(source=>source.available);
@@ -50,7 +52,10 @@
     let operations=snapshot.operations;
     const type=$('activity-type')?.value,state=$('activity-state')?.value;
     if(type) operations=operations.filter(op=>op.type===type);
-    if(state) operations=operations.filter(op=>state==='active'?active(op):state==='failed'?needsAttention(op):state==='complete'?['complete','completed'].includes(op.state):op.state===state);
+    if(state) operations=operations.filter(op=>state==='active'?active(op):state==='failed'?needsAttention(op):state==='reviewed'?(op.failureResolved||op.attentionDismissed):state==='complete'?['complete','completed'].includes(op.state):op.state===state);
+    if(!overview) $('activity-history-scope').textContent=failureHistory()
+      ? 'Showing retained failure history for this boot.'
+      : 'Up to 120 recent operation records. Internal worker attempts are omitted.';
     if(overview) operations=operations.slice(0,8);
     const body=$('operation-rows'), existing=new Map([...body.querySelectorAll('[data-operation]')].map(row=>[row.dataset.operation,row]));
     body.querySelector('[data-empty]')?.remove();
@@ -62,7 +67,7 @@
       row.cells[0].querySelector('strong').textContent=op.title;
       row.cells[0].querySelector('small').textContent=op.parentId?'Run '+op.parentId:op.type;
       row.cells[1].querySelector('code').textContent=[op.source,op.destination].filter(Boolean).join(' → ') || 'Configured datasets';
-      const badge=row.cells[2].firstChild;badge.dataset.state=['Waiting','Waiting to retry','Queued'].includes(op.stateLabel)?'waiting':op.state;badge.textContent=label(op);
+      const badge=row.cells[2].firstChild;badge.dataset.state=op.failureResolved?'recovered':['Waiting','Waiting to retry','Queued'].includes(op.stateLabel)?'waiting':op.state;badge.textContent=label(op);
       let activity=row.cells[2].querySelector('.ui-transfer-status');
       if(!activity){
         activity=document.createElement('div');activity.className='ui-transfer-status';
@@ -87,7 +92,12 @@
       if(row.parentElement!==body) body.append(row);
     }
     for(const row of existing.values()) row.remove();
-    if(!operations.length) { const row=document.createElement('tr');row.dataset.empty='1';row.innerHTML='<td colspan="5" class="ui-empty"><strong>No operations to show</strong>New work will appear here. Earlier history may be unavailable after reboot.</td>';body.append(row); }
+    if(!operations.length) {
+      const row=document.createElement('tr');row.dataset.empty='1';
+      const complete=Object.values(snapshot.sources).every(source=>source.available);
+      const message=reviewingFailures()?(complete?'No failures need attention in this selection.':'Failure history is incomplete. Check the status messages above.'):'No operations to show.';
+      const cell=row.insertCell();cell.colSpan=5;cell.className='ui-empty';cell.textContent=message;body.append(row);
+    }
   }
   function detail(op) {
     $('operation-title').textContent=op.title;
@@ -98,11 +108,23 @@
     let metadata=$('operation-metadata');
     if(!metadata){metadata=document.createElement('div');metadata.id='operation-metadata';content.prepend(metadata);}
     const drawer=$('operation-detail'), scroll=drawer.scrollTop;
-    if (content.contains(document.activeElement)) return;
+    const nextButton=$('next-failure');
+    if(nextButton){
+      const queue=snapshot.operations.filter(item=>needsAttention(item) && (!$('activity-type').value || item.type===$('activity-type').value));
+      const index=queue.findIndex(item=>item.id===op.id);
+      const next=queue[index+1];
+      nextButton.hidden=!reviewingFailures() || !next;
+      nextButton.onclick=next ? ()=>{ if(!busy) open(next.id,nextButton); } : null;
+    }
+    if (metadata.dataset.operation===op.id && metadata.dataset.resolved===String(!!op.failureResolved) && content.contains(document.activeElement)) return;
+    metadata.dataset.resolved=String(!!op.failureResolved);
     const reviewInSummary = Boolean(op.problem && op.actions.includes('review_recovery'));
     const diagnostics = op.problem?.diagnosticAvailable
       ? '<details><summary>Recorded ZFS error</summary><pre>'+escape(op.problem.diagnostic)+'</pre></details>' : '';
-    const notice = op.problem
+    const notice = op.failureResolved
+      ? '<section class="ui-notice"><h3>Resolved by recovery</h3><p>A later recovery resolved this failure. The original attempt is recorded below.</p>'+
+        (op.problem?'<p>'+escape(op.problem.summary)+'</p>':'')+diagnostics+'</section>'
+      : op.problem
       ? '<section class="ui-notice"><h3>What happened</h3><p>'+escape(op.problem.summary)+'</p><p>'+escape([op.problem.source,op.problem.destination].filter(Boolean).join(' → '))+'</p><h3>Next action</h3><p>'+escape(op.problem.nextAction)+'</p>'+
         (reviewInSummary ? '<button type="button" data-review-recovery>Review recovery</button>' : '')+diagnostics+'</section>'
       : '<p class="ui-notice">'+escape(label(op))+'. '+escape(active(op)?op.message || 'Work continues when prerequisites and resources are ready.':op.state==='complete'?'Work recorded as complete.':'Review recorded steps and recovery before retrying.')+'</p>';
@@ -126,7 +148,7 @@
       if(op.logDownloadUrl){const link=document.createElement('a');link.className='btn';link.textContent='Download failure log';link.href=op.logDownloadUrl;logs.append(link);}
     }
   }
-  function open(id,trigger) {const op=snapshot.operations.find(item=>item.id===id);if(!op)return;if(selected!==id){detailLogPoll?.stop();stagePoll?.stop();$('operation-checklist')?.remove();$('operation-log-panel')?.remove();}selected=id;$('operation-action-message').textContent='';detail(op);ZfsasUI.open($('operation-detail'),trigger);if(op.coordinator&&['replication','auto'].includes(op.type)&&!op.sourceCleanupOf)showChecklist(op);}
+  function open(id,trigger) {const op=snapshot.operations.find(item=>item.id===id);if(!op)return;if(selected!==id){detailLogPoll?.stop();stagePoll?.stop();$('operation-checklist')?.remove();$('operation-log-panel')?.remove();}selected=id;$('operation-action-message').textContent='';detail(op);if(!$('operation-detail').open)ZfsasUI.open($('operation-detail'),trigger);if(op.coordinator&&['replication','auto'].includes(op.type)&&!op.sourceCleanupOf)showChecklist(op);}
   async function perform(op,action) {
     if(busy)return;
     if(action==='review_recovery'){ZfsasRecovery.open(op.nativeId,op.scheduleId);return;}
@@ -136,7 +158,7 @@
     busy=true; $('operation-actions').querySelectorAll('button').forEach(button=>button.disabled=true);
     try {
       if(action==='dismiss_attention'||action==='restore_attention'){
-        const data=await ZfsasRequests.request('operation-action',base+'attention-action.php',{action,operation_id:op.id,attention_token:op.attentionToken});
+        const data=await ZfsasRequests.request('operation-action',base+'attention-action.php',{action,operation_id:op.id,attention_token:op.attentionToken,review:failureHistory()?'failures':''});
         $('operation-action-message').textContent=data.message;
         return;
       }
@@ -223,9 +245,13 @@
   }
   $('operation-detail').addEventListener('close',()=>{stagePoll?.stop();stagePoll=null;detailLogPoll?.stop();detailLogPoll=null;});
   window.addEventListener('snapsync:recovery-started',()=>poll.refresh());
-  const poll=ZfsasRequests.poll('workspace-summary',()=>ZfsasRequests.request('workspace-summary',base+'workspace-summary.php'),render);
-  ['activity-type','activity-state'].forEach(id=>$(id)?.addEventListener('change',()=>{rows();const url=new URL(location.href);url.searchParams.set(id==='activity-type'?'type':'state',$(id).value);history.replaceState(null,'',url);}));
   if($('activity-type')) {const params=new URLSearchParams(location.search);$('activity-type').value=params.get('type')||'';$('activity-state').value=params.get('state')||'';}
+  const poll=ZfsasRequests.poll('workspace-summary',()=>ZfsasRequests.request('workspace-summary',base+'workspace-summary.php'+(failureHistory()?'?review=failures':'')),render);
+  ['activity-type','activity-state'].forEach(id=>$(id)?.addEventListener('change',()=>{
+    const url=new URL(location.href);url.searchParams.set(id==='activity-type'?'type':'state',$(id).value);history.replaceState(null,'',url);
+    if(snapshot)rows();
+    if(id==='activity-state')poll.refresh();
+  }));
   $('activity-refresh')?.addEventListener('click',()=>poll.refresh());
   const logs=$('activity-logs');
   function startLogs(){logPoll?.stop();logPoll=null;if(!logs?.open)return;logPoll=ZfsasRequests.poll('activity-log',()=>ZfsasRequests.request('activity-log',base+'workspace-log.php?type='+encodeURIComponent($('activity-log-type').value)),data=>{const node=$('activity-log-output'), bottom=node.scrollHeight-node.scrollTop-node.clientHeight<20;node.textContent=data.content||'No log is available for this boot.';if(bottom)node.scrollTop=node.scrollHeight;return snapshot?.operations.some(active);});}

@@ -9,12 +9,28 @@ function zfsas_diagnostic_text(string $text, int $limit=4096): string
     $text=preg_replace('/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/','',$text);
     return json_decode(json_encode(substr($text,-$limit),JSON_INVALID_UTF8_SUBSTITUTE),true);
 }
+/** Display-only. Use the existing journal evidence, including records from before this UI. */
+function zfsas_failure_resolved(array $run, array $tasks): bool
+{
+    if ($run['state'] !== 'failed' || $run['recoveryRequired'] || isset($run['retirementAbandonedAt'])) { return false; }
+    if (str_starts_with($run['recoveryResolvedBy'] ?? '', 'run-')) { return true; }
+    $hasResolvedFailure = false;
+    foreach ($tasks as $task) {
+        if ($task['state'] !== 'failed' || !empty($task['supersededBy'])) { continue; }
+        if (empty($task['recoveryResolvedBy'])) { return false; }
+        $hasResolvedFailure = true;
+    }
+    return $hasResolvedFailure;
+}
+
 function zfsas_operation_problem(array $tasks): ?array
 {
     $failures=array_values(array_filter($tasks,static fn($t)=>$t['state']==='failed' && empty($t['supersededBy'])));
     if (!$failures) return null;
     // A dependency that never ran is not the cause. Prefer the actual failed result.
-    $task=$failures[0];$r=$task['result'] ?? [];$p=$task['parameters'] ?? [];
+    $unresolved = array_filter($failures, static fn($task)=>empty($task['recoveryResolvedBy']));
+    $task = $unresolved ? reset($unresolved) : $failures[0];
+    $r=$task['result'] ?? [];$p=$task['parameters'] ?? [];
     $code=$r['failureCode'] ?? (($r['inspection']['resumeRequired'] ?? false)?'interrupted_receive':($r['reason'] ?? 'unknown'));
     $message=$r['message'] ?? 'This step stopped without recording an error.';
     if(str_contains($message,'Receiver has an interrupted transfer'))$code='interrupted_receive';

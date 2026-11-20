@@ -24,7 +24,7 @@ function zfsas_attention_read(?string $root=null): array
 function zfsas_attention_project(array $operations,array $records): array
 {
     foreach ($operations as &$operation) {
-        $attention=$operation['state']==='failed' || !empty($operation['recoveryRequired']);
+        $attention=($operation['state']==='failed' && empty($operation['failureResolved'])) || !empty($operation['recoveryRequired']);
         $operation['attentionToken']=$attention?zfsas_attention_token($operation):null;
         $operation['attentionDismissed']=$attention && isset($records[$operation['attentionToken']]);
         $operation['needsAttention']=$attention && !$operation['attentionDismissed'];

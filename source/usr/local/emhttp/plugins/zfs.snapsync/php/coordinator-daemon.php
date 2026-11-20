@@ -8,6 +8,7 @@ require_once __DIR__ . '/coordinator-remote-shutdown.php';
 require_once __DIR__ . '/coordinator-retention.php';
 require_once __DIR__.'/coordinator-retirement.php';
 require_once __DIR__ . '/operation-diagnostics.php';
+require_once __DIR__.'/workspace-operation.php';
 require_once __DIR__ . '/coordinator-source-retention.php';
 require_once __DIR__ . '/coordinator-auto-admission.php';
 require_once __DIR__ . '/coordinator-deletion.php';
@@ -143,7 +144,24 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
     }
     if ($action === 'status' || $action === 'watchdog') {
         $runs = array_values($journal->state['runs']);
-        usort($runs, static fn($a, $b) => $b['createdAt'] <=> $a['createdAt']);
+        $reviewFailures = ($request['failureReview'] ?? false) === true;
+        $nextPage = null;
+        if ($reviewFailures) {
+            // A stable cursor also works when older runs are pruned between reads.
+            $before = $request['before'] ?? null;
+            if ($before !== null && (!is_array($before) || !is_int($before[0] ?? null) || !is_string($before[1] ?? null))) {
+                throw new InvalidArgumentException('Invalid failure review cursor.');
+            }
+            $runs = array_filter($runs, static fn($r) =>
+                ($before === null || [$r['createdAt'],$r['id']] < $before)
+                && ($r['state'] === 'failed' || $journal->runRequiresReview($r['id'])));
+            usort($runs, static fn($a,$b) => [$b['createdAt'],$b['id']] <=> [$a['createdAt'],$a['id']]);
+            if (count($runs) > 40) { $nextPage = [$runs[39]['createdAt'],$runs[39]['id']]; }
+            $runs = array_slice($runs, 0, 40);
+        } else {
+            usort($runs, static fn($a, $b) => $b['createdAt'] <=> $a['createdAt']);
+            $runs = array_slice($runs, 0, 120);
+        }
         foreach ($runs as &$run) {
             $originParameters=$journal->state['tasks'][$run['id'].':prepare']['parameters'] ?? [];
             $run['recoveryReview']=($originParameters['phase'] ?? '')==='recovery_scan';
@@ -187,11 +205,18 @@ $handler = static function (array $request) use ($journal, $executor, $submitAut
             }
             $run['recoveryRequired']=$journal->runRequiresReview($run['id']);
             if (isset($run['recoveryResolvedBy'])) { $run['canRetry']=false; }
-            $run['problem']=zfsas_operation_problem(array_map(static fn($id)=>$journal->state['tasks'][$id],$run['tasks']));
+            $tasks = array_map(static fn($id)=>$journal->state['tasks'][$id],$run['tasks']);
+            $run['failureResolved'] = zfsas_failure_resolved($run, $tasks);
+            if ($run['failureResolved']) { $run['canRetry'] = $run['canReviewRecovery'] = false; }
+            $run['problem']=zfsas_operation_problem($tasks);
             $run['kinds'] = array_values(array_unique($run['kinds']));
             $run['blockedReasons'] = array_values(array_unique($run['blockedReasons']));
         } unset($run);
-        return ['service'=>$service, 'runs' => array_slice($runs, 0, 120), 'sequence' => $journal->state['sequence'],
+        if ($reviewFailures) {
+            return ['service'=>$service, 'failureRows'=>array_values(array_filter(array_map('zfsas_workspace_operation',$runs))),
+                'nextFailurePage'=>$nextPage];
+        }
+        return ['service'=>$service, 'runs' => $runs, 'sequence' => $journal->state['sequence'],
             'autoPaused' => is_file(zfsas_ops_control_path('paused', 'auto')),
             'schedule' => ZfsasSchedule::preview(ZfsasSchedule::autoConfig($config['auto']), time(), ZfsasSchedule::hostTimezone())];
     }

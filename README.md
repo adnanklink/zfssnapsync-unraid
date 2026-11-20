@@ -4,7 +4,7 @@
 
 Manage snapshots, replicate datasets, and follow storage operations from one Unraid WebGUI. ZFS SnapSync brings scheduled snapshots, retention cleanup, local replication, snapshot browsing, and dataset migration into a shared workspace.
 
-**Current experimental release: `2026.11.20.01` · Requires Unraid 6.12.0 or newer**
+**Current experimental release: `2026.11.20.02` · Requires Unraid 6.12.0 or newer**
 
 Main is the experimental release channel. Local and SSH jobs use coordinator ownership, independently authorized cleanup and reviewed recovery. Automatic snapshot mutations have individual ownership and conservative continuation after configuration changes. Automated verification has passed, but dedicated-host acceptance and the 48-hour soak remain incomplete. This release is available for normal use and issue reporting; it is not certified production-ready. See [known testing gaps](docs/host-acceptance.md) and the optional [testing checklist](docs/personal-unraid-checklist.md).
 
@@ -95,6 +95,8 @@ Create a job through **Source & destination → Schedule & history → Review**.
 ![Dark-theme backup job setup with source and destination fields](docs/screenshots/replication-dark.png)
 
 </details>
+
+Select **Overview → Needs attention → Review failures** to see failures across retained history for this boot. Open **Details** on a row and use **Next failure** to continue through the list. When the coordinator records that recovery resolved every failed step and no recovery remains outstanding, Activity labels the historical row **Failed · recovered** and removes its alert automatically. Partial recoveries and unrelated failures stay in the list. Select **Recovered or dismissed** in Activity to revisit reviewed alerts. Recovery still requires a separate review and approval.
 
 In **Needs attention**, open an alert and choose **Dismiss from Needs attention** to acknowledge it. Its failed/recovery record and snapshot protections remain intact in Activity, where **Restore to Needs attention** reverses dismissal. Changed failures appear again. Dismissals stay in RAM for the current boot.
 

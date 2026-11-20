@@ -11,9 +11,17 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   await page.route('http://attention.test/**',async route=>{
    const request=route.request(),url=new URL(request.url());
    if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
+   if(url.searchParams.get('section')==='activity')return route.fulfill({contentType:'text/html',body:execFileSync('php',['-r','$_GET["section"]="activity";require $argv[1];',plugin+'/php/workspace.php'],{encoding:'utf8'})});
    if(/\.(js|css)$/.test(url.pathname))return route.fulfill({contentType:url.pathname.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(plugin+'/'+(url.pathname.endsWith('.js')?'js/':'css/')+path.basename(url.pathname),'utf8')});
    let data={ok:true};
    if(url.pathname.endsWith('workspace-summary.php'))data={ok:true,generatedAt:123,timezone:'UTC',sources:{configuration:{available:true}},schedules:[],pausedSchedules:[],operations:[{...op,attentionDismissed:dismissed,needsAttention:!dismissed,actions:[dismissed?'restore_attention':'dismiss_attention']}]};
+   if(url.searchParams.get('review')==='failures'){
+    data.operations=[
+      {...op,id:'coordinator:new',title:'New failure',needsAttention:true,actions:[]},
+      {...op,id:'coordinator:old',title:'Older failure',needsAttention:true,actions:[]},
+      {...op,id:'coordinator:resolved',title:'Recovered failure',recoveryRequired:false,failureResolved:true,needsAttention:false,actions:[]}
+    ];
+   }
    if(request.method()==='POST'){
     assert(url.pathname.endsWith('attention-action.php'),'Dismissal reached worker mutation endpoint');mutations++;
     const body=new URLSearchParams(request.postData());assert.equal(body.get('operation_id'),op.id);assert.equal(body.get('attention_token'),op.attentionToken);dismissed=body.get('action')==='dismiss_attention';data={ok:true,message:'History and recovery protections are preserved.'};
@@ -29,6 +37,19 @@ const plugin=path.resolve(__dirname,'../../source/usr/local/emhttp/plugins/zfs.s
   await page.getByRole('button',{name:'Dismiss from Needs attention',exact:true}).click();await page.waitForFunction(()=>document.getElementById('summary-attention').textContent==='0');
   await page.reload();await page.waitForFunction(()=>document.getElementById('summary-attention').textContent==='0');
   assert.equal(await page.locator('tr[data-operation="coordinator:failed"]').count(),1);assert.equal(mutations,3);assert.deepEqual(errors,[]);
+  await page.getByRole('link',{name:'Review failures'}).click();
+  await page.locator('tr[data-operation="coordinator:new"] button').click();
+  assert.equal(await page.locator('#operation-title').textContent(),'New failure');
+  await page.getByRole('button',{name:'Next failure'}).click();
+  assert.equal(await page.locator('#operation-title').textContent(),'Older failure');
+  assert(await page.locator('#next-failure').isHidden());
+  await page.getByRole('button',{name:'Close operation details'}).click();
+  assert.equal(await page.locator('[data-operation="coordinator:resolved"]').count(),0);
+  await page.selectOption('#activity-state','reviewed');
+  await page.locator('[data-operation="coordinator:resolved"] button').click();
+  assert.match(await page.locator('#operation-body').textContent(),/Resolved by recovery/);
+  assert.equal(await page.getByRole('button',{name:'Review recovery',exact:true}).count(),0);
+  assert.equal(mutations,3,'Reviewing the queue submitted work');
   console.log('PASS: Chromium dismiss/restore, attention counts, retained history/recovery and dismissal across reload');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});

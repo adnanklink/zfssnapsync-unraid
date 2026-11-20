@@ -6,51 +6,34 @@ require_once __DIR__ . '/send-queue-helpers.php';
 require_once __DIR__ . '/migrate-datasets-helpers.php';
 require_once __DIR__ . '/config-service.php';
 require_once __DIR__ . '/send-schedule.php';
-require_once __DIR__ . '/transfer-progress.php';
+require_once __DIR__ . '/workspace-operation.php';
 require_once __DIR__ . '/attention-state.php';
 
-function zfsas_workspace_summary(): array
+function zfsas_workspace_summary(bool $reviewFailures=false): array
 {
     $result = ['ok' => true, 'generatedAt' => time(), 'timezone' => ZfsasSchedule::hostTimezone()->getName(),
         'sources' => [], 'operations' => [], 'schedules' => [], 'pausedSchedules' => [], 'limited' => true];
     $terminal = ['complete', 'completed', 'failed', 'canceled', 'skipped', 'recorded'];
     try {
-        $response = zfsas_coordinator_request(['action' => 'status'], '/var/run/zfs-snapsync-coordinator/control.sock', .5);
-        if (!$response['ok']) { throw new RuntimeException('Coordinator status unavailable.'); }
-        $result['service']=zfsas_service_compatibility($response['result']['service'] ?? null);
-        $result['sources']['coordinator'] = ['available' => true];
-        foreach ($response['result']['runs'] ?? [] as $run) {
-            if (!empty($run['sourceReview']) || !empty($run['recoveryReview'])) { continue; }
-            $sourceCleanup=!empty($run['sourceCleanupOf']);
-            $kinds = $run['kinds'] ?? [];
-            $replication = in_array('send',$kinds,true) || in_array('prepare',$kinds,true) || in_array('finalize',$kinds,true);
-            if (!in_array('auto', $kinds, true) && !in_array('batch', $kinds, true) && !$replication) { continue; }
-            $auto = in_array('auto', $kinds, true) && empty($run['nativeReplication']);
-            $display = zfsas_run_progress($run, time());
-            $details = $display['messages']; $datasets = []; $resultMessages = [];
-            $progress = $display['percent']; $phase = $display['phase'];
-            foreach ($run['taskStatus'] ?? [] as $task) {
-                if (!empty($task['dataset'])) { $datasets[] = $task['dataset']; }
-                if (!empty($task['result']['message'])) { $resultMessages[] = $task['result']['message']; }
+        $before = null;
+        do {
+            $response = zfsas_coordinator_request(['action'=>'status','failureReview'=>$reviewFailures,'before'=>$before],
+                '/var/run/zfs-snapsync-coordinator/control.sock', $reviewFailures ? 2 : .5);
+            if (!$response['ok']) { throw new RuntimeException('Coordinator status unavailable.'); }
+            $page = $response['result'];
+            $result['service'] ??= zfsas_service_compatibility($page['service'] ?? null);
+            $result['sources']['coordinator'] = $reviewFailures && !array_key_exists('nextFailurePage', $page)
+                ? ['available'=>false,'message'=>'The running coordinator only provides recent failures.'] : ['available'=>true];
+            $before = $reviewFailures ? ($page['nextFailurePage'] ?? null) : null;
+            foreach ($page['failureRows'] ?? [] as $row) { $result['operations'][] = $row; }
+            foreach ($page['runs'] ?? [] as $run) {
+                $operation = zfsas_workspace_operation($run);
+                if ($operation !== null) { $result['operations'][] = $operation; }
             }
-            if (!$details) { $details = $run['state']==='failed' ? [$run['problem']['summary'] ?? 'A required step failed. Open job details for the cause.'] : $resultMessages; }
-            if ($sourceCleanup) { $c=$run['sourceCleanup'];array_unshift($details,sprintf('Source cleanup: %d deleted, %d skipped, %d protected, %d datasets deferred.',$c['deleted'],$c['skipped'],$c['protected'],$c['deferred'])); }
-            $result['operations'][] = ['id' => 'coordinator:' . $run['id'], 'nativeId' => $run['id'], 'coordinator'=>true,'manual'=>$run['manual'] ?? false,'type' => $auto ? 'auto' : ($replication ? 'replication' : 'batch'),
-                'title' => !empty($run['retirement']) ? 'Dataset retirement' : ($sourceCleanup ? 'Source cleanup' : ($auto ? 'Automatic snapshots' : ($replication ? 'Replication' : 'Snapshot batch'))), 'source' => implode(', ', array_unique($datasets)),
-                'problem'=>$run['problem'] ?? null, 'destination' => $run['problem']['destination'] ?? '', 'state' => $run['state'], 'stateLabel'=>$display['stateLabel'] ?? null, 'message' => implode(' ', array_unique($details)),
-                'sourceCleanup'=>$run['sourceCleanup'] ?? null,'sourceCleanupRunId'=>$run['sourceCleanupRunId'] ?? null,'sourceCleanupOf'=>$run['sourceCleanupOf'] ?? null,
-                'cleanup'=>$run['cleanup'] ?? null, 'createdAt' => $run['createdAt'], 'finishedAt' => $run['finishedAt'], 'progress' => in_array($run['state'], $terminal, true) ? null : $progress,
-                'phase' => in_array($run['state'], $terminal, true) ? '' : ($phase ?: (implode(', ', $run['blockedReasons'] ?? []) ?: 'Queued')),
-                'blocked' => $run['blockedReasons'] ?? [], 'retryAt' => $run['nextRetry'] ?? null,
-                'recoveryRequired' => $run['recoveryRequired'] ?? false,
-                'attentionVersion'=>hash('sha256',json_encode(array_map(static fn($task)=>[$task['id'],$task['attemptCount'] ?? 0,$task['state'],$task['result'] ?? null],$run['taskStatus'] ?? []),JSON_THROW_ON_ERROR)),
-                'scheduleId'=>$run['scheduleId'] ?? null, 'actions' => !in_array($run['state'], array_merge($terminal, ['canceling']), true) ? ['cancel'] : (!empty($run['canReviewRecovery']) ? ['review_recovery'] : (!empty($run['canRetry']) ? ['retry'] : [])),
-                'url' => ($replication ? '/Settings/ZFSSnapSync?section=replication' : '/Settings/ZFSSnapSync?section=snapshots') . ($auto ? '&tab=automation' : ''),
-                'logType' => $auto ? 'auto' : ($replication ? 'replication' : 'batch')];
-        }
+        } while ($before !== null);
     } catch (Throwable $error) { $result['sources']['coordinator'] = ['available' => false, 'message' => 'Coordinator unavailable. Its runtime status cannot currently be verified.']; }
     try {
-        $jobs = zfsas_ops_send_queue_status_payload(120, true);
+        $jobs = zfsas_ops_send_queue_status_payload($reviewFailures ? PHP_INT_MAX : 120, true, $reviewFailures);
         $result['sources']['replication'] = ['available' => true];
         foreach ($jobs['jobs'] as $job) {
             $actions = [];
@@ -107,10 +90,11 @@ function zfsas_workspace_summary(): array
         return (int) in_array($a['state'], $terminal, true) <=> (int) in_array($b['state'], $terminal, true)
             ?: ($b['createdAt'] ?? 0) <=> ($a['createdAt'] ?? 0);
     });
-    $result['operations'] = array_slice($result['operations'], 0, 120);
+    if (!$reviewFailures) { $result['operations'] = array_slice($result['operations'], 0, 120); }
+    $result['limited'] = !$reviewFailures;
     try { $dismissals=zfsas_attention_read(); }
     catch (Throwable $error) { $dismissals=[];$result['sources']['attention']=['available'=>false,'message'=>'Attention acknowledgements are unavailable; all current alerts are shown.']; }
     $result['operations']=zfsas_attention_project($result['operations'],$dismissals);
     return $result;
 }
-if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { zfsas_emit_marked_json(zfsas_workspace_summary()); }
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) { zfsas_emit_marked_json(zfsas_workspace_summary(($_GET['review'] ?? '') === 'failures')); }

@@ -20,4 +20,31 @@ $post['action']='restore_attention';check(endpoint('POST',$post)['ok']&&$find()[
 $post['action']='dismiss_attention';check(endpoint('POST',$post)['ok'],'Second dismissal failed');
 $job['LAST_ERROR']='New receiver failure';zfsas_ops_write_job_file_unlocked($path,$job);check($find()['needsAttention'],'New failure remained hidden');
 check(!endpoint('POST',$post)['ok'],'Old client dismissed new failure');
+// Retain more than one page of failures with the same timestamp, below the recent window.
+$j = new ZfsasCoordinatorState('/tmp/zfs-snapsync-coordinator');
+$now = time();
+$failures = [];
+for ($i=0; $i<125; $i++) {
+    $id = $j->submit('history-'.$i,['tasks'=>['prepare'=>['kind'=>'prepare','dataset'=>'tank/old']]],$now)['runId'];
+    $j->rejectAdmission($id.':prepare',['outcome'=>'validation_failure','message'=>'Fixture failure'],1,$now);
+    $failures[] = 'coordinator:'.$id;
+}
+unset($j);
+$daemon=proc_open([PHP_BINARY,$base.'/coordinator-daemon.php'],[1=>['file','/tmp/attention-daemon.log','a'],2=>['file','/tmp/attention-daemon.log','a']],$pipes);
+try {
+    for ($i=0; $i<100 && !file_exists('/var/run/zfs-snapsync-coordinator/control.sock'); $i++) { usleep(50000); }
+    $recent=array_column(zfsas_workspace_summary()['operations'],null,'id');
+    $queue=array_column(zfsas_workspace_summary(true)['operations'],null,'id');
+    check(!array_diff($failures,array_keys($queue)), 'Older failures lost between review pages');
+    $outside=array_values(array_diff($failures,array_keys($recent)));
+    check(count($outside)>=5, 'Recent Activity exceeded its window');
+    $old=$queue[$outside[0]];
+    $dismiss=['csrf_token'=>'fixture','operation_id'=>$old['id'],'attention_token'=>$old['attentionToken'],'action'=>'dismiss_attention','review'=>'failures'];
+    check(endpoint('POST',$dismiss)['ok'], 'Could not acknowledge older failure from the review list');
+    $rows=array_column(zfsas_workspace_summary(true)['operations'],null,'id');
+    check(!$rows[$old['id']]['needsAttention'] && $rows[$old['id']]['state']==='failed', 'Older dismissal lost historical outcome');
+} finally {
+    proc_terminate($daemon);
+    proc_close($daemon);
+}
 unlink($runner);echo "PASS: attention POST/CSRF/identity checks, duplicate dismissal, restore, unchanged recovery job and read-only coordinator status\n";

@@ -52,6 +52,16 @@ check(!array_filter($run['tasks'],fn($tid)=>in_array($j->state['tasks'][$tid]['k
 foreach($run['tasks'] as $tid){$o=startTask($j,$tid);$j->result($tid,$o,['outcome'=>'success'],1,time(),true);}
 $j->resolveReplicationRecovery($run['id']);
 check(!$j->runRequiresReview($original),'Verified interrupted transfer did not resolve its blocker');
+$oldRun = $j->state['runs'][$original] + ['recoveryRequired'=>$j->runRequiresReview($original)];
+$oldTask = $j->state['tasks'][$original.':prepare'];
+check(zfsas_failure_resolved($oldRun, [$oldTask]), 'Completed recovery left its historical failure in the review list');
+$other = $oldTask;
+unset($other['recoveryResolvedBy']);
+$other['result'] = ['message'=>'Unrelated source failure'];
+check(!zfsas_failure_resolved($oldRun, [$oldTask,$other]), 'Partial recovery hid a different failure');
+check(zfsas_operation_problem([$oldTask,$other])['summary']==='Unrelated source failure','Review selected an already resolved failure');
+check(!zfsas_failure_resolved(array_replace($oldRun,['recoveryRequired'=>true]), [$oldTask]),'Outstanding recovery hidden');
+check(!zfsas_failure_resolved($oldRun+['retirementAbandonedAt'=>time()], [$oldTask]),'Abandoned recovery shown as verified');
 check($j->state['runs'][$original]['state']==='failed','Recovery rewrote original failure history');
 check(!isset($j->state['runs'][$run['id']]['sourceCleanupPending']),'Recovery granted source cleanup');
 $changed=$job;$changed['destination']='backup/other';$changedConfig=$config;$changedConfig['send']['SEND_JOBS']=zfsas_send_render_jobs_string([$changed]);

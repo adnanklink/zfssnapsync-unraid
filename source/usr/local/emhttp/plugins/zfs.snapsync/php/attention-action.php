@@ -9,7 +9,7 @@ try {
     if (!in_array($action,['dismiss_attention','restore_attention'],true)) { throw new InvalidArgumentException('Invalid attention action.'); }
     $id=$_POST['operation_id'] ?? '';$token=$_POST['attention_token'] ?? '';
     if (!is_string($id) || !is_string($token)) { throw new InvalidArgumentException('Invalid attention request.'); }
-    $operations=zfsas_workspace_summary()['operations'];$match=null;
+    $operations=zfsas_workspace_summary(($_POST['review'] ?? '') === 'failures')['operations'];$match=null;
     foreach ($operations as $operation) { if ($operation['id']===$id) { $match=$operation;break; } }
     if (!$match || !is_string($match['attentionToken']) || !hash_equals($match['attentionToken'],$token)) {
         throw new InvalidArgumentException('The operation changed or is no longer available. Refresh and review its current status.');
