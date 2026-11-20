@@ -1,0 +1,10 @@
+{
+  "version": "2026.11.20.03",
+  "status": "experimental",
+  "hostAcceptance": "pending",
+  "releasePolicy": "Experimental main distribution with dedicated-host acceptance pending.",
+  "sourceCommit": "4033f0976e10716cd97a204f00b237558de93835",
+  "inputDigest": "0fdc1979f873191316273e2b8ec2babf18c50770a130f6d63cbf44948498f1f6",
+  "packageSha256": "fabb87e82faa58142701359e7a46896c98f5855802e037ca0d2a1034647d9e38",
+  "notes": "Reduced interface text across Overview, Activity and configuration screens. Live host acceptance and the 48-hour soak remain pending."
+}
