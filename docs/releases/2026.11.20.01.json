@@ -1,0 +1,10 @@
+{
+  "version": "2026.11.20.01",
+  "status": "experimental",
+  "hostAcceptance": "pending",
+  "releasePolicy": "Experimental main distribution with dedicated-host acceptance pending.",
+  "sourceCommit": "6cbea3e6702c5057d78f5bcf6fe905dda4d54a94",
+  "inputDigest": "45e0b2b15d4a629418bd1a79c480fec10c76ac4cc71756b3e615229da536cc18",
+  "packageSha256": "11ff328c1e52730429d82ae98d9e1f6c60b78062232e69922e5b60205fe9cf47",
+  "notes": "Resume-stream measurement and recovery UI. Live Unraid acceptance and the 48-hour soak remain pending."
+}
